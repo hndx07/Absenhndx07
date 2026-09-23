@@ -87,6 +87,36 @@ export async function checkSupabaseConnection(): Promise<{ ok: boolean; message:
   }
 }
 
+export async function signInWithEmailPassword(email: string, password: string) {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error('Supabase client belum terkonfigurasi. Silakan lengkapi URL dan Anon Key di Pengaturan Supabase.');
+  }
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function signUpWithEmailPassword(email: string, password: string) {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error('Supabase client belum terkonfigurasi. Silakan lengkapi URL dan Anon Key di Pengaturan Supabase.');
+  }
+
+  const { data, error } = await client.auth.signUp({
+    email,
+    password,
+  });
+
+  if (error) throw error;
+  return data;
+}
+
 export async function signInWithGoogleOAuth() {
   const client = getSupabaseClient();
   if (!client) {
