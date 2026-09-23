@@ -1,0 +1,6 @@
+{
+  "name": "Aplikasi Absensi & Nilai Siswa - SMK Muhammadiyah Bawang",
+  "description": "Sistem Informasi Presensi, Penilaian, Jurnal Guru & Tabungan Siswa SMK Muhammadiyah Bawang berbasis Supabase dan Browser-First",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
