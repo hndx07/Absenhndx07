@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   LogIn,
   Mail,
@@ -9,32 +9,32 @@ import {
   CheckCircle2,
   AlertCircle,
   ShieldCheck,
-  Settings,
   UserPlus,
-  ArrowRight,
   GraduationCap,
+  KeyRound,
 } from 'lucide-react';
 import {
   signInWithEmailPassword,
   signUpWithEmailPassword,
-  checkSupabaseConnection,
-  getSupabaseClient,
+  isSupabaseConfigured,
 } from '../services/supabase';
-import { TeacherProfile } from '../types';
 
 interface LoginViewProps {
-  onLoginSuccess: (profile?: Partial<TeacherProfile>) => void;
-  onOpenSettings: () => void;
+  onLoginSuccess: () => void;
+  onOpenSettings?: () => void;
 }
 
 const STORAGE_SAVED_EMAIL = 'smk_saved_login_email';
 
-export const LoginView: React.FC<LoginViewProps> = ({
-  onLoginSuccess,
-  onOpenSettings,
-}) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSettings }) => {
   const [isSignUpMode, setIsSignUpMode] = useState(false);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_SAVED_EMAIL) || '';
+    } catch {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
   const [namaLengkap, setNamaLengkap] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -43,18 +43,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const [cloudStatus, setCloudStatus] = useState<{ ok: boolean; message: string }>({
-    ok: false,
-    message: 'Memeriksa status Supabase...',
-  });
-
-  useEffect(() => {
-    checkSupabaseConnection().then((res) => setCloudStatus(res));
-    const saved = localStorage.getItem(STORAGE_SAVED_EMAIL);
-    if (saved) {
-      setEmail(saved);
-    }
-  }, []);
+  const isConfigured = isSupabaseConfigured();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,86 +60,72 @@ export const LoginView: React.FC<LoginViewProps> = ({
       return;
     }
 
+    if (!isConfigured) {
+      setErrorMessage(
+        'Supabase belum dikonfigurasi di Environment Variables (VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY). Silakan hubungkan project Supabase Anda.'
+      );
+      return;
+    }
+
     if (rememberMe) {
-      localStorage.setItem(STORAGE_SAVED_EMAIL, cleanEmail);
+      try {
+        localStorage.setItem(STORAGE_SAVED_EMAIL, cleanEmail);
+      } catch {}
     } else {
-      localStorage.removeItem(STORAGE_SAVED_EMAIL);
+      try {
+        localStorage.removeItem(STORAGE_SAVED_EMAIL);
+      } catch {}
     }
 
     setIsSubmitting(true);
 
-    const supabase = getSupabaseClient();
+    try {
+      if (isSignUpMode) {
+        const res = await signUpWithEmailPassword(cleanEmail, password, {
+          nama_guru: namaLengkap.trim() || undefined,
+        });
 
-    if (supabase) {
-      try {
-        if (isSignUpMode) {
-          const res = await signUpWithEmailPassword(cleanEmail, password);
-          if (res.user) {
-            setSuccessMessage(
-              'Pendaftaran berhasil! Mengalihkan ke sistem...'
-            );
+        if (res.user) {
+          if (res.session) {
+            setSuccessMessage('Akun guru berhasil dibuat! Masuk ke sistem...');
             setTimeout(() => {
-              onLoginSuccess({
-                email: cleanEmail,
-                namaGuru: namaLengkap.trim() || cleanEmail.split('@')[0],
-                isLoggedIn: true,
-              });
-            }, 800);
-            return;
-          }
-        } else {
-          const res = await signInWithEmailPassword(cleanEmail, password);
-          if (res.user) {
-            onLoginSuccess({
-              email: cleanEmail,
-              namaGuru:
-                res.user.user_metadata?.nama_guru ||
-                cleanEmail.split('@')[0],
-              isLoggedIn: true,
-            });
-            return;
+              onLoginSuccess();
+            }, 600);
+          } else {
+            setSuccessMessage(
+              'Pendaftaran berhasil! Jika konfirmasi email aktif di Supabase, silakan periksa kotak masuk email Anda lalu masuk.'
+            );
+            setIsSignUpMode(false);
           }
         }
-      } catch (err: any) {
-        console.warn('Supabase auth error:', err);
-        const rawMsg = err?.message || 'Gagal masuk ke Supabase.';
-        
-        // If credentials failed or network error in browser-first architecture:
-        // Offer quick fallback or show error
-        setErrorMessage(
-          `${rawMsg}. Anda dapat tetap melanjutkan masuk secara lokal (Browser-First).`
-        );
-      } finally {
-        setIsSubmitting(false);
+      } else {
+        const res = await signInWithEmailPassword(cleanEmail, password);
+        if (res.session) {
+          onLoginSuccess();
+        } else {
+          setErrorMessage('Session tidak ditemukan. Silakan coba masuk kembali.');
+        }
       }
-    } else {
-      // Browser-First offline mode without Supabase client:
-      // Validates manual email & password and logs teacher in
+    } catch (err: any) {
+      console.error('Supabase Auth error:', err);
+      const rawMsg = err?.message || 'Gagal masuk ke sistem Supabase.';
+      if (rawMsg.includes('Invalid login credentials')) {
+        setErrorMessage('Alamat email atau kata sandi tidak cocok. Silakan periksa kembali.');
+      } else if (rawMsg.includes('Email not confirmed')) {
+        setErrorMessage('Email Anda belum dikonfirmasi di Supabase. Silakan cek inbox/spam.');
+      } else if (rawMsg.includes('User already registered')) {
+        setErrorMessage('Email ini sudah terdaftar. Silakan pilih mode Masuk Akun Guru.');
+      } else {
+        setErrorMessage(rawMsg);
+      }
+    } finally {
       setIsSubmitting(false);
-      onLoginSuccess({
-        email: cleanEmail,
-        namaGuru: namaLengkap.trim() || cleanEmail.split('@')[0],
-        isLoggedIn: true,
-      });
     }
-  };
-
-  const handleContinueOffline = () => {
-    const cleanEmail = email.trim() || 'guru@smkmuhbawang.sch.id';
-    onLoginSuccess({
-      email: cleanEmail,
-      namaGuru: namaLengkap.trim() || 'Hendra Setiawan, S.Kom',
-      nip: '19880512 201502 1 003',
-      nbm: '1182940',
-      namaSekolah: 'SMK Muhammadiyah Bawang',
-      mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
-      isLoggedIn: true,
-    });
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 flex flex-col justify-between p-4 sm:p-6 text-slate-100 selection:bg-indigo-500 selection:text-white">
-      {/* Top Navbar Minimal (No school logo) */}
+      {/* Top Navbar Minimal */}
       <div className="max-w-5xl w-full mx-auto flex items-center justify-between py-2">
         <div className="flex items-center gap-2.5">
           <div className="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
@@ -166,19 +141,21 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={onOpenSettings}
-          className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-indigo-200 transition flex items-center gap-1.5 border border-white/10"
-        >
-          <Settings className="w-3.5 h-3.5" />
-          Konfigurasi Supabase
-        </button>
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-indigo-200 transition flex items-center gap-1.5 border border-white/10"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            Info Setup Supabase
+          </button>
+        )}
       </div>
 
       {/* Center Auth Card */}
       <div className="max-w-md w-full mx-auto my-auto py-6">
         <div className="bg-white text-slate-900 rounded-3xl p-7 sm:p-8 shadow-2xl border border-slate-100 space-y-6">
-          {/* Header without school logo */}
+          {/* Header */}
           <div className="text-center space-y-2">
             <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto shadow-xs">
               <Lock className="w-6 h-6" />
@@ -188,7 +165,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 {isSignUpMode ? 'Daftar Akun Guru' : 'Masuk Akun Guru'}
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Silakan masukkan email dan kata sandi Anda untuk mengakses sistem
+                Autentikasi resmi berbasis Cloud Supabase (PostgreSQL & Auth)
               </p>
             </div>
           </div>
@@ -196,24 +173,26 @@ export const LoginView: React.FC<LoginViewProps> = ({
           {/* Cloud Supabase Status Pill */}
           <div
             className={`p-3 rounded-2xl border text-xs flex items-center gap-2.5 transition ${
-              cloudStatus.ok
+              isConfigured
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                : 'bg-indigo-50 border-indigo-200 text-indigo-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
             }`}
           >
-            {cloudStatus.ok ? (
+            {isConfigured ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             ) : (
-              <Cloud className="w-4 h-4 text-indigo-600 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             )}
             <div className="truncate">
               <span className="font-bold block">
-                {cloudStatus.ok
-                  ? 'Tersambung ke Cloud Supabase'
-                  : 'Mode Browser-First Aktif'}
+                {isConfigured
+                  ? 'Supabase Backend Terhubung'
+                  : 'Konfigurasi Environment Diperlukan'}
               </span>
               <span className="text-[10px] text-slate-500 block truncate">
-                {cloudStatus.message}
+                {isConfigured
+                  ? 'Kredensial VITE_SUPABASE_URL & ANON KEY aktif'
+                  : 'Atur VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY di .env'}
               </span>
             </div>
           </div>
@@ -222,15 +201,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
           {errorMessage && (
             <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <p className="font-medium leading-relaxed">{errorMessage}</p>
-                <button
-                  type="button"
-                  onClick={handleContinueOffline}
-                  className="font-bold underline hover:text-rose-950 block text-[11px]"
-                >
-                  &rarr; Klik di sini untuk tetap masuk dalam Mode Browser-First
-                </button>
               </div>
             </div>
           )}
@@ -247,7 +219,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
             {isSignUpMode && (
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1.5">
-                  Nama Lengkap & Gelar
+                  Nama Lengkap Guru & Gelar
                 </label>
                 <input
                   type="text"
@@ -269,7 +241,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 <input
                   type="email"
                   required
-                  placeholder="nama@smkmuhbawang.sch.id"
+                  placeholder="nama@guru.smkmuhbawang.sch.id"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-800"
@@ -286,7 +258,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
-                  placeholder="Masukkan kata sandi..."
+                  placeholder="Masukkan kata sandi (min. 6 karakter)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-800"
@@ -305,7 +277,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
             </div>
 
-            {/* Remember Me */}
+            {/* Remember Me & Toggle Mode */}
             <div className="flex items-center justify-between text-xs pt-1">
               <label className="flex items-center gap-2 cursor-pointer text-slate-600 select-none">
                 <input
@@ -314,7 +286,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                <span>Ingat Email Saya</span>
+                <span>Ingat Email</span>
               </label>
 
               <button
@@ -333,15 +305,15 @@ export const LoginView: React.FC<LoginViewProps> = ({
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !isConfigured}
               className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-2xl font-bold text-xs transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 disabled:opacity-60"
             >
               {isSubmitting ? (
-                <span>Memproses...</span>
+                <span>Memproses ke Supabase...</span>
               ) : isSignUpMode ? (
                 <>
                   <UserPlus className="w-4 h-4" />
-                  <span>Daftar & Masuk ke Sistem</span>
+                  <span>Daftar Akun Guru</span>
                 </>
               ) : (
                 <>
@@ -352,20 +324,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </button>
           </form>
 
-          {/* Quick Demo Offline Login */}
-          <div className="pt-2 border-t border-slate-100 text-center space-y-2.5">
-            <button
-              type="button"
-              onClick={handleContinueOffline}
-              className="w-full py-2.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200 flex items-center justify-center gap-1.5"
-            >
-              <span>Masuk Mode Guru Cepat (Tanpa Sandi)</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-
+          <div className="pt-2 border-t border-slate-100 text-center space-y-2">
             <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-              Data tersimpan di perangkat lokal & dapat disinkronkan ke Supabase.
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              Keamanan dilindungi Row Level Security (RLS) PostgreSQL Supabase
             </p>
           </div>
         </div>

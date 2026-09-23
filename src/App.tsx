@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   CalendarCheck,
   Award,
@@ -15,10 +15,43 @@ import {
   Settings,
   ChevronDown,
   GraduationCap,
-  Bell,
+  AlertCircle,
   LogOut,
-  ExternalLink,
 } from 'lucide-react';
+
+// Supabase Services
+import {
+  getAuthSession,
+  getSafeSupabaseClient,
+  signOutSupabase,
+  checkSupabaseConnection,
+} from './services/supabase';
+import {
+  getTeacherProfile,
+  createOrUpdateTeacherProfile,
+  getClasses,
+  createClass,
+  updateClass,
+  deleteClass,
+  getStudents,
+  createStudent,
+  updateStudent,
+  deleteStudent,
+  batchInsertStudents,
+  getAttendanceSessions,
+  saveAttendanceSession,
+  deleteAttendanceSession,
+  getStudentGrades,
+  saveStudentGrade,
+  getGradeColumns,
+  saveGradeColumns,
+  getTeachingAgendas,
+  saveTeachingAgenda,
+  deleteTeachingAgenda,
+  getSavingTransactions,
+  saveSavingTransaction,
+  deleteSavingTransaction,
+} from './services/data';
 
 // Types
 import {
@@ -31,28 +64,7 @@ import {
   TeachingAgenda,
   SavingTransaction,
 } from './types';
-
-// Utils & Storage
-import {
-  getStoredTeacher,
-  saveStoredTeacher,
-  getStoredClasses,
-  saveStoredClasses,
-  getStoredStudents,
-  saveStoredStudents,
-  getStoredAttendance,
-  saveStoredAttendance,
-  getStoredGrades,
-  saveStoredGrades,
-  getStoredGradeColumns,
-  saveStoredGradeColumns,
-  getStoredAgendas,
-  saveStoredAgendas,
-  getStoredSavings,
-  saveStoredSavings,
-  syncAllToSupabase,
-} from './utils/storage';
-import { checkSupabaseConnection } from './services/supabase';
+import { exportDataToJsonBackup } from './utils/storage';
 
 // Components
 import { SchoolLogo } from './components/SchoolLogo';
@@ -85,7 +97,7 @@ type NavTab =
   | 'school_map';
 
 export default function App() {
-  // 1. Check for Public Share parameters in URL
+  // 1. Check for Public Share parameters in URL (accessible without auth)
   const [publicShare, setPublicShare] = useState<{
     type: 'absen' | 'nilai' | 'tabungan';
     shareId: string;
@@ -104,66 +116,325 @@ export default function App() {
     return null;
   });
 
-  // State
-  const [teacher, setTeacher] = useState<TeacherProfile>(getStoredTeacher());
-  const [classes, setClasses] = useState<ClassRoom[]>(getStoredClasses());
-  const [students, setStudents] = useState<Student[]>(getStoredStudents());
-  const [attendance, setAttendance] = useState<AttendanceSession[]>(getStoredAttendance());
-  const [grades, setGrades] = useState<StudentGrade[]>(getStoredGrades());
-  const [gradeColumns, setGradeColumns] = useState<GradeColumn[]>(getStoredGradeColumns());
-  const [agendas, setAgendas] = useState<TeachingAgenda[]>(getStoredAgendas());
-  const [savings, setSavings] = useState<SavingTransaction[]>(getStoredSavings());
+  // 2. Auth Session State (Source of Truth)
+  const [session, setSession] = useState<any>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
+  // 3. Database State from Supabase
+  const [teacher, setTeacher] = useState<TeacherProfile | null>(null);
+  const [classes, setClasses] = useState<ClassRoom[]>([]);
+  const [activeClassId, setActiveClassId] = useState<string>('');
+  const [students, setStudents] = useState<Student[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceSession[]>([]);
+  const [grades, setGrades] = useState<StudentGrade[]>([]);
+  const [gradeColumns, setGradeColumns] = useState<GradeColumn[]>([]);
+  const [agendas, setAgendas] = useState<TeachingAgenda[]>([]);
+  const [savings, setSavings] = useState<SavingTransaction[]>([]);
+
+  // 4. UI States
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<NavTab>('attendance');
   const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [cloudStatus, setCloudStatus] = useState<{ ok: boolean; message: string }>({
-    ok: false,
-    message: '',
-  });
 
-  // Active Class
-  const activeClass =
-    classes.find((c) => c.id === teacher.activeClassId) || classes[0] || {
-      id: 'default_cls',
-      namaKelas: 'X TKJ 1',
-      mataPelajaran: 'Dasar Kejuruan TKJ',
-      kkm: 75,
-      jurusan: 'Teknik Komputer & Jaringan',
-      createdAt: '2026-01-01',
-    };
+  // Load all user data from Supabase
+  const loadUserData = useCallback(async (targetClassId?: string) => {
+    setIsLoadingData(true);
+    setDataError(null);
 
-  // Recheck Supabase connection on mount
-  useEffect(() => {
-    checkSupabaseConnection().then(setCloudStatus);
+    try {
+      // 1. Fetch / initialize teacher profile
+      let profile = await getTeacherProfile();
+      if (!profile) {
+        profile = await createOrUpdateTeacherProfile({
+          namaGuru: 'Guru SMK Muhammadiyah Bawang',
+          namaSekolah: 'SMK Muhammadiyah Bawang',
+          mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
+          tahunAjaran: '2025/2026',
+          semester: 'Genap',
+        });
+      }
+      setTeacher(profile);
+
+      // 2. Fetch classes
+      const loadedClasses = await getClasses();
+      setClasses(loadedClasses);
+
+      // Determine active class
+      let currentClassId = targetClassId || profile.activeClassId || '';
+      if (!currentClassId && loadedClasses.length > 0) {
+        currentClassId = loadedClasses[0].id;
+      }
+      setActiveClassId(currentClassId);
+
+      // 3. Fetch related records
+      if (currentClassId) {
+        const [
+          loadedStudents,
+          loadedAttendance,
+          loadedGrades,
+          loadedGradeCols,
+          loadedAgendas,
+          loadedSavings,
+        ] = await Promise.all([
+          getStudents(currentClassId),
+          getAttendanceSessions(currentClassId),
+          getStudentGrades(currentClassId),
+          getGradeColumns(currentClassId),
+          getTeachingAgendas(currentClassId),
+          getSavingTransactions(currentClassId),
+        ]);
+
+        setStudents(loadedStudents);
+        setAttendance(loadedAttendance);
+        setGrades(loadedGrades);
+        setGradeColumns(loadedGradeCols);
+        setAgendas(loadedAgendas);
+        setSavings(loadedSavings);
+      } else {
+        setStudents([]);
+        setAttendance([]);
+        setGrades([]);
+        setGradeColumns([]);
+        setAgendas([]);
+        setSavings([]);
+      }
+    } catch (err: any) {
+      console.error('Error loading data from Supabase:', err);
+      setDataError(
+        err?.message ||
+          'Tidak dapat terhubung ke server PostgreSQL Supabase. Periksa koneksi internet Anda.'
+      );
+    } finally {
+      setIsLoadingData(false);
+    }
   }, []);
 
-  const refreshAllData = () => {
-    setTeacher(getStoredTeacher());
-    setClasses(getStoredClasses());
-    setStudents(getStoredStudents());
-    setAttendance(getStoredAttendance());
-    setGrades(getStoredGrades());
-    setGradeColumns(getStoredGradeColumns());
-    setAgendas(getStoredAgendas());
-    setSavings(getStoredSavings());
+  // Check auth session on startup & subscribe to auth changes
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initAuth() {
+      try {
+        const currentSession = await getAuthSession();
+        if (isMounted) {
+          setSession(currentSession);
+          setIsAuthChecking(false);
+          if (currentSession) {
+            loadUserData();
+          }
+        }
+      } catch (err) {
+        console.error('Session check error:', err);
+        if (isMounted) {
+          setIsAuthChecking(false);
+        }
+      }
+    }
+
+    initAuth();
+
+    // Supabase Auth State Change Listener
+    const supabase = getSafeSupabaseClient();
+    if (supabase) {
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+        if (!isMounted) return;
+
+        setSession(newSession);
+        setIsAuthChecking(false);
+
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+          if (newSession) {
+            loadUserData();
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setTeacher(null);
+          setClasses([]);
+          setStudents([]);
+          setAttendance([]);
+          setGrades([]);
+          setAgendas([]);
+          setSavings([]);
+        }
+      });
+
+      return () => {
+        isMounted = false;
+        subscription.unsubscribe();
+      };
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadUserData]);
+
+  // Handle active class change
+  const handleSelectClass = async (clsId: string) => {
+    setActiveClassId(clsId);
+    if (teacher) {
+      const updated = { ...teacher, activeClassId: clsId };
+      setTeacher(updated);
+      createOrUpdateTeacherProfile({ activeClassId: clsId }).catch(console.error);
+    }
+
+    setIsLoadingData(true);
+    try {
+      const [
+        loadedStudents,
+        loadedAttendance,
+        loadedGrades,
+        loadedGradeCols,
+        loadedAgendas,
+        loadedSavings,
+      ] = await Promise.all([
+        getStudents(clsId),
+        getAttendanceSessions(clsId),
+        getStudentGrades(clsId),
+        getGradeColumns(clsId),
+        getTeachingAgendas(clsId),
+        getSavingTransactions(clsId),
+      ]);
+
+      setStudents(loadedStudents);
+      setAttendance(loadedAttendance);
+      setGrades(loadedGrades);
+      setGradeColumns(loadedGradeCols);
+      setAgendas(loadedAgendas);
+      setSavings(loadedSavings);
+    } catch (e: any) {
+      console.error('Error switching class data:', e);
+    } finally {
+      setIsLoadingData(false);
+    }
   };
 
-  // Switch Active Class
-  const handleSelectClass = (classId: string) => {
-    const updated = { ...teacher, activeClassId: classId };
-    setTeacher(updated);
-    saveStoredTeacher(updated);
+  // 1. Classes Handlers
+  const handleSaveClass = async (cls: ClassRoom) => {
+    const exists = classes.some((c) => c.id === cls.id);
+    if (exists) {
+      const updated = await updateClass(cls);
+      setClasses((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    } else {
+      const created = await createClass(cls);
+      setClasses((prev) => [...prev, created]);
+      if (!activeClassId) {
+        handleSelectClass(created.id);
+      }
+    }
   };
 
-  // Quick Cloud Sync
-  const handleQuickSync = async () => {
-    setIsSyncing(true);
-    const res = await syncAllToSupabase();
-    setIsSyncing(false);
-    alert(res.message);
+  const handleDeleteClass = async (clsId: string) => {
+    await deleteClass(clsId);
+    const updated = classes.filter((c) => c.id !== clsId);
+    setClasses(updated);
+    if (activeClassId === clsId) {
+      if (updated.length > 0) {
+        handleSelectClass(updated[0].id);
+      } else {
+        setActiveClassId('');
+        setStudents([]);
+        setAttendance([]);
+        setGrades([]);
+      }
+    }
+  };
+
+  // 2. Students Handlers
+  const handleSaveStudent = async (std: Student) => {
+    const exists = students.some((s) => s.id === std.id);
+    if (exists) {
+      const updated = await updateStudent(std);
+      setStudents((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    } else {
+      const created = await createStudent(std);
+      setStudents((prev) => [...prev, created]);
+    }
+  };
+
+  const handleDeleteStudent = async (stdId: string) => {
+    await deleteStudent(stdId);
+    setStudents((prev) => prev.filter((s) => s.id !== stdId));
+  };
+
+  const handleBatchAddStudents = async (newStds: Student[]) => {
+    await batchInsertStudents(newStds);
+    if (activeClassId) {
+      const fresh = await getStudents(activeClassId);
+      setStudents(fresh);
+    }
+  };
+
+  // 3. Attendance Handlers
+  const handleSaveAttendance = async (sessionData: AttendanceSession) => {
+    const saved = await saveAttendanceSession(sessionData);
+    setAttendance((prev) => [saved, ...prev.filter((s) => s.id !== saved.id)]);
+  };
+
+  const handleDeleteAttendance = async (sessionId: string) => {
+    await deleteAttendanceSession(sessionId);
+    setAttendance((prev) => prev.filter((s) => s.id !== sessionId));
+  };
+
+  // 4. Grades Handlers
+  const handleSaveGrade = async (gradeData: StudentGrade) => {
+    const saved = await saveStudentGrade(gradeData);
+    setGrades((prev) => [saved, ...prev.filter((g) => g.id !== saved.id)]);
+  };
+
+  const handleSaveGradeCols = async (cols: GradeColumn[]) => {
+    if (!activeClassId) return;
+    await saveGradeColumns(cols, activeClassId);
+    setGradeColumns(cols);
+  };
+
+  // 5. Teaching Agenda Handlers
+  const handleSaveAgenda = async (agendaData: TeachingAgenda) => {
+    const saved = await saveTeachingAgenda(agendaData);
+    setAgendas((prev) => [saved, ...prev.filter((a) => a.id !== saved.id)]);
+  };
+
+  const handleDeleteAgenda = async (agendaId: string) => {
+    await deleteTeachingAgenda(agendaId);
+    setAgendas((prev) => prev.filter((a) => a.id !== agendaId));
+  };
+
+  // 6. Savings Handlers
+  const handleSaveSaving = async (txData: SavingTransaction) => {
+    const saved = await saveSavingTransaction(txData);
+    setSavings((prev) => [saved, ...prev.filter((s) => s.id !== saved.id)]);
+  };
+
+  const handleDeleteSaving = async (txId: string) => {
+    await deleteSavingTransaction(txId);
+    setSavings((prev) => prev.filter((s) => s.id !== txId));
+  };
+
+  // Download JSON backup
+  const handleDownloadBackup = () => {
+    const jsonStr = exportDataToJsonBackup({
+      teacher,
+      classes,
+      students,
+      attendance,
+      grades,
+      gradeColumns,
+      agendas,
+      savings,
+    });
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Backup_SMK_Muh_Bawang_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Public Share Zero-Login Route
@@ -173,7 +444,6 @@ export default function App() {
         type={publicShare.type}
         shareId={publicShare.shareId}
         onBackToApp={() => {
-          // Clear query params
           window.history.replaceState({}, '', window.location.pathname);
           setPublicShare(null);
         }}
@@ -181,32 +451,60 @@ export default function App() {
     );
   }
 
-  // Login Screen if not logged in
-  if (!teacher.isLoggedIn) {
+  // Loading Session on startup
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
+        <div className="flex flex-col items-center gap-4 animate-in fade-in">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center">
+            <RefreshCw className="w-6 h-6 text-indigo-300 animate-spin" />
+          </div>
+          <p className="text-sm font-semibold tracking-wide text-slate-300">
+            Memeriksa sesi Supabase Auth...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not Logged In -> Login Screen (Supabase Auth Only)
+  if (!session) {
     return (
       <>
         <LoginView
-          onLoginSuccess={(newProfile) => {
-            const updated = {
-              ...teacher,
-              ...newProfile,
-              isLoggedIn: true,
-            };
-            setTeacher(updated);
-            saveStoredTeacher(updated);
-          }}
+          onLoginSuccess={() => loadUserData()}
           onOpenSettings={() => setIsCloudModalOpen(true)}
         />
         <CloudSupabaseModal
           isOpen={isCloudModalOpen}
-          onClose={() => {
-            setIsCloudModalOpen(false);
-            checkSupabaseConnection().then(setCloudStatus);
-          }}
+          onClose={() => setIsCloudModalOpen(false)}
         />
       </>
     );
   }
+
+  // Active Class Entity
+  const activeClass: ClassRoom = classes.find((c) => c.id === activeClassId) || {
+    id: activeClassId || 'empty_cls',
+    namaKelas: classes.length > 0 ? classes[0].namaKelas : 'Belum Ada Kelas',
+    mataPelajaran: classes.length > 0 ? classes[0].mataPelajaran : 'Silakan Buat Kelas',
+    kkm: 75,
+    jurusan: 'TKJ',
+    createdAt: new Date().toISOString(),
+  };
+
+  const activeTeacher: TeacherProfile = teacher || {
+    id: session.user.id,
+    namaGuru: session.user.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
+    nip: '',
+    nbm: '',
+    namaSekolah: 'SMK Muhammadiyah Bawang',
+    mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
+    tahunAjaran: '2025/2026',
+    semester: 'Genap',
+    email: session.user.email,
+    isLoggedIn: true,
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-indigo-500 selection:text-white">
@@ -214,7 +512,7 @@ export default function App() {
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
-            {/* School Emblem & Brand */}
+            {/* Brand */}
             <div className="flex items-center gap-3 shrink-0">
               <SchoolLogo size={44} />
               <div className="hidden md:flex flex-col">
@@ -227,85 +525,65 @@ export default function App() {
                   </span>
                 </div>
                 <span className="text-xs text-indigo-600 font-medium">
-                  Sistem Presensi, Penilaian & Jurnal Guru
+                  Sistem Presensi, Penilaian & Jurnal Guru (Supabase Cloud)
                 </span>
               </div>
             </div>
 
-            {/* Middle: Active Class Switcher */}
+            {/* Active Class Switcher */}
             <div className="flex items-center gap-2">
-              <div className="relative">
-                <button
-                  onClick={() => setIsClassModalOpen(true)}
-                  className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-950 text-xs sm:text-sm font-bold transition border border-indigo-200/60 shadow-xs"
-                >
-                  <GraduationCap className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <span className="truncate max-w-[130px] sm:max-w-none">
-                    Kelas: {activeClass.namaKelas}
-                  </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-indigo-400" />
-                </button>
-              </div>
+              <button
+                onClick={() => setIsClassModalOpen(true)}
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-950 text-xs sm:text-sm font-bold transition border border-indigo-200/60 shadow-xs"
+              >
+                <GraduationCap className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span className="truncate max-w-[130px] sm:max-w-none">
+                  Kelas: {activeClass.namaKelas}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-indigo-400" />
+              </button>
             </div>
 
-            {/* Right: Supabase Status & User Menu */}
+            {/* Cloud Status Pill & Teacher Profile */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Cloud Status Pill & Sync Button */}
               <button
-                onClick={handleQuickSync}
-                disabled={isSyncing}
-                className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
-                  cloudStatus.ok
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                    : 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100'
-                }`}
-                title="Klik untuk menyinkronkan data ke Supabase"
+                onClick={() => setIsCloudModalOpen(true)}
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition"
+                title="Tersambung ke Cloud PostgreSQL Supabase"
               >
-                {isSyncing ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-                ) : (
-                  <Cloud className="w-3.5 h-3.5 text-emerald-600" />
-                )}
-                <span>
-                  {isSyncing
-                    ? 'Menyinkronkan...'
-                    : cloudStatus.ok
-                    ? 'Tersambung ke Supabase'
-                    : 'Mode Browser-First'}
-                </span>
+                <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Cloud PostgreSQL</span>
               </button>
 
-              {/* Supabase Settings Modal Trigger */}
               <button
                 onClick={() => setIsCloudModalOpen(true)}
                 className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-slate-100 transition"
-                title="Pengaturan Supabase & SQL Schema"
+                title="Status Supabase"
               >
                 <Settings className="w-5 h-5" />
               </button>
 
-              {/* Teacher Profile Avatar */}
               <button
                 onClick={() => setIsProfileModalOpen(true)}
                 className="flex items-center gap-2 pl-2 pr-1 py-1 rounded-2xl hover:bg-slate-100 transition border border-slate-200"
               >
                 <div className="text-right hidden lg:block">
                   <span className="text-xs font-bold text-slate-800 block leading-tight">
-                    {teacher.namaGuru}
+                    {activeTeacher.namaGuru}
                   </span>
                   <span className="text-[10px] text-slate-400 font-mono">
-                    {teacher.nbm ? `NBM. ${teacher.nbm}` : teacher.nip}
+                    {activeTeacher.email}
                   </span>
                 </div>
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                  {teacher.namaGuru.charAt(0)}
+                  {activeTeacher.namaGuru.charAt(0)}
                 </div>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Secondary Subnavigation Bar (Scrollable Tabs) */}
+        {/* Secondary Subnavigation Bar */}
         <div className="border-t border-slate-200/80 bg-slate-50/70">
           <div className="max-w-7xl mx-auto px-4 sm:px-6">
             <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-2 scrollbar-none text-xs font-semibold">
@@ -435,132 +713,138 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
-        {activeTab === 'attendance' && (
-          <AttendanceView
-            currentClass={activeClass}
-            students={students}
-            sessions={attendance}
-            teacher={teacher}
-            onSaveSession={(sess) => {
-              const updated = [sess, ...attendance.filter((s) => s.id !== sess.id)];
-              setAttendance(updated);
-              saveStoredAttendance(updated);
-            }}
-            onDeleteSession={(sessionId) => {
-              const updated = attendance.filter((s) => s.id !== sessionId);
-              setAttendance(updated);
-              saveStoredAttendance(updated);
-            }}
-          />
+        {/* Error state if Supabase connection fails */}
+        {dataError && (
+          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+              <div>
+                <p className="font-bold">Gagal memuat data dari Supabase</p>
+                <p className="text-slate-600">{dataError}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => loadUserData(activeClassId)}
+              className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition flex items-center gap-1.5 shrink-0"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Coba Lagi
+            </button>
+          </div>
         )}
 
-        {activeTab === 'grades' && (
-          <GradesView
-            currentClass={activeClass}
-            students={students}
-            grades={grades}
-            gradeColumns={gradeColumns}
-            teacher={teacher}
-            onSaveGrade={(g) => {
-              const updated = [g, ...grades.filter((item) => item.id !== g.id)];
-              setGrades(updated);
-              saveStoredGrades(updated);
-            }}
-            onSaveGradeColumns={(cols) => {
-              setGradeColumns(cols);
-              saveStoredGradeColumns(cols);
-            }}
-          />
+        {/* Loading Spinner for data fetching */}
+        {isLoadingData && (
+          <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
+            <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
+            <span className="text-xs font-semibold">Mengambil data dari PostgreSQL Supabase...</span>
+          </div>
         )}
 
-        {activeTab === 'students' && (
-          <StudentManagementView
-            currentClass={activeClass}
-            students={students}
-            onSaveStudent={(std) => {
-              const updated = [std, ...students.filter((s) => s.id !== std.id)];
-              setStudents(updated);
-              saveStoredStudents(updated);
-            }}
-            onDeleteStudent={(stdId) => {
-              const updated = students.filter((s) => s.id !== stdId);
-              setStudents(updated);
-              saveStoredStudents(updated);
-            }}
-            onBatchAddStudents={(newStds) => {
-              const updated = [...students, ...newStds];
-              setStudents(updated);
-              saveStoredStudents(updated);
-            }}
-          />
-        )}
+        {!isLoadingData && (
+          <>
+            {classes.length === 0 && (
+              <div className="mb-6 p-6 rounded-3xl bg-indigo-50 border border-indigo-200 text-indigo-950 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-base">Selamat Datang di Sistem Absensi & Nilai!</h3>
+                  <p className="text-xs text-indigo-700 mt-1">
+                    Anda belum memiliki kelas yang terdaftar di akun ini. Silakan buat kelas pertama Anda untuk mulai mengelola presensi dan nilai siswa.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsClassModalOpen(true)}
+                  className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition shrink-0 shadow-md"
+                >
+                  + Tambah Kelas Pertama
+                </button>
+              </div>
+            )}
 
-        {activeTab === 'agendas' && (
-          <TeachingAgendaView
-            currentClass={activeClass}
-            agendas={agendas}
-            teacher={teacher}
-            onSaveAgenda={(ag) => {
-              const updated = [ag, ...agendas.filter((item) => item.id !== ag.id)];
-              setAgendas(updated);
-              saveStoredAgendas(updated);
-            }}
-            onDeleteAgenda={(agId) => {
-              const updated = agendas.filter((item) => item.id !== agId);
-              setAgendas(updated);
-              saveStoredAgendas(updated);
-            }}
-          />
-        )}
+            {activeTab === 'attendance' && (
+              <AttendanceView
+                currentClass={activeClass}
+                students={students}
+                sessions={attendance}
+                teacher={activeTeacher}
+                onSaveSession={handleSaveAttendance}
+                onDeleteSession={handleDeleteAttendance}
+              />
+            )}
 
-        {activeTab === 'savings' && (
-          <SavingsView
-            currentClass={activeClass}
-            students={students}
-            savings={savings}
-            teacher={teacher}
-            onSaveTransaction={(tx) => {
-              const updated = [tx, ...savings.filter((s) => s.id !== tx.id)];
-              setSavings(updated);
-              saveStoredSavings(updated);
-            }}
-            onDeleteTransaction={(txId) => {
-              const updated = savings.filter((s) => s.id !== txId);
-              setSavings(updated);
-              saveStoredSavings(updated);
-            }}
-          />
-        )}
+            {activeTab === 'grades' && (
+              <GradesView
+                currentClass={activeClass}
+                students={students}
+                grades={grades}
+                gradeColumns={gradeColumns}
+                teacher={activeTeacher}
+                onSaveGrade={handleSaveGrade}
+                onSaveGradeColumns={handleSaveGradeCols}
+              />
+            )}
 
-        {activeTab === 'statistics' && (
-          <StatisticsView
-            currentClass={activeClass}
-            students={students}
-            sessions={attendance}
-            grades={grades}
-            teacher={teacher}
-          />
-        )}
+            {activeTab === 'students' && (
+              <StudentManagementView
+                currentClass={activeClass}
+                students={students}
+                onSaveStudent={handleSaveStudent}
+                onDeleteStudent={handleDeleteStudent}
+                onBatchAddStudents={handleBatchAddStudents}
+              />
+            )}
 
-        {activeTab === 'modul_ajar' && (
-          <ModulAjarGeneratorView currentClass={activeClass} teacher={teacher} />
-        )}
+            {activeTab === 'agendas' && (
+              <TeachingAgendaView
+                currentClass={activeClass}
+                agendas={agendas}
+                teacher={activeTeacher}
+                onSaveAgenda={handleSaveAgenda}
+                onDeleteAgenda={handleDeleteAgenda}
+              />
+            )}
 
-        {activeTab === 'kisi_kisi' && (
-          <KisiKisiView currentClass={activeClass} teacher={teacher} />
-        )}
+            {activeTab === 'savings' && (
+              <SavingsView
+                currentClass={activeClass}
+                students={students}
+                savings={savings}
+                teacher={activeTeacher}
+                onSaveTransaction={handleSaveSaving}
+                onDeleteTransaction={handleDeleteSaving}
+              />
+            )}
 
-        {activeTab === 'parent_report' && (
-          <ParentReportView
-            currentClass={activeClass}
-            students={students}
-            sessions={attendance}
-            grades={grades}
-            teacher={teacher}
-          />
-        )}
+            {activeTab === 'statistics' && (
+              <StatisticsView
+                currentClass={activeClass}
+                students={students}
+                sessions={attendance}
+                grades={grades}
+                teacher={activeTeacher}
+              />
+            )}
 
-        {activeTab === 'school_map' && <SchoolMapView />}
+            {activeTab === 'modul_ajar' && (
+              <ModulAjarGeneratorView currentClass={activeClass} teacher={activeTeacher} />
+            )}
+
+            {activeTab === 'kisi_kisi' && (
+              <KisiKisiView currentClass={activeClass} teacher={activeTeacher} />
+            )}
+
+            {activeTab === 'parent_report' && (
+              <ParentReportView
+                currentClass={activeClass}
+                students={students}
+                sessions={attendance}
+                grades={grades}
+                teacher={activeTeacher}
+              />
+            )}
+
+            {activeTab === 'school_map' && <SchoolMapView />}
+          </>
+        )}
       </main>
 
       {/* Footer */}
@@ -570,7 +854,7 @@ export default function App() {
             Aplikasi Presensi & Nilai Siswa &bull; SMK Muhammadiyah Bawang, Batang, Jawa Tengah
           </p>
           <p className="text-[11px] text-slate-400">
-            Didukung arsitektur Browser-First + Supabase Cloud (PostgreSQL, Realtime, Google OAuth). Tahun Ajaran 2025/2026.
+            Didukung Backend 100% PostgreSQL & Auth Supabase dengan Row Level Security. Tahun Ajaran 2025/2026.
           </p>
         </div>
       </footer>
@@ -582,42 +866,27 @@ export default function App() {
         classes={classes}
         activeClassId={activeClass.id}
         onSelectClass={handleSelectClass}
-        onSaveClass={(cls) => {
-          const updated = [cls, ...classes.filter((c) => c.id !== cls.id)];
-          setClasses(updated);
-          saveStoredClasses(updated);
-          handleSelectClass(cls.id);
-        }}
-        onDeleteClass={(clsId) => {
-          const updated = classes.filter((c) => c.id !== clsId);
-          setClasses(updated);
-          saveStoredClasses(updated);
-          if (teacher.activeClassId === clsId && updated[0]) {
-            handleSelectClass(updated[0].id);
-          }
-        }}
+        onSaveClass={handleSaveClass}
+        onDeleteClass={handleDeleteClass}
       />
 
       <CloudSupabaseModal
         isOpen={isCloudModalOpen}
-        onClose={() => {
-          setIsCloudModalOpen(false);
-          checkSupabaseConnection().then(setCloudStatus);
-        }}
-        onSyncComplete={refreshAllData}
+        onClose={() => setIsCloudModalOpen(false)}
+        onSyncComplete={() => loadUserData(activeClassId)}
       />
 
       <TeacherProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
-        teacher={teacher}
+        teacher={activeTeacher}
         onUpdateTeacher={(upd) => setTeacher(upd)}
         onLogout={() => {
-          const loggedOut = { ...teacher, isLoggedIn: false };
-          setTeacher(loggedOut);
-          saveStoredTeacher(loggedOut);
+          signOutSupabase();
+          setSession(null);
         }}
-        onDataRestored={refreshAllData}
+        onDataMigrated={() => loadUserData(activeClassId)}
+        onDownloadBackup={handleDownloadBackup}
       />
     </div>
   );

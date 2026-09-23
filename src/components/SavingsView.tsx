@@ -16,8 +16,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { SavingTransaction, Student, ClassRoom, TeacherProfile, PublicShareRecord } from '../types';
-import { saveStoredPublicShare } from '../utils/storage';
-import { getSupabaseClient } from '../services/supabase';
+import { createOrUpdatePublicShare } from '../services/data';
 
 interface SavingsViewProps {
   currentClass: ClassRoom;
@@ -138,22 +137,11 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
         school: teacher.namaSekolah,
       },
     };
-    saveStoredPublicShare(shareRecord);
 
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        await supabase.from('public_shares').upsert({
-          id: shareId,
-          type: 'tabungan',
-          class_id: currentClass.id,
-          title: shareRecord.title,
-          payload: shareRecord.data,
-          updated_at: new Date().toISOString(),
-        });
-      } catch (err) {
-        console.warn('Could not sync share to cloud', err);
-      }
+    try {
+      await createOrUpdatePublicShare(shareRecord);
+    } catch (err) {
+      console.warn('Could not sync share to cloud', err);
     }
 
     try {

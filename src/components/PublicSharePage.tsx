@@ -12,8 +12,8 @@ import {
   Share2,
 } from 'lucide-react';
 import { SchoolLogo } from './SchoolLogo';
-import { getStoredPublicShares } from '../utils/storage';
-import { getSupabaseClient } from '../services/supabase';
+import { getSafeSupabaseClient } from '../services/supabase';
+import { getPublicShare } from '../services/data';
 import { PublicShareRecord } from '../types';
 
 interface PublicSharePageProps {
@@ -34,39 +34,24 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
 
   const loadData = async () => {
     setLoading(true);
-    // 1. Try local storage first
-    const stored = getStoredPublicShares();
-    if (stored[shareId]) {
-      setData(stored[shareId].data);
-    }
-
-    // 2. Try Supabase cloud fetch
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        const { data: cloudData, error } = await supabase
-          .from('public_shares')
-          .select('*')
-          .eq('id', shareId)
-          .single();
-
-        if (!error && cloudData?.payload) {
-          setData(cloudData.payload);
-        }
-      } catch (err) {
-        console.warn('Could not load from supabase', err);
+    try {
+      const sharePayload = await getPublicShare(shareId);
+      if (sharePayload) {
+        setData(sharePayload);
       }
+    } catch (err) {
+      console.warn('Could not load public share from supabase', err);
+    } finally {
+      setLoading(false);
+      setLastRefreshed(new Date());
     }
-
-    setLoading(false);
-    setLastRefreshed(new Date());
   };
 
   useEffect(() => {
     loadData();
 
     // Setup Supabase Realtime subscription if available
-    const supabase = getSupabaseClient();
+    const supabase = getSafeSupabaseClient();
     if (supabase) {
       const channel = supabase
         .channel(`public_share_${shareId}`)

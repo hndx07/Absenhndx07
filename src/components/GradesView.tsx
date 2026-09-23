@@ -23,8 +23,7 @@ import {
   PublicShareRecord,
 } from '../types';
 import { exportGradesToExcel } from '../utils/exportUtils';
-import { saveStoredPublicShare } from '../utils/storage';
-import { getSupabaseClient } from '../services/supabase';
+import { createOrUpdatePublicShare } from '../services/data';
 
 interface GradesViewProps {
   currentClass: ClassRoom;
@@ -197,22 +196,11 @@ export const GradesView: React.FC<GradesViewProps> = ({
         gradeColumns: gradeColumns.slice(0, activeColumnsCount),
       },
     };
-    saveStoredPublicShare(shareRecord);
 
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        await supabase.from('public_shares').upsert({
-          id: shareId,
-          type: 'nilai',
-          class_id: currentClass.id,
-          title: shareRecord.title,
-          payload: shareRecord.data,
-          updated_at: new Date().toISOString(),
-        });
-      } catch (err) {
-        console.warn('Could not sync share to cloud', err);
-      }
+    try {
+      await createOrUpdatePublicShare(shareRecord);
+    } catch (err) {
+      console.warn('Could not sync share to cloud', err);
     }
 
     try {

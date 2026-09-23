@@ -1,23 +1,23 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   User,
   Save,
   Download,
-  Upload,
   LogOut,
   X,
-  Check,
-  Shield,
   FileJson,
-  School,
+  Database,
+  CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 import { TeacherProfile } from '../types';
-import {
-  createDatabaseBackup,
-  restoreDatabaseBackup,
-  saveStoredTeacher,
-} from '../utils/storage';
+import { createOrUpdateTeacherProfile } from '../services/data';
 import { signOutSupabase } from '../services/supabase';
+import {
+  checkHasLegacyLocalData,
+  getLegacyDataSummary,
+  migrateLegacyLocalStorageToSupabase,
+} from '../utils/storage';
 
 interface TeacherProfileModalProps {
   isOpen: boolean;
@@ -25,7 +25,8 @@ interface TeacherProfileModalProps {
   teacher: TeacherProfile;
   onUpdateTeacher: (updated: TeacherProfile) => void;
   onLogout: () => void;
-  onDataRestored: () => void;
+  onDataMigrated?: () => void;
+  onDownloadBackup?: () => void;
 }
 
 export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
@@ -34,57 +35,56 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   teacher,
   onUpdateTeacher,
   onLogout,
-  onDataRestored,
+  onDataMigrated,
+  onDownloadBackup,
 }) => {
   const [profile, setProfile] = useState<TeacherProfile>({ ...teacher });
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSave = (e: React.FormEvent) => {
+  const hasLegacyData = checkHasLegacyLocalData();
+  const legacySummary = getLegacyDataSummary();
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveStoredTeacher(profile);
-    onUpdateTeacher(profile);
-    alert('Profil Guru berhasil diperbarui!');
-    onClose();
+    setIsSaving(true);
+    try {
+      const saved = await createOrUpdateTeacherProfile(profile);
+      onUpdateTeacher(saved);
+      alert('Profil Guru berhasil diperbarui di PostgreSQL Supabase!');
+      onClose();
+    } catch (err: any) {
+      alert(`Gagal memperbarui profil: ${err?.message || 'Error'}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDownloadBackup = () => {
-    const jsonStr = createDatabaseBackup();
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Backup_SMK_Muh_Bawang_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        const result = restoreDatabaseBackup(content);
-        if (result.success) {
-          alert(result.message);
-          onDataRestored();
-          onClose();
-        } else {
-          alert(result.message);
-        }
+  const handleRunMigration = async () => {
+    if (!confirm('Pindahkan seluruh data lokal lama dari browser ke database Supabase?')) {
+      return;
+    }
+    setIsMigrating(true);
+    setMigrationStatus('Memindahkan data...');
+    try {
+      const res = await migrateLegacyLocalStorageToSupabase();
+      setMigrationStatus(res.message);
+      alert(res.message);
+      if (res.success && onDataMigrated) {
+        onDataMigrated();
       }
-    };
-    reader.readAsText(file);
+    } catch (e: any) {
+      setMigrationStatus(`Gagal: ${e?.message}`);
+    } finally {
+      setIsMigrating(false);
+    }
   };
 
   const handlePerformLogout = async () => {
-    if (confirm('Keluar dari sesi guru saat ini?')) {
+    if (confirm('Keluar dari sesi Supabase Auth?')) {
       await signOutSupabase();
       onLogout();
       onClose();
@@ -103,7 +103,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
             <div>
               <h3 className="font-bold text-lg leading-tight">Pengaturan Profil Guru & Data</h3>
               <p className="text-xs text-indigo-200">
-                Administrasi Guru SMK Muhammadiyah Bawang
+                Data tersimpan di tabel teacher_profiles Supabase
               </p>
             </div>
           </div>
@@ -196,63 +196,69 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
             <div className="flex justify-end pt-2">
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md"
+                disabled={isSaving}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md"
               >
-                <Save className="w-4 h-4" />
-                Simpan Perubahan Profil
+                {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {isSaving ? 'Menyimpan...' : 'Simpan Profil ke Supabase'}
               </button>
             </div>
           </form>
 
-          {/* Backup and Restore Section */}
-          <div className="pt-4 border-t border-slate-200 space-y-3">
-            <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
-              <FileJson className="w-4 h-4 text-indigo-600" />
-              Cadangkan & Pulihkan Basis Data (JSON)
-            </h4>
-            <p className="text-xs text-slate-500">
-              Unduh cadangan seluruh data lokal siswa, nilai, presensi, jurnal, dan kas kelas untuk disimpan secara offline.
-            </p>
-
-            <div className="flex flex-wrap gap-2.5">
+          {/* Legacy Migration Section (Requirement T) */}
+          {hasLegacyData && (
+            <div className="pt-4 border-t border-slate-200 space-y-3 bg-amber-50/70 p-4 rounded-2xl border border-amber-200">
+              <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                <Database className="w-4 h-4 text-amber-700" />
+                <span>Migrasi Data Lokal Lama ke Supabase</span>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Ditemukan data lama di peramban: {legacySummary.classes} kelas, {legacySummary.students} siswa, {legacySummary.attendance} absensi, {legacySummary.grades} nilai, {legacySummary.agendas} jurnal.
+              </p>
               <button
                 type="button"
-                onClick={handleDownloadBackup}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                onClick={handleRunMigration}
+                disabled={isMigrating}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-xs"
               >
-                <Download className="w-4 h-4 text-indigo-600" />
-                Unduh Cadangan JSON
+                {isMigrating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                {isMigrating ? 'Mengimpor ke Supabase...' : 'Impor Data Lokal ke Supabase'}
               </button>
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
-              >
-                <Upload className="w-4 h-4 text-emerald-600" />
-                Pulihkan dari File JSON
-              </button>
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept=".json"
-                onChange={handleRestoreFile}
-                className="hidden"
-              />
+              {migrationStatus && <p className="text-xs font-semibold text-amber-950 mt-1">{migrationStatus}</p>}
             </div>
-          </div>
+          )}
+
+          {/* Backup Export */}
+          {onDownloadBackup && (
+            <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-slate-800 text-xs flex items-center gap-2">
+                  <FileJson className="w-4 h-4 text-indigo-600" />
+                  Unduh Salinan JSON
+                </h4>
+                <p className="text-[11px] text-slate-500">Ekspor salinan data Supabase aktif ke file JSON.</p>
+              </div>
+              <button
+                type="button"
+                onClick={onDownloadBackup}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5 text-indigo-600" />
+                Unduh JSON
+              </button>
+            </div>
+          )}
 
           {/* Sign Out */}
           <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-            <span className="text-xs text-slate-400">Sesi Akun Guru</span>
+            <span className="text-xs text-slate-400">Sesi Supabase Auth</span>
             <button
               type="button"
               onClick={handlePerformLogout}
               className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-rose-200"
             >
               <LogOut className="w-4 h-4" />
-              Keluar Akun
+              Keluar Sesi
             </button>
           </div>
         </div>
