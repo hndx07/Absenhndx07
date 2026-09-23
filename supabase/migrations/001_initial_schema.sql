@@ -1,8 +1,9 @@
 -- ==============================================================================
--- SCHEMA POSTGRESQL & ROW LEVEL SECURITY (RLS) UNTUK APLIKASI ABSENSI & NILAI
--- SMK MUHAMMADIYAH BAWANG (100% SUPABASE NATIVE)
--- Jalankan seluruh query ini di SQL Editor Dashboard Supabase Anda:
--- Dashboard Supabase -> Project -> SQL Editor -> New Query -> Run
+-- MIGRATION: 001_initial_schema.sql
+-- TARGET: Supabase PostgreSQL (Public Schema)
+-- PROJEK: Absenhndx07 - SMK Muhammadiyah Bawang
+-- DESKRIPSI: Skrip DDL komprehensif untuk seluruh tabel, relasi Foreign Key,
+--            Indeks performa, Row Level Security (RLS) policies, dan reload schema cache.
 -- ==============================================================================
 
 -- 0. EXTENSIONS
@@ -13,6 +14,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ==============================================================================
 
 -- 1.1. public.teacher_profiles
+-- Induk profil guru, terikat langsung ke auth.users(id)
 CREATE TABLE IF NOT EXISTS public.teacher_profiles (
   id TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -32,6 +34,7 @@ CREATE TABLE IF NOT EXISTS public.teacher_profiles (
 );
 
 -- 1.2. public.classes
+-- Induk data kelas untuk seluruh entitas siswa, nilai, presensi, dll.
 CREATE TABLE IF NOT EXISTS public.classes (
   id TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -45,6 +48,7 @@ CREATE TABLE IF NOT EXISTS public.classes (
 );
 
 -- 1.3. public.students
+-- Bergantung pada public.classes(id)
 CREATE TABLE IF NOT EXISTS public.students (
   id TEXT PRIMARY KEY,
   class_id TEXT NOT NULL REFERENCES public.classes(id) ON DELETE CASCADE,
@@ -59,6 +63,7 @@ CREATE TABLE IF NOT EXISTS public.students (
 );
 
 -- 1.4. public.attendance_sessions
+-- Sesi presensi per pertemuan kelas
 CREATE TABLE IF NOT EXISTS public.attendance_sessions (
   id TEXT PRIMARY KEY,
   class_id TEXT NOT NULL REFERENCES public.classes(id) ON DELETE CASCADE,
@@ -72,6 +77,7 @@ CREATE TABLE IF NOT EXISTS public.attendance_sessions (
 );
 
 -- 1.5. public.student_grades
+-- Nilai formatif & sumatif siswa
 CREATE TABLE IF NOT EXISTS public.student_grades (
   id TEXT PRIMARY KEY,
   student_id TEXT NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
@@ -95,6 +101,7 @@ CREATE TABLE IF NOT EXISTS public.student_grades (
 );
 
 -- 1.6. public.grade_columns
+-- Kolom konfigurasi asesmen / formatif dinamis per kelas
 CREATE TABLE IF NOT EXISTS public.grade_columns (
   id TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -109,6 +116,7 @@ CREATE TABLE IF NOT EXISTS public.grade_columns (
 );
 
 -- 1.7. public.teaching_agendas
+-- Jurnal harian mengajar guru
 CREATE TABLE IF NOT EXISTS public.teaching_agendas (
   id TEXT PRIMARY KEY,
   class_id TEXT NOT NULL REFERENCES public.classes(id) ON DELETE CASCADE,
@@ -127,6 +135,7 @@ CREATE TABLE IF NOT EXISTS public.teaching_agendas (
 );
 
 -- 1.8. public.saving_transactions
+-- Buku kas kelas dan tabungan siswa
 CREATE TABLE IF NOT EXISTS public.saving_transactions (
   id TEXT PRIMARY KEY,
   class_id TEXT NOT NULL REFERENCES public.classes(id) ON DELETE CASCADE,
@@ -143,6 +152,7 @@ CREATE TABLE IF NOT EXISTS public.saving_transactions (
 );
 
 -- 1.9. public.public_shares
+-- Link publik baca-saja untuk wali murid / siswa
 CREATE TABLE IF NOT EXISTS public.public_shares (
   id TEXT PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,

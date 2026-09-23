@@ -786,7 +786,7 @@ export async function getPublicShare(shareId: string): Promise<any | null> {
 
   if (error) {
     console.error('Error fetching public share:', error);
-    return null;
+    throw error;
   }
 
   return data ? data.payload : null;

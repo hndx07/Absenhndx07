@@ -34,6 +34,12 @@ export const CloudSupabaseModal: React.FC<CloudSupabaseModalProps> = ({
   const [connectionStatus, setConnectionStatus] = useState<{
     tested: boolean;
     ok: boolean;
+    connected?: boolean;
+    databaseSchemaReady?: boolean;
+    authReady?: boolean;
+    readReady?: boolean;
+    writeReady?: boolean;
+    missingTables?: string[];
     message: string;
   }>({ tested: false, ok: false, message: '' });
   const [copiedSchema, setCopiedSchema] = useState(false);
@@ -60,6 +66,12 @@ export const CloudSupabaseModal: React.FC<CloudSupabaseModalProps> = ({
     setConnectionStatus({
       tested: true,
       ok: res.ok,
+      connected: res.connected,
+      databaseSchemaReady: res.databaseSchemaReady,
+      authReady: res.authReady,
+      readReady: res.readReady,
+      writeReady: res.writeReady,
+      missingTables: res.missingTables,
       message: res.message,
     });
     setIsChecking(false);
@@ -183,11 +195,52 @@ export const CloudSupabaseModal: React.FC<CloudSupabaseModalProps> = ({
                   <h4 className="font-bold text-sm">
                     {connectionStatus.ok
                       ? 'Tersambung ke PostgreSQL Supabase'
+                      : connectionStatus.databaseSchemaReady === false
+                      ? 'DATABASE_SCHEMA_READY = FALSE'
                       : 'Koneksi Supabase Memerlukan Konfigurasi'}
                   </h4>
                   <p className="text-xs leading-relaxed opacity-90">
                     {connectionStatus.message || (isConfigured ? 'Memeriksa...' : 'Variabel lingkungan belum terpasang.')}
                   </p>
+                </div>
+              </div>
+
+              {/* Detailed Diagnostic Matrix */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  Status Diagnostik Supabase
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                    <span className="text-slate-600 font-mono text-[11px]">CONNECTED:</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${connectionStatus.connected ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                      {connectionStatus.connected ? 'TRUE' : 'FALSE'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                    <span className="text-slate-600 font-mono text-[11px]">SCHEMA_READY:</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${connectionStatus.databaseSchemaReady ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                      {connectionStatus.databaseSchemaReady ? 'TRUE' : 'FALSE'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                    <span className="text-slate-600 font-mono text-[11px]">AUTH_READY:</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${connectionStatus.authReady ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                      {connectionStatus.authReady ? 'TRUE' : 'FALSE'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                    <span className="text-slate-600 font-mono text-[11px]">READ_READY:</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${connectionStatus.readReady ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                      {connectionStatus.readReady ? 'TRUE' : 'FALSE'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200">
+                    <span className="text-slate-600 font-mono text-[11px]">WRITE_READY:</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${connectionStatus.writeReady ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                      {connectionStatus.writeReady ? 'TRUE' : 'FALSE'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
