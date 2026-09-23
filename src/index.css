@@ -3,11 +3,83 @@
 @layer base {
   :root {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
+}
+
+/* Custom smooth scrollbars for Windows & all platforms */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.5);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.8);
+}
+
+/* Dark mode overrides for background & text */
+.dark body {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+.dark .bg-white {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
+
+.dark .bg-slate-50 {
+  background-color: #0f172a;
+}
+
+.dark .bg-slate-100 {
+  background-color: #1e293b;
+}
+
+.dark .border-slate-200,
+.dark .border-slate-200\/80,
+.dark .border-slate-100 {
+  border-color: #334155;
+}
+
+.dark .text-slate-900,
+.dark .text-slate-800 {
+  color: #f8fafc;
+}
+
+.dark .text-slate-700 {
+  color: #cbd5e1;
+}
+
+.dark .text-slate-600 {
+  color: #94a3b8;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #1e293b;
+  color: #f8fafc;
+  border-color: #475569;
 }
 
 @media print {
@@ -22,4 +94,3 @@
     display: block !important;
   }
 }
-

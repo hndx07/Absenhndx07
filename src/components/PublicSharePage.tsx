@@ -8,24 +8,22 @@ import {
   Award,
   Wallet,
   BookOpen,
-  ArrowLeft,
   Share2,
+  GraduationCap,
 } from 'lucide-react';
-import { SchoolLogo } from './SchoolLogo';
 import { getSafeSupabaseClient } from '../services/supabase';
 import { getPublicShare } from '../services/data';
 import { PublicShareRecord } from '../types';
+import { ThemeToggle } from './ThemeToggle';
 
 interface PublicSharePageProps {
   type: 'absen' | 'nilai' | 'tabungan';
   shareId: string;
-  onBackToApp?: () => void;
 }
 
 export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   type,
   shareId,
-  onBackToApp,
 }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -90,7 +88,9 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       <header className="bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white shadow-lg sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <SchoolLogo size={42} />
+            <div className="w-10 h-10 rounded-2xl bg-indigo-600/40 border border-indigo-400/30 flex items-center justify-center text-indigo-200 shadow-xs">
+              <GraduationCap className="w-5 h-5" />
+            </div>
             <div>
               <h1 className="font-extrabold text-sm sm:text-base leading-tight">
                 SMK Muhammadiyah Bawang
@@ -102,6 +102,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <button
               onClick={loadData}
               className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-indigo-200 transition"
@@ -109,15 +110,6 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
             >
               <RefreshCw className="w-4 h-4" />
             </button>
-            {onBackToApp && (
-              <button
-                onClick={onBackToApp}
-                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Masuk Guru
-              </button>
-            )}
           </div>
         </div>
       </header>
@@ -391,6 +383,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="text-center text-xs text-slate-500 dark:text-slate-400 py-6 mt-6 border-t border-slate-200 dark:border-slate-800">
+        &copy; 2026 SMK Muhammadiyah Bawang, Batang &bull; Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; developed by @hndx07
+      </footer>
     </div>
   );
 };

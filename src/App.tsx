@@ -6,8 +6,6 @@ import {
   BookMarked,
   Wallet,
   BarChart3,
-  Sparkles,
-  Layers,
   MessageSquare,
   MapPin,
   Cloud,
@@ -67,7 +65,6 @@ import {
 import { exportDataToJsonBackup } from './utils/storage';
 
 // Components
-import { SchoolLogo } from './components/SchoolLogo';
 import { LoginView } from './components/LoginView';
 import { ClassManagementModal } from './components/ClassManagementModal';
 import { CloudSupabaseModal } from './components/CloudSupabaseModal';
@@ -79,10 +76,9 @@ import { StudentManagementView } from './components/StudentManagementView';
 import { TeachingAgendaView } from './components/TeachingAgendaView';
 import { SavingsView } from './components/SavingsView';
 import { StatisticsView } from './components/StatisticsView';
-import { ModulAjarGeneratorView } from './components/ModulAjarGeneratorView';
-import { KisiKisiView } from './components/KisiKisiView';
 import { ParentReportView } from './components/ParentReportView';
 import { SchoolMapView } from './components/SchoolMapView';
+import { ThemeToggle } from './components/ThemeToggle';
 
 type NavTab =
   | 'attendance'
@@ -91,8 +87,6 @@ type NavTab =
   | 'agendas'
   | 'savings'
   | 'statistics'
-  | 'modul_ajar'
-  | 'kisi_kisi'
   | 'parent_report'
   | 'school_map';
 
@@ -443,10 +437,6 @@ export default function App() {
       <PublicSharePage
         type={publicShare.type}
         shareId={publicShare.shareId}
-        onBackToApp={() => {
-          window.history.replaceState({}, '', window.location.pathname);
-          setPublicShare(null);
-        }}
       />
     );
   }
@@ -470,16 +460,9 @@ export default function App() {
   // Not Logged In -> Login Screen (Supabase Auth Only)
   if (!session) {
     return (
-      <>
-        <LoginView
-          onLoginSuccess={() => loadUserData()}
-          onOpenSettings={() => setIsCloudModalOpen(true)}
-        />
-        <CloudSupabaseModal
-          isOpen={isCloudModalOpen}
-          onClose={() => setIsCloudModalOpen(false)}
-        />
-      </>
+      <LoginView
+        onLoginSuccess={() => loadUserData()}
+      />
     );
   }
 
@@ -514,7 +497,9 @@ export default function App() {
           <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
             {/* Brand */}
             <div className="flex items-center gap-3 shrink-0">
-              <SchoolLogo size={44} />
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-xs">
+                <GraduationCap className="w-5 h-5" />
+              </div>
               <div className="hidden md:flex flex-col">
                 <div className="flex items-center gap-1.5">
                   <span className="font-extrabold text-slate-900 tracking-tight text-base">
@@ -544,8 +529,10 @@ export default function App() {
               </button>
             </div>
 
-            {/* Cloud Status Pill & Teacher Profile */}
+            {/* Controls, Theme Toggle & Teacher Profile */}
             <div className="flex items-center gap-2 sm:gap-3">
+              <ThemeToggle />
+
               <button
                 onClick={() => setIsCloudModalOpen(true)}
                 className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition"
@@ -657,30 +644,6 @@ export default function App() {
               >
                 <BarChart3 className="w-4 h-4" />
                 Statistik & Resume
-              </button>
-
-              <button
-                onClick={() => setActiveTab('modul_ajar')}
-                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                  activeTab === 'modul_ajar'
-                    ? 'bg-purple-600 text-white shadow-xs font-bold'
-                    : 'text-purple-700 bg-purple-50 hover:bg-purple-100'
-                }`}
-              >
-                <Sparkles className="w-4 h-4" />
-                Prompt Modul Ajar (AI)
-              </button>
-
-              <button
-                onClick={() => setActiveTab('kisi_kisi')}
-                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                  activeTab === 'kisi_kisi'
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                <Layers className="w-4 h-4" />
-                Kisi-kisi & Soal
               </button>
 
               <button
@@ -824,14 +787,6 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'modul_ajar' && (
-              <ModulAjarGeneratorView currentClass={activeClass} teacher={activeTeacher} />
-            )}
-
-            {activeTab === 'kisi_kisi' && (
-              <KisiKisiView currentClass={activeClass} teacher={activeTeacher} />
-            )}
-
             {activeTab === 'parent_report' && (
               <ParentReportView
                 currentClass={activeClass}
@@ -848,12 +803,12 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 mt-12 py-6 text-center text-xs text-slate-500">
+      <footer className="bg-white border-t border-slate-200 dark:border-slate-800 mt-12 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
         <div className="max-w-7xl mx-auto px-4 space-y-1">
-          <p className="font-bold text-slate-700">
-            Aplikasi Presensi & Nilai Siswa &bull; SMK Muhammadiyah Bawang, Batang, Jawa Tengah
+          <p className="font-bold text-slate-700 dark:text-slate-200">
+            Aplikasi Presensi & Nilai Siswa &bull; SMK Muhammadiyah Bawang, Batang, Jawa Tengah &bull; developed by @hndx07
           </p>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">
             Didukung Backend 100% PostgreSQL & Auth Supabase dengan Row Level Security. Tahun Ajaran 2025/2026.
           </p>
         </div>

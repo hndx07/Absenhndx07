@@ -1,6 +1,5 @@
 import React from 'react';
-import { MapPin, Phone, Mail, Globe, Navigation, Award, School } from 'lucide-react';
-import { SchoolLogo } from './SchoolLogo';
+import { MapPin, Phone, Mail, Globe, Navigation, GraduationCap } from 'lucide-react';
 
 export const SchoolMapView: React.FC = () => {
   return (
@@ -62,7 +61,9 @@ export const SchoolMapView: React.FC = () => {
         {/* School Profile Sidebar */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
           <div className="text-center pb-4 border-b border-slate-100">
-            <SchoolLogo size={64} className="mx-auto mb-2" />
+            <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-2 shadow-xs">
+              <GraduationCap className="w-8 h-8" />
+            </div>
             <h3 className="font-extrabold text-slate-900 text-base mt-2">
               SMK Muhammadiyah Bawang
             </h3>
@@ -104,20 +105,36 @@ export const SchoolMapView: React.FC = () => {
 
           <div className="pt-4 border-t border-slate-100 space-y-2">
             <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-              Konsentrasi Keahlian Unggulan:
+              Konsentrasi Keahlian / Jurusan:
             </h4>
-            <div className="space-y-1.5 text-xs text-slate-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-1.5 text-xs text-slate-600">
               <div className="p-2 bg-slate-50 rounded-xl font-medium flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                Teknik Komputer & Jaringan (TKJ)
+                <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                <span>TO (Teknik Otomotif)</span>
               </div>
               <div className="p-2 bg-slate-50 rounded-xl font-medium flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                Teknik Bisnis Sepeda Motor (TBSM)
+                <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                <span>TJKT (Teknik Jaringan Komputer & Telekomunikasi)</span>
               </div>
               <div className="p-2 bg-slate-50 rounded-xl font-medium flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                Akuntansi & Keuangan Lembaga (AKL)
+                <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                <span>Akl/perbankan syari'ah</span>
+              </div>
+              <div className="p-2 bg-slate-50 rounded-xl font-medium flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                <span>TKR (Teknik Kendaraan Ringan)</span>
+              </div>
+              <div className="p-2 bg-slate-50 rounded-xl font-medium flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                <span>TSM (Teknik Sepeda Motor)</span>
+              </div>
+              <div className="p-2 bg-slate-50 rounded-xl font-medium flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                <span>TKJ (Teknik Komputer & Jaringan)</span>
+              </div>
+              <div className="p-2 bg-slate-50 rounded-xl font-medium flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                <span>TJAT (Teknik Jaringan Akses Telekomunikasi)</span>
               </div>
             </div>
           </div>

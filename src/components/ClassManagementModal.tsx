@@ -32,7 +32,7 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
       namaKelas: '',
       mataPelajaran: '',
       kkm: 75,
-      jurusan: 'Teknik Komputer & Jaringan',
+      jurusan: 'TKJ',
       keterangan: 'Tahun Ajaran 2025/2026',
       createdAt: new Date().toISOString().split('T')[0],
     });
@@ -224,19 +224,20 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Program / Kompetensi Keahlian
+                    Kompetensi Keahlian / Jurusan
                   </label>
                   <select
-                    value={editingClass?.jurusan || 'Teknik Komputer & Jaringan'}
+                    value={editingClass?.jurusan || 'TKJ'}
                     onChange={(e) => setEditingClass({ ...editingClass, jurusan: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                   >
-                    <option value="Teknik Komputer & Jaringan">Teknik Komputer & Jaringan (TKJ)</option>
-                    <option value="Teknik Bisnis Sepeda Motor">Teknik Bisnis Sepeda Motor (TBSM)</option>
-                    <option value="Akuntansi & Keuangan Lembaga">Akuntansi & Keuangan Lembaga (AKL)</option>
-                    <option value="Teknik Otomotif">Teknik Otomotif (TO)</option>
-                    <option value="Manajemen Perkantoran">Manajemen Perkantoran (MPLB)</option>
-                    <option value="Umum / Muatan Nasional">Umum / Muatan Nasional</option>
+                    <option value="TO">TO (Teknik Otomotif)</option>
+                    <option value="TJKT">TJKT (Teknik Jaringan Komputer & Telekomunikasi)</option>
+                    <option value="Akl/perbankan syari'ah">Akl/perbankan syari'ah</option>
+                    <option value="TKR">TKR (Teknik Kendaraan Ringan)</option>
+                    <option value="TSM">TSM (Teknik Sepeda Motor)</option>
+                    <option value="TKJ">TKJ (Teknik Komputer & Jaringan)</option>
+                    <option value="TJAT">TJAT (Teknik Jaringan Akses Telekomunikasi)</option>
                   </select>
                 </div>
 

@@ -8,7 +8,6 @@ import {
   RefreshCw,
   Database,
   ShieldCheck,
-  ExternalLink,
   X,
   Server,
 } from 'lucide-react';
@@ -244,44 +243,7 @@ export const CloudSupabaseModal: React.FC<CloudSupabaseModalProps> = ({
                 </div>
               </div>
 
-              {/* Environment Variables Info */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                  Variabel Lingkungan (Environment Variables)
-                </h4>
-
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <span className="font-mono font-bold text-slate-600 block">VITE_SUPABASE_URL</span>
-                    <span className="font-mono text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 block truncate">
-                      {envUrl || '(Belum diset - tambahkan di .env atau Vercel Settings)'}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="font-mono font-bold text-slate-600 block">VITE_SUPABASE_ANON_KEY</span>
-                    <span className="font-mono text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 block truncate">
-                      {envKey ? `${envKey.slice(0, 16)}...${envKey.slice(-8)}` : '(Belum diset - tambahkan di .env atau Vercel Settings)'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Vercel Deployment Instructions */}
-              <div className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl text-xs space-y-2 text-indigo-950">
-                <h5 className="font-bold flex items-center gap-1.5 text-indigo-900">
-                  <ExternalLink className="w-4 h-4 text-indigo-600" />
-                  Panduan Deploy ke Vercel:
-                </h5>
-                <ol className="list-decimal list-inside space-y-1 text-slate-700">
-                  <li>Buka Dashboard <strong>Vercel</strong> &rarr; Pilih project ini &rarr; <strong>Settings</strong> &rarr; <strong>Environment Variables</strong>.</li>
-                  <li>Tambahkan <code className="font-mono font-bold text-indigo-700">VITE_SUPABASE_URL</code> dengan URL project Supabase Anda.</li>
-                  <li>Tambahkan <code className="font-mono font-bold text-indigo-700">VITE_SUPABASE_ANON_KEY</code> dengan Anon/Publishable key Supabase Anda.</li>
-                  <li><em>Catatan Keamanan:</em> <strong>JANGAN PERNAH</strong> memasukkan <code>service_role</code> key ke frontend.</li>
-                </ol>
-              </div>
-
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-2">
                 <button
                   type="button"
                   onClick={handleTestConnection}

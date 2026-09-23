@@ -5,29 +5,24 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Cloud,
   CheckCircle2,
   AlertCircle,
   ShieldCheck,
-  UserPlus,
   GraduationCap,
-  KeyRound,
 } from 'lucide-react';
 import {
   signInWithEmailPassword,
-  signUpWithEmailPassword,
   isSupabaseConfigured,
 } from '../services/supabase';
+import { ThemeToggle } from './ThemeToggle';
 
 interface LoginViewProps {
   onLoginSuccess: () => void;
-  onOpenSettings?: () => void;
 }
 
 const STORAGE_SAVED_EMAIL = 'smk_saved_login_email';
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSettings }) => {
-  const [isSignUpMode, setIsSignUpMode] = useState(false);
+export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_SAVED_EMAIL) || '';
@@ -36,19 +31,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSett
     }
   });
   const [password, setPassword] = useState('');
-  const [namaLengkap, setNamaLengkap] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const isConfigured = isSupabaseConfigured();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    setSuccessMessage(null);
 
     const cleanEmail = email.trim();
     if (!cleanEmail) {
@@ -62,7 +54,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSett
 
     if (!isConfigured) {
       setErrorMessage(
-        'Supabase belum dikonfigurasi di Environment Variables (VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY). Silakan hubungkan project Supabase Anda.'
+        'Supabase belum dikonfigurasi di Environment Variables (VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY).'
       );
       return;
     }
@@ -80,41 +72,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSett
     setIsSubmitting(true);
 
     try {
-      if (isSignUpMode) {
-        const res = await signUpWithEmailPassword(cleanEmail, password, {
-          nama_guru: namaLengkap.trim() || undefined,
-        });
-
-        if (res.user) {
-          if (res.session) {
-            setSuccessMessage('Akun guru berhasil dibuat! Masuk ke sistem...');
-            setTimeout(() => {
-              onLoginSuccess();
-            }, 600);
-          } else {
-            setSuccessMessage(
-              'Pendaftaran berhasil! Jika konfirmasi email aktif di Supabase, silakan periksa kotak masuk email Anda lalu masuk.'
-            );
-            setIsSignUpMode(false);
-          }
-        }
+      const res = await signInWithEmailPassword(cleanEmail, password);
+      if (res.session) {
+        onLoginSuccess();
       } else {
-        const res = await signInWithEmailPassword(cleanEmail, password);
-        if (res.session) {
-          onLoginSuccess();
-        } else {
-          setErrorMessage('Session tidak ditemukan. Silakan coba masuk kembali.');
-        }
+        setErrorMessage('Sesi login tidak ditemukan. Silakan coba kembali.');
       }
     } catch (err: any) {
       console.error('Supabase Auth error:', err);
       const rawMsg = err?.message || 'Gagal masuk ke sistem Supabase.';
       if (rawMsg.includes('Invalid login credentials')) {
-        setErrorMessage('Alamat email atau kata sandi tidak cocok. Silakan periksa kembali.');
+        setErrorMessage('Alamat email atau kata sandi salah. Silakan periksa kembali.');
       } else if (rawMsg.includes('Email not confirmed')) {
-        setErrorMessage('Email Anda belum dikonfirmasi di Supabase. Silakan cek inbox/spam.');
-      } else if (rawMsg.includes('User already registered')) {
-        setErrorMessage('Email ini sudah terdaftar. Silakan pilih mode Masuk Akun Guru.');
+        setErrorMessage('Email Anda belum dikonfirmasi di Supabase. Silakan periksa email.');
       } else {
         setErrorMessage(rawMsg);
       }
@@ -128,7 +98,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSett
       {/* Top Navbar Minimal */}
       <div className="max-w-5xl w-full mx-auto flex items-center justify-between py-2">
         <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-600/40 border border-indigo-400/30 flex items-center justify-center text-indigo-200 shadow-xs">
             <GraduationCap className="w-5 h-5" />
           </div>
           <div>
@@ -141,15 +111,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSett
           </div>
         </div>
 
-        {onOpenSettings && (
-          <button
-            onClick={onOpenSettings}
-            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-indigo-200 transition flex items-center gap-1.5 border border-white/10"
-          >
-            <KeyRound className="w-3.5 h-3.5" />
-            Info Setup Supabase
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* Center Auth Card */}
@@ -162,42 +126,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSett
             </div>
             <div>
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                {isSignUpMode ? 'Daftar Akun Guru' : 'Masuk Akun Guru'}
+                Masuk Akun Guru
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Autentikasi resmi berbasis Cloud Supabase (PostgreSQL & Auth)
+                Silakan masukkan kredensial akun guru Anda
               </p>
             </div>
           </div>
 
-          {/* Cloud Supabase Status Pill */}
-          <div
-            className={`p-3 rounded-2xl border text-xs flex items-center gap-2.5 transition ${
-              isConfigured
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                : 'bg-rose-50 border-rose-200 text-rose-900'
-            }`}
-          >
-            {isConfigured ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            )}
-            <div className="truncate">
-              <span className="font-bold block">
-                {isConfigured
-                  ? 'Supabase Backend Terhubung'
-                  : 'Konfigurasi Environment Diperlukan'}
-              </span>
-              <span className="text-[10px] text-slate-500 block truncate">
-                {isConfigured
-                  ? 'Kredensial VITE_SUPABASE_URL & ANON KEY aktif'
-                  : 'Atur VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY di .env'}
-              </span>
-            </div>
-          </div>
-
-          {/* Alert Messages */}
+          {/* Alert Error Messages */}
           {errorMessage && (
             <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
@@ -207,31 +144,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSett
             </div>
           )}
 
-          {successMessage && (
-            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2.5 animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <p className="font-medium">{successMessage}</p>
-            </div>
-          )}
-
-          {/* Form Login Email & Password Manual */}
+          {/* Form Login Email & Password */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isSignUpMode && (
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1.5">
-                  Nama Lengkap Guru & Gelar
-                </label>
-                <input
-                  type="text"
-                  required={isSignUpMode}
-                  placeholder="Contoh: Hendra Setiawan, S.Kom"
-                  value={namaLengkap}
-                  onChange={(e) => setNamaLengkap(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                />
-              </div>
-            )}
-
             <div>
               <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1.5">
                 Alamat Email *
@@ -258,7 +172,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSett
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
-                  placeholder="Masukkan kata sandi (min. 6 karakter)"
+                  placeholder="Masukkan kata sandi"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-slate-800"
@@ -277,7 +191,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSett
               </div>
             </div>
 
-            {/* Remember Me & Toggle Mode */}
+            {/* Remember Email */}
             <div className="flex items-center justify-between text-xs pt-1">
               <label className="flex items-center gap-2 cursor-pointer text-slate-600 select-none">
                 <input
@@ -286,35 +200,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSett
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                <span>Ingat Email</span>
+                <span>Ingat Email Saya</span>
               </label>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSignUpMode(!isSignUpMode);
-                  setErrorMessage(null);
-                  setSuccessMessage(null);
-                }}
-                className="text-indigo-600 hover:text-indigo-800 font-bold transition"
-              >
-                {isSignUpMode ? 'Sudah punya akun? Masuk' : 'Daftar akun baru'}
-              </button>
             </div>
 
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting || !isConfigured}
+              disabled={isSubmitting}
               className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-2xl font-bold text-xs transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 disabled:opacity-60"
             >
               {isSubmitting ? (
-                <span>Memproses ke Supabase...</span>
-              ) : isSignUpMode ? (
-                <>
-                  <UserPlus className="w-4 h-4" />
-                  <span>Daftar Akun Guru</span>
-                </>
+                <span>Memproses Masuk...</span>
               ) : (
                 <>
                   <LogIn className="w-4 h-4" />
@@ -335,7 +232,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSett
 
       {/* Footer */}
       <footer className="text-center text-xs text-indigo-200/70 py-3">
-        &copy; 2026 SMK Muhammadiyah Bawang, Batang &bull; Sistem Informasi Presensi, Penilaian & Jurnal Guru
+        &copy; 2026 SMK Muhammadiyah Bawang, Batang &bull; Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; developed by @hndx07
       </footer>
     </div>
   );
