@@ -51,7 +51,7 @@ export const SchoolMapView: React.FC = () => {
           <div className="w-full h-96 relative bg-slate-100">
             <iframe
               title="Peta Lokasi SMK Muhammadiyah Bawang"
-              src="https://maps.google.com/maps?q=SMK%20Muhammadiyah%20Bawang%20Batang%20Jawa%20Tengah&t=&z=16&ie=UTF8&iwloc=&output=embed"
+              src="https://maps.google.com/maps?q=SMK%20Muhammadiyah%20Bawang%20Jl.%20Bawang-Sukorejo%20KM%2001%20Jlamprang%20Bawang%20Batang%2051274&t=&z=16&ie=UTF8&iwloc=&output=embed"
               className="w-full h-full border-0"
               loading="lazy"
             />
@@ -75,30 +75,35 @@ export const SchoolMapView: React.FC = () => {
           <div className="space-y-3 text-xs">
             <div className="flex items-start gap-3">
               <MapPin className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-              <p className="text-slate-600 leading-relaxed">
-                Jl. Raya Bawang - Subah, Pangempon, Bawang, Kabupaten Batang, Jawa Tengah 51274
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                Jl. Bawang-Sukorejo KM 01, Jlamprang, Bawang, 51274, Kabupaten Batang, Jawa Tengah
               </p>
             </div>
 
             <div className="flex items-center gap-3">
               <Phone className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span className="font-mono text-slate-700">(0285) 6681023</span>
+              <span className="font-mono text-slate-700 dark:text-slate-300">(0285) 4486909</span>
             </div>
 
             <div className="flex items-center gap-3">
               <Mail className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span className="text-slate-700 font-mono">smkmuhbawang@gmail.com</span>
+              <a
+                href="mailto:smkmutu1@yahoo.co.id"
+                className="text-slate-700 dark:text-slate-300 hover:text-indigo-600 font-mono"
+              >
+                smkmutu1@yahoo.co.id
+              </a>
             </div>
 
             <div className="flex items-center gap-3">
               <Globe className="w-4 h-4 text-indigo-600 shrink-0" />
               <a
-                href="https://smkmuhbawang.sch.id"
+                href="https://smkmuhiba.sch.id"
                 target="_blank"
                 rel="noreferrer"
-                className="text-indigo-600 hover:underline"
+                className="text-indigo-600 hover:underline font-semibold"
               >
-                smkmuhbawang.sch.id
+                smkmuhiba.sch.id
               </a>
             </div>
           </div>

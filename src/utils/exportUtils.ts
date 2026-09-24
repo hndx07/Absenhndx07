@@ -252,7 +252,7 @@ export function exportToWordDocument(title: string, contentHtml: string) {
         <div class="header-box">
           <h2 style="margin:0; font-size:14pt;">MAJELIS PENDIDIKAN DASAR MENENGAH DAN PENDIDIKAN NONFORMAL</h2>
           <h1 style="margin:4px 0; font-size:16pt; font-weight:bold;">SMK MUHAMMADIYAH BAWANG</h1>
-          <p style="margin:0; font-size:9.5pt;">Alamat: Jl. Raya Bawang - Subah, Kec. Bawang, Kab. Batang, Jawa Tengah 51274</p>
+          <p style="margin:0; font-size:9.5pt;">Alamat: Jl. Bawang-Sukorejo KM 01, Jlamprang, Bawang, 51274 &bull; Telp: (0285) 4486909 &bull; Website: smkmuhiba.sch.id &bull; Email: smkmutu1@yahoo.co.id</p>
         </div>
         ${contentHtml}
       </body>
@@ -362,3 +362,251 @@ export function exportAttendanceToPDF(
 
   doc.save(`Presensi_${classRoom.namaKelas.replace(/\s+/g, '_')}.pdf`);
 }
+
+/**
+ * Export data siswa ke file Excel (.xlsx)
+ */
+export function exportStudentsToExcel(
+  classRoom: ClassRoom | null,
+  students: Student[],
+  teacher?: TeacherProfile,
+  allClasses?: ClassRoom[]
+) {
+  const headerRow1 = ['DATA PESERTA DIDIK'];
+  const headerRow2 = [`Sekolah: ${teacher?.namaSekolah || 'SMK Muhammadiyah Bawang'}`];
+  const headerRow3 = [
+    classRoom
+      ? `Kelas: ${classRoom.namaKelas} | Jurusan: ${classRoom.jurusan || '-'} | Tahun Ajaran: ${teacher?.tahunAjaran || '2025/2026'}`
+      : `Seluruh Siswa (${students.length} Siswa) | Tahun Ajaran: ${teacher?.tahunAjaran || '2025/2026'}`
+  ];
+  const headerRow4 = [`Alamat: Jl. Bawang-Sukorejo KM 01, Jlamprang, Bawang, 51274 | Website: www.smkmuhiba.sch.id`];
+  const emptyRow: any[] = [];
+
+  const tableHeader = [
+    'No',
+    'NISN',
+    'Nama Lengkap Siswa',
+    'Jenis Kelamin (L/P)',
+    'Kelas / Rombel',
+    'Konsentrasi Keahlian',
+    'No HP Orang Tua / Wali',
+    'Catatan Khusus',
+  ];
+
+  const sortedStudents = [...students].sort((a, b) => a.no - b.no);
+  const tableData = sortedStudents.map((std, idx) => {
+    const cls = allClasses?.find((c) => c.id === std.classId) || classRoom;
+    return [
+      idx + 1,
+      std.nisn || '',
+      std.nama,
+      std.gender === 'P' ? 'P' : 'L',
+      cls ? cls.namaKelas : '-',
+      cls ? cls.jurusan || 'Akuntansi dan Keuangan Lembaga' : '-',
+      std.noHpOrangTua || '',
+      std.catatanUmum || '',
+    ];
+  });
+
+  const fullData = [headerRow1, headerRow2, headerRow3, headerRow4, emptyRow, tableHeader, ...tableData];
+  const ws = XLSX.utils.aoa_to_sheet(fullData);
+
+  ws['!cols'] = [
+    { wch: 6 },
+    { wch: 16 },
+    { wch: 32 },
+    { wch: 18 },
+    { wch: 16 },
+    { wch: 30 },
+    { wch: 22 },
+    { wch: 30 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const sheetName = classRoom ? classRoom.namaKelas.replace(/[/\\?*[\]]/g, '_').slice(0, 30) : 'Semua Siswa';
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  const fileName = classRoom
+    ? `Data_Siswa_${classRoom.namaKelas.replace(/\s+/g, '_')}.xlsx`
+    : `Data_Seluruh_Siswa_SMK_Muhiba.xlsx`;
+  XLSX.writeFile(wb, fileName);
+}
+
+/**
+ * Export Agenda Mengajar ke PDF
+ */
+export function exportAgendaToPDF(
+  agendas: TeachingAgenda[],
+  classRoom: ClassRoom,
+  teacher: TeacherProfile
+) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // Kop Sekolah
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('MAJELIS PENDIDIKAN DASAR MENENGAH DAN PENDIDIKAN NONFORMAL', 105, 14, { align: 'center' });
+  doc.setFontSize(14);
+  doc.text('SMK MUHAMMADIYAH BAWANG', 105, 20, { align: 'center' });
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Jl. Bawang-Sukorejo KM 01, Jlamprang, Bawang, 51274 | Website: www.smkmuhiba.sch.id', 105, 25, { align: 'center' });
+  doc.setLineWidth(0.6);
+  doc.line(14, 28, 196, 28);
+  doc.setLineWidth(0.2);
+  doc.line(14, 29, 196, 29);
+
+  // Judul
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('JURNAL / AGENDA MENGAJAR GURU', 105, 36, { align: 'center' });
+
+  // Identitas Guru & Kelas
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Nama Guru    : ${teacher.namaGuru}`, 14, 43);
+  doc.text(`NBM / NIP     : ${teacher.nbm || teacher.nip || '-'}`, 14, 48);
+  doc.text(`Mata Pelajaran: ${classRoom.mataPelajaran}`, 14, 53);
+
+  doc.text(`Kelas / Rombel : ${classRoom.namaKelas}`, 130, 43);
+  doc.text(`Tahun Ajaran   : ${teacher.tahunAjaran}`, 130, 48);
+  doc.text(`Semester       : ${teacher.semester}`, 130, 53);
+
+  // Table
+  let startY = 58;
+  doc.setFillColor(241, 245, 249);
+  doc.rect(14, startY, 182, 8, 'F');
+  doc.setDrawColor(148, 163, 184);
+  doc.rect(14, startY, 182, 8, 'S');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text('No', 17, startY + 5.5);
+  doc.text('Hari / Tgl', 26, startY + 5.5);
+  doc.text('Jam', 48, startY + 5.5);
+  doc.text('Materi / Capaian Pembelajaran', 62, startY + 5.5);
+  doc.text('Hadir', 156, startY + 5.5);
+  doc.text('Absen', 168, startY + 5.5);
+  doc.text('TTD', 184, startY + 5.5);
+
+  let currentY = startY + 8;
+  doc.setFont('helvetica', 'normal');
+
+  agendas.forEach((ag, idx) => {
+    if (currentY > 260) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    const rowH = 10;
+    doc.rect(14, currentY, 182, rowH, 'S');
+    doc.text(String(idx + 1), 17, currentY + 6);
+    doc.text(`${ag.hari?.substring(0, 3)}, ${ag.tanggal}`, 26, currentY + 6);
+    doc.text(`Ke-${ag.jamKe}`, 48, currentY + 6);
+    doc.text(ag.materiAjar ? ag.materiAjar.substring(0, 46) : '-', 62, currentY + 6);
+    doc.text(String(ag.hadirCount ?? 0), 158, currentY + 6);
+    doc.text(String(ag.tidakHadirCount ?? 0), 170, currentY + 6);
+    doc.text('...', 185, currentY + 6);
+
+    currentY += rowH;
+  });
+
+  // Tanda Tangan
+  const signY = currentY + 12 > 260 ? 260 : currentY + 12;
+  doc.setFontSize(8.5);
+  doc.text(`Bawang, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, 140, signY);
+  doc.text('Guru Mata Pelajaran,', 140, signY + 5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(teacher.namaGuru, 140, signY + 22);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`NBM/NIP: ${teacher.nbm || teacher.nip || '-'}`, 140, signY + 26);
+
+  doc.save(`Agenda_Mengajar_${classRoom.namaKelas.replace(/\s+/g, '_')}.pdf`);
+}
+
+/**
+ * Unduh template Excel untuk impor data siswa
+ */
+export function downloadStudentTemplateExcel(classRoom: ClassRoom) {
+  const wsData = [
+    ['No', 'NISN', 'Nama Lengkap', 'Jenis Kelamin', 'No HP Orang Tua', 'Catatan'],
+    [1, '0081234567', 'Ahmad Fauzi', 'L', '08123456789', 'Contoh siswa 1'],
+    [2, '0087654321', 'Siti Nurhaliza', 'P', '08567890123', 'Contoh siswa 2'],
+    [3, '', 'Muhammad Rizki', 'L', '08781234567', ''],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [
+    { wch: 6 },
+    { wch: 16 },
+    { wch: 28 },
+    { wch: 14 },
+    { wch: 20 },
+    { wch: 24 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Template Siswa');
+  XLSX.writeFile(wb, `Template_Impor_Siswa_${classRoom.namaKelas.replace(/\s+/g, '_')}.xlsx`);
+}
+
+/**
+ * Unduh template Excel untuk impor nilai siswa (sudah berisi daftar siswa kelas)
+ */
+export function downloadGradesTemplateExcel(
+  classRoom: ClassRoom,
+  students: Student[],
+  gradeColumns: GradeColumn[],
+  teacher: TeacherProfile
+) {
+  const activeCols = gradeColumns.slice(0, 8);
+  const colLabels = activeCols.map((c) => c.label);
+
+  const headerRow1 = ['TEMPLATE PENGISIAN NILAI SISWA'];
+  const headerRow2 = [`Sekolah: ${teacher.namaSekolah || 'SMK Muhammadiyah Bawang'}`];
+  const headerRow3 = [`Kelas: ${classRoom.namaKelas} | Mapel: ${classRoom.mataPelajaran} | KKM: ${classRoom.kkm}`];
+  const headerRow4 = ['Petunjuk: Isikan angka nilai (0-100) pada kolom formatif dan sumatif. Jangan ubah kolom NISN atau Nama Siswa.'];
+  const emptyRow: any[] = [];
+
+  const tableHeader = [
+    'No',
+    'NISN',
+    'Nama Siswa',
+    'L/P',
+    ...colLabels,
+    'STS',
+    'SAS',
+    'Catatan Capaian',
+  ];
+
+  const sortedStudents = [...students].sort((a, b) => a.no - b.no);
+  const tableData = sortedStudents.map((std, idx) => [
+    idx + 1,
+    std.nisn || '',
+    std.nama,
+    std.gender,
+    ...activeCols.map(() => ''),
+    '',
+    '',
+    '',
+  ]);
+
+  const fullData = [headerRow1, headerRow2, headerRow3, headerRow4, emptyRow, tableHeader, ...tableData];
+  const ws = XLSX.utils.aoa_to_sheet(fullData);
+
+  ws['!cols'] = [
+    { wch: 5 },
+    { wch: 14 },
+    { wch: 30 },
+    { wch: 6 },
+    ...activeCols.map(() => ({ wch: 14 })),
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 25 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Nilai Siswa');
+  XLSX.writeFile(wb, `Template_Nilai_${classRoom.namaKelas.replace(/\s+/g, '_')}_${classRoom.mataPelajaran.replace(/\s+/g, '_')}.xlsx`);
+}
+

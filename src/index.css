@@ -8,6 +8,17 @@
     text-rendering: optimizeLegibility;
   }
 
+  body {
+    background:
+      radial-gradient(1000px circle at 15% 15%, rgba(99, 102, 241, 0.06) 0%, transparent 70%),
+      radial-gradient(800px circle at 85% 20%, rgba(168, 85, 247, 0.05) 0%, transparent 60%),
+      radial-gradient(900px circle at 50% 85%, rgba(56, 189, 248, 0.05) 0%, transparent 65%),
+      linear-gradient(145deg, #f8fafc 0%, #f1f5f9 35%, #eef2ff 75%, #faf5ff 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    color: #0f172a;
+  }
+
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }

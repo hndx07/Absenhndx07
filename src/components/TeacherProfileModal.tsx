@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   Save,
@@ -9,6 +9,8 @@ import {
   Database,
   CheckCircle2,
   RefreshCw,
+  Info,
+  RotateCcw,
 } from 'lucide-react';
 import { TeacherProfile } from '../types';
 import { createOrUpdateTeacherProfile } from '../services/data';
@@ -42,11 +44,29 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationStatus, setMigrationStatus] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setProfile({ ...teacher });
+      setIsDirty(false);
+    }
+  }, [isOpen, teacher]);
 
   if (!isOpen) return null;
 
   const hasLegacyData = checkHasLegacyLocalData();
   const legacySummary = getLegacyDataSummary();
+
+  const handleFieldChange = (field: keyof TeacherProfile, value: any) => {
+    setProfile((prev) => ({ ...prev, [field]: value }));
+    setIsDirty(true);
+  };
+
+  const handleReset = () => {
+    setProfile({ ...teacher });
+    setIsDirty(false);
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +74,8 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
     try {
       const saved = await createOrUpdateTeacherProfile(profile);
       onUpdateTeacher(saved);
-      alert('Profil Guru berhasil diperbarui di PostgreSQL Supabase!');
+      setIsDirty(false);
+      alert('Identitas guru & tahun ajaran berhasil disimpan ke PostgreSQL Supabase!');
       onClose();
     } catch (err: any) {
       alert(`Gagal memperbarui profil: ${err?.message || 'Error'}`);
@@ -114,66 +135,79 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
 
         {/* Form Body */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          {/* Draft Notification Banner */}
+          <div className="p-3.5 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 flex items-start gap-3 text-xs">
+            <Info className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="font-bold text-indigo-950 dark:text-indigo-200">
+                Mode Draft (Aman & Terkontrol)
+              </p>
+              <p className="text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                Isian identitas guru dan tahun ajaran <strong>tidak langsung tersimpan ke cloud server</strong> saat Anda mengetik. Data baru akan disinkronkan ke PostgreSQL Supabase hanya saat tombol <em>Simpan Profil ke Supabase</em> ditekan.
+              </p>
+            </div>
+          </div>
+
           <form onSubmit={handleSave} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase mb-1">
                   Nama Lengkap Guru (dengan Gelar) *
                 </label>
                 <input
                   type="text"
                   required
                   value={profile.namaGuru}
-                  onChange={(e) => setProfile({ ...profile, namaGuru: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-semibold"
+                  onChange={(e) => handleFieldChange('namaGuru', e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-semibold dark:bg-slate-800 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase mb-1">
                   NIP
                 </label>
                 <input
                   type="text"
                   value={profile.nip}
-                  onChange={(e) => setProfile({ ...profile, nip: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                  onChange={(e) => handleFieldChange('nip', e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-mono dark:bg-slate-800 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase mb-1">
                   NBM (Nomor Baku Muhammadiyah)
                 </label>
                 <input
                   type="text"
                   placeholder="Contoh: 1182940"
                   value={profile.nbm || ''}
-                  onChange={(e) => setProfile({ ...profile, nbm: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                  onChange={(e) => handleFieldChange('nbm', e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-mono dark:bg-slate-800 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase mb-1">
                   Tahun Pelajaran
                 </label>
                 <input
                   type="text"
                   value={profile.tahunAjaran}
-                  onChange={(e) => setProfile({ ...profile, tahunAjaran: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono"
+                  onChange={(e) => handleFieldChange('tahunAjaran', e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-mono dark:bg-slate-800 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase mb-1">
                   Semester
                 </label>
                 <select
                   value={profile.semester}
-                  onChange={(e) => setProfile({ ...profile, semester: e.target.value as any })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs bg-white font-semibold"
+                  onChange={(e) => handleFieldChange('semester', e.target.value as any)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs bg-white dark:bg-slate-800 dark:text-white font-semibold"
                 >
                   <option value="Ganjil">Ganjil</option>
                   <option value="Genap">Genap</option>
@@ -181,23 +215,36 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase mb-1">
                   Nama Satuan Pendidikan
                 </label>
                 <input
                   type="text"
                   value={profile.namaSekolah}
-                  onChange={(e) => setProfile({ ...profile, namaSekolah: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-medium"
+                  onChange={(e) => handleFieldChange('namaSekolah', e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-medium dark:bg-slate-800 dark:text-white"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex items-center justify-between pt-2">
+              {isDirty ? (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="px-3.5 py-2 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Reset Isian
+                </button>
+              ) : (
+                <span className="text-[11px] text-slate-400">Semua isian sinkron</span>
+              )}
+
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md"
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md ml-auto"
               >
                 {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {isSaving ? 'Menyimpan...' : 'Simpan Profil ke Supabase'}

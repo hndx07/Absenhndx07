@@ -15,6 +15,7 @@ import {
   GraduationCap,
   AlertCircle,
   LogOut,
+  FileCheck,
 } from 'lucide-react';
 
 // Supabase Services
@@ -78,10 +79,12 @@ import { SavingsView } from './components/SavingsView';
 import { StatisticsView } from './components/StatisticsView';
 import { ParentReportView } from './components/ParentReportView';
 import { SchoolMapView } from './components/SchoolMapView';
+import { MonthlyAttendanceRecapView } from './components/MonthlyAttendanceRecapView';
 import { ThemeToggle } from './components/ThemeToggle';
 
 type NavTab =
   | 'attendance'
+  | 'recap'
   | 'grades'
   | 'students'
   | 'agendas'
@@ -587,6 +590,18 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => setActiveTab('recap')}
+                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
+                  activeTab === 'recap'
+                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                }`}
+              >
+                <FileCheck className="w-4 h-4" />
+                Rekap Absensi
+              </button>
+
+              <button
                 onClick={() => setActiveTab('grades')}
                 className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
                   activeTab === 'grades'
@@ -734,6 +749,16 @@ export default function App() {
               />
             )}
 
+            {activeTab === 'recap' && (
+              <MonthlyAttendanceRecapView
+                currentClass={activeClass}
+                classes={classes}
+                students={students}
+                sessions={attendance}
+                teacher={activeTeacher}
+              />
+            )}
+
             {activeTab === 'grades' && (
               <GradesView
                 currentClass={activeClass}
@@ -750,6 +775,8 @@ export default function App() {
               <StudentManagementView
                 currentClass={activeClass}
                 students={students}
+                teacher={activeTeacher}
+                classes={classes}
                 onSaveStudent={handleSaveStudent}
                 onDeleteStudent={handleDeleteStudent}
                 onBatchAddStudents={handleBatchAddStudents}

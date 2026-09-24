@@ -14,6 +14,7 @@ import {
   Check,
   ExternalLink,
   ChevronRight,
+  ChevronDown,
   TrendingUp,
 } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -27,6 +28,7 @@ import {
 } from '../types';
 import { exportAttendanceToExcel, exportAttendanceToPDF } from '../utils/exportUtils';
 import { createOrUpdatePublicShare } from '../services/data';
+import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface AttendanceViewProps {
   currentClass: ClassRoom;
@@ -56,6 +58,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const [activeSessionId, setActiveSessionId] = useState<string>(
     classSessions[0]?.id || ''
   );
+  const [isMeetingsPanelOpen, setIsMeetingsPanelOpen] = useState(false);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [newSessionData, setNewSessionData] = useState({
     tanggal: new Date().toISOString().split('T')[0],
@@ -128,7 +131,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   };
 
   // Stats for current session
-  let countH = 0, countS = 0, countI = 0, countA = 0;
+  let countH = 0, countS = 0, countI = 0, countA = 0, countD = 0;
   if (currentSession) {
     classStudents.forEach((std) => {
       const st = currentSession.records?.[std.id]?.status;
@@ -136,10 +139,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       else if (st === 'S') countS++;
       else if (st === 'I') countI++;
       else if (st === 'A') countA++;
+      else if (st === 'D') countD++;
     });
   }
   const totalInSession = classStudents.length || 1;
-  const attendanceRate = Math.round((countH / totalInSession) * 100);
+  const attendanceRate = Math.round(((countH + countD) / totalInSession) * 100);
 
   // Generate public share link
   const handleOpenShare = async () => {
@@ -251,33 +255,77 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           </div>
         </div>
 
-        {/* Sessions Pills Carousel */}
+        {/* Collapsible Sessions Selector Panel (Default: Tersembunyi) */}
         {classSessions.length > 0 ? (
-          <div className="space-y-2 pt-2 border-t border-slate-100">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Daftar Sesi Pertemuan ({classSessions.length} Pertemuan)
-            </p>
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
-              {classSessions.map((session) => {
-                const isSelected = (currentSession?.id === session.id);
-                return (
-                  <button
-                    key={session.id}
-                    onClick={() => setActiveSessionId(session.id)}
-                    className={`shrink-0 px-4 py-2.5 rounded-2xl text-xs font-semibold transition text-left border flex flex-col gap-0.5 ${
-                      isSelected
-                        ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-indigo-500/30'
-                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    <span className="font-bold">Pertemuan {session.pertemuanKe}</span>
-                    <span className={`text-[10px] ${isSelected ? 'text-indigo-300' : 'text-slate-400'}`}>
-                      {session.tanggal}
-                    </span>
-                  </button>
-                );
-              })}
+          <div className="pt-2 border-t border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsMeetingsPanelOpen(!isMeetingsPanelOpen)}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-xs font-bold transition flex items-center justify-between gap-3 shadow-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-indigo-600" />
+                  <span>
+                    Pertemuan {currentSession ? `Ke-${currentSession.pertemuanKe} (${currentSession.tanggal})` : 'Pilih Pertemuan'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">
+                    {classSessions.length} Pertemuan
+                  </span>
+                </div>
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${
+                    isMeetingsPanelOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              <span className="text-[11px] text-slate-400 hidden sm:inline">
+                Klik tombol di atas untuk membuka daftar seluruh pertemuan
+              </span>
             </div>
+
+            {/* Hidden / Expanded Dropdown Panel */}
+            {isMeetingsPanelOpen && (
+              <div className="mt-3 p-4 bg-slate-50/80 rounded-2xl border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Pilih Sesi Pertemuan:
+                  </p>
+                  <button
+                    onClick={() => setIsMeetingsPanelOpen(false)}
+                    className="text-xs text-slate-400 hover:text-slate-600 font-medium"
+                  >
+                    Tutup Panel ▲
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-56 overflow-y-auto pr-1">
+                  {classSessions.map((session) => {
+                    const isSelected = currentSession?.id === session.id;
+                    return (
+                      <button
+                        key={session.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveSessionId(session.id);
+                          setIsMeetingsPanelOpen(false); // Auto close after selecting
+                        }}
+                        className={`p-2.5 rounded-xl text-xs font-semibold transition text-left border flex flex-col gap-0.5 ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-500/30'
+                            : 'bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-900 border-slate-200'
+                        }`}
+                      >
+                        <span className="font-bold leading-tight">Pertemuan {session.pertemuanKe}</span>
+                        <span className={`text-[10px] ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
+                          {session.tanggal}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-800">
@@ -335,7 +383,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 {attendanceRate}%
               </span>
               <span className="text-xs text-slate-500 font-medium">
-                ({countH}/{classStudents.length} Siswa)
+                ({countH + countD}/{classStudents.length} Siswa)
               </span>
             </div>
             <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
@@ -346,22 +394,26 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm grid grid-cols-2 gap-2 text-center">
-            <div className="bg-emerald-50 p-2.5 rounded-2xl border border-emerald-100">
-              <span className="block text-emerald-800 font-bold text-lg font-mono">{countH}</span>
-              <span className="text-[11px] font-bold text-emerald-600">Hadir (H)</span>
+          <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm grid grid-cols-5 gap-1.5 text-center">
+            <div className="bg-emerald-50 p-2 rounded-xl border border-emerald-100">
+              <span className="block text-emerald-800 font-bold text-base font-mono">{countH}</span>
+              <span className="text-[10px] font-bold text-emerald-600">Hadir</span>
             </div>
-            <div className="bg-blue-50 p-2.5 rounded-2xl border border-blue-100">
-              <span className="block text-blue-800 font-bold text-lg font-mono">{countS}</span>
-              <span className="text-[11px] font-bold text-blue-600">Sakit (S)</span>
+            <div className="bg-blue-50 p-2 rounded-xl border border-blue-100">
+              <span className="block text-blue-800 font-bold text-base font-mono">{countS}</span>
+              <span className="text-[10px] font-bold text-blue-600">Sakit</span>
             </div>
-            <div className="bg-amber-50 p-2.5 rounded-2xl border border-amber-100">
-              <span className="block text-amber-800 font-bold text-lg font-mono">{countI}</span>
-              <span className="text-[11px] font-bold text-amber-600">Izin (I)</span>
+            <div className="bg-amber-50 p-2 rounded-xl border border-amber-100">
+              <span className="block text-amber-800 font-bold text-base font-mono">{countI}</span>
+              <span className="text-[10px] font-bold text-amber-600">Izin</span>
             </div>
-            <div className="bg-rose-50 p-2.5 rounded-2xl border border-rose-100">
-              <span className="block text-rose-800 font-bold text-lg font-mono">{countA}</span>
-              <span className="text-[11px] font-bold text-rose-600">Alfa (A)</span>
+            <div className="bg-rose-50 p-2 rounded-xl border border-rose-100">
+              <span className="block text-rose-800 font-bold text-base font-mono">{countA}</span>
+              <span className="text-[10px] font-bold text-rose-600">Alfa</span>
+            </div>
+            <div className="bg-purple-50 p-2 rounded-xl border border-purple-100">
+              <span className="block text-purple-800 font-bold text-base font-mono">{countD}</span>
+              <span className="text-[10px] font-bold text-purple-600">Dispen</span>
             </div>
           </div>
         </div>
@@ -415,7 +467,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       </td>
                       <td className="py-2.5 px-3">
                         <div className="flex items-center justify-center gap-1.5">
-                          {(['H', 'S', 'I', 'A'] as AttendanceStatus[]).map((st) => {
+                          {(['H', 'S', 'I', 'A', 'D'] as AttendanceStatus[]).map((st) => {
                             const isSelected = status === st;
                             let style = 'bg-slate-100 text-slate-600 hover:bg-slate-200';
                             if (isSelected) {
@@ -423,6 +475,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                               else if (st === 'S') style = 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20';
                               else if (st === 'I') style = 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-500/20';
                               else if (st === 'A') style = 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-500/20';
+                              else if (st === 'D') style = 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-500/20';
                             }
 
                             return (
@@ -430,7 +483,18 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                 key={st}
                                 type="button"
                                 onClick={() => handleUpdateRecord(std.id, st)}
-                                className={`w-9 h-8 rounded-xl font-bold font-mono transition text-xs flex items-center justify-center ${style}`}
+                                className={`w-8 h-8 rounded-xl font-bold font-mono transition text-xs flex items-center justify-center ${style}`}
+                                title={
+                                  st === 'H'
+                                    ? 'Hadir'
+                                    : st === 'S'
+                                    ? 'Sakit'
+                                    : st === 'I'
+                                    ? 'Izin'
+                                    : st === 'A'
+                                    ? 'Alpa'
+                                    : 'Dispensasi'
+                                }
                               >
                                 {st}
                               </button>

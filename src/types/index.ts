@@ -1,5 +1,5 @@
 export type Gender = 'L' | 'P';
-export type AttendanceStatus = 'H' | 'S' | 'I' | 'A';
+export type AttendanceStatus = 'H' | 'S' | 'I' | 'A' | 'D';
 
 export interface TeacherProfile {
   id: string;

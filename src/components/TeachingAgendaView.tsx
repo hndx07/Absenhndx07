@@ -12,9 +12,12 @@ import {
   X,
   Printer,
   Sparkles,
+  Eye,
+  Download,
 } from 'lucide-react';
 import { TeachingAgenda, ClassRoom, TeacherProfile } from '../types';
-import { exportAgendasToExcel, exportToWordDocument } from '../utils/exportUtils';
+import { exportAgendasToExcel, exportToWordDocument, exportAgendaToPDF } from '../utils/exportUtils';
+import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface TeachingAgendaViewProps {
   currentClass: ClassRoom;
@@ -32,6 +35,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
   onDeleteAgenda,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPreviewPdfOpen, setIsPreviewPdfOpen] = useState(false);
   const [editingAgenda, setEditingAgenda] = useState<Partial<TeachingAgenda> | null>(null);
 
   const classAgendas = agendas
@@ -142,7 +146,25 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsPreviewPdfOpen(true)}
+            className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+            title="Lihat format cetak PDF resmi"
+          >
+            <Eye className="w-4 h-4 text-rose-600" />
+            Preview PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => exportAgendaToPDF(classAgendas, currentClass, teacher)}
+            className="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-rose-600/20"
+            title="Unduh berkas PDF siap cetak"
+          >
+            <Download className="w-4 h-4" />
+            Unduh PDF
+          </button>
           <button
             onClick={() => exportAgendasToExcel(classAgendas, currentClass, teacher)}
             className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 border border-emerald-200"
@@ -390,6 +412,158 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Preview PDF Agenda Mengajar */}
+      {isPreviewPdfOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in">
+          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
+              <div className="flex items-center gap-2.5">
+                <Eye className="w-5 h-5 text-indigo-400" />
+                <h3 className="font-bold text-sm sm:text-base">
+                  Pratinjau Dokumen PDF Agenda Mengajar
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => exportAgendaToPDF(classAgendas, currentClass, teacher)}
+                  className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Unduh PDF
+                </button>
+                <button
+                  onClick={() => setIsPreviewPdfOpen(false)}
+                  className="p-1.5 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* A4 Paper Simulation Canvas */}
+            <div className="p-4 sm:p-8 overflow-y-auto bg-slate-100 flex-1">
+              <div className="bg-white mx-auto p-6 sm:p-10 shadow-lg rounded-xl border border-slate-200 text-slate-900 max-w-[210mm] font-serif leading-relaxed text-xs">
+                {/* Kop Sekolah */}
+                <div className="text-center border-b-2 border-slate-900 pb-3 mb-4">
+                  <p className="font-bold text-[11px] tracking-wide text-slate-700 uppercase">
+                    MAJELIS PENDIDIKAN DASAR MENENGAH DAN PENDIDIKAN NONFORMAL
+                  </p>
+                  <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight uppercase my-0.5">
+                    {SCHOOL_CONFIG.namaSekolah}
+                  </h1>
+                  <p className="text-[10px] text-slate-600">
+                    Alamat: {SCHOOL_CONFIG.alamat} &bull; Website: {SCHOOL_CONFIG.website} &bull; Telp: {SCHOOL_CONFIG.telepon}
+                  </p>
+                </div>
+
+                {/* Document Title */}
+                <div className="text-center mb-5">
+                  <h2 className="text-sm font-bold uppercase tracking-wider underline">
+                    BUKU JURNAL / AGENDA MENGAJAR GURU
+                  </h2>
+                </div>
+
+                {/* Guru & Rombel Info */}
+                <div className="grid grid-cols-2 gap-4 text-xs mb-5 font-sans bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <div className="space-y-1">
+                    <p><span className="text-slate-500 inline-block w-28">Nama Guru:</span> <strong>{teacher.namaGuru}</strong></p>
+                    <p><span className="text-slate-500 inline-block w-28">NBM / NIP:</span> {teacher.nbm || teacher.nip || '-'}</p>
+                    <p><span className="text-slate-500 inline-block w-28">Mata Pelajaran:</span> {currentClass.mataPelajaran}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p><span className="text-slate-500 inline-block w-28">Kelas / Rombel:</span> <strong>{currentClass.namaKelas}</strong></p>
+                    <p><span className="text-slate-500 inline-block w-28">Tahun Ajaran:</span> {teacher.tahunAjaran}</p>
+                    <p><span className="text-slate-500 inline-block w-28">Semester:</span> {teacher.semester}</p>
+                  </div>
+                </div>
+
+                {/* Table Agendas */}
+                <div className="overflow-x-auto mb-6">
+                  <table className="w-full border-collapse border border-slate-300 text-[11px] font-sans">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-800">
+                        <th className="border border-slate-300 p-2 text-center w-8">No</th>
+                        <th className="border border-slate-300 p-2 text-left w-24">Hari / Tanggal</th>
+                        <th className="border border-slate-300 p-2 text-center w-14">Jam Ke</th>
+                        <th className="border border-slate-300 p-2 text-left">Materi / Capaian Pembelajaran</th>
+                        <th className="border border-slate-300 p-2 text-center w-12">Hadir</th>
+                        <th className="border border-slate-300 p-2 text-center w-12">Absen</th>
+                        <th className="border border-slate-300 p-2 text-center w-16">Paraf</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {classAgendas.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="border border-slate-300 p-4 text-center text-slate-400 italic">
+                            Belum ada entri jurnal mengajar untuk kelas ini.
+                          </td>
+                        </tr>
+                      ) : (
+                        classAgendas.map((ag, idx) => (
+                          <tr key={ag.id} className="hover:bg-slate-50">
+                            <td className="border border-slate-300 p-2 text-center font-mono">{idx + 1}</td>
+                            <td className="border border-slate-300 p-2 font-medium">{ag.hari?.substring(0, 3)}, {ag.tanggal}</td>
+                            <td className="border border-slate-300 p-2 text-center font-mono">Ke-{ag.jamKe}</td>
+                            <td className="border border-slate-300 p-2">
+                              <p className="font-semibold text-slate-800">{ag.materiAjar}</p>
+                              {ag.kegiatan && <p className="text-[10px] text-slate-500 mt-0.5">{ag.kegiatan}</p>}
+                            </td>
+                            <td className="border border-slate-300 p-2 text-center font-mono text-emerald-700 font-bold">{ag.hadirCount ?? 0}</td>
+                            <td className="border border-slate-300 p-2 text-center font-mono text-rose-700 font-bold">{ag.tidakHadirCount ?? 0}</td>
+                            <td className="border border-slate-300 p-2 text-center text-slate-300 font-mono text-[9px]">&#10003;</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Tanda Tangan */}
+                <div className="flex justify-end pt-4 font-sans text-xs">
+                  <div className="text-center w-64">
+                    <p className="text-slate-600">
+                      Bawang, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </p>
+                    <p className="text-slate-600 mt-0.5">Guru Pengampu Mata Pelajaran,</p>
+                    <div className="h-16 flex items-end justify-center">
+                      <p className="font-bold underline text-slate-900">{teacher.namaGuru}</p>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                      NBM / NIP: {teacher.nbm || teacher.nip || '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3 bg-slate-50 border-t flex items-center justify-between">
+              <span className="text-xs text-slate-500">
+                Format resmi sesuai standar kurikulum SMK Muhammadiyah Bawang
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewPdfOpen(false)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => exportAgendaToPDF(classAgendas, currentClass, teacher)}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5"
+                >
+                  <Download className="w-4 h-4" />
+                  Unduh PDF
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

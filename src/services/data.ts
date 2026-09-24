@@ -1,4 +1,5 @@
 import { getSupabaseClient, getAuthUser } from './supabase';
+import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import {
   TeacherProfile,
   ClassRoom,
@@ -35,10 +36,10 @@ export async function getTeacherProfile(): Promise<TeacherProfile | null> {
 
   return {
     id: data.id,
-    namaGuru: data.nama_guru,
+    namaGuru: data.nama_guru || user.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
     nip: data.nip || '',
     nbm: data.nbm || '',
-    namaSekolah: data.nama_sekolah || 'SMK Muhammadiyah Bawang',
+    namaSekolah: data.nama_sekolah || SCHOOL_CONFIG.namaSekolah,
     mataPelajaranUtama: data.mata_pelajaran_utama || 'Konsentrasi Keahlian TKJ',
     tahunAjaran: data.tahun_ajaran || '2025/2026',
     semester: (data.semester as 'Ganjil' | 'Genap') || 'Genap',
@@ -56,20 +57,33 @@ export async function createOrUpdateTeacherProfile(
   const user = await getAuthUser();
   if (!user) throw new Error('User belum terautentikasi');
 
-  const profileId = profile.id || `teacher_${user.id.slice(0, 8)}`;
+  // Ambil profil yang tersimpan di cloud agar partial update tidak menimpa data yang sudah ada
+  const { data: existing } = await supabase
+    .from('teacher_profiles')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  const profileId = profile.id || existing?.id || `teacher_${user.id.slice(0, 8)}`;
   const payload = {
     id: profileId,
     user_id: user.id,
-    nama_guru: profile.namaGuru || user.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
-    nip: profile.nip || '',
-    nbm: profile.nbm || '',
-    nama_sekolah: profile.namaSekolah || 'SMK Muhammadiyah Bawang',
-    mata_pelajaran_utama: profile.mataPelajaranUtama || 'Konsentrasi Keahlian TKJ',
-    tahun_ajaran: profile.tahunAjaran || '2025/2026',
-    semester: profile.semester || 'Genap',
-    email: user.email || profile.email || '',
-    avatar_url: profile.avatarUrl || '',
-    active_class_id: profile.activeClassId || null,
+    nama_guru:
+      profile.namaGuru ??
+      existing?.nama_guru ??
+      user.user_metadata?.nama_guru ??
+      'Guru SMK Muhammadiyah Bawang',
+    nip: profile.nip ?? existing?.nip ?? '',
+    nbm: profile.nbm ?? existing?.nbm ?? '',
+    nama_sekolah: profile.namaSekolah ?? existing?.nama_sekolah ?? SCHOOL_CONFIG.namaSekolah,
+    mata_pelajaran_utama:
+      profile.mataPelajaranUtama ?? existing?.mata_pelajaran_utama ?? 'Konsentrasi Keahlian TKJ',
+    tahun_ajaran: profile.tahunAjaran ?? existing?.tahun_ajaran ?? '2025/2026',
+    semester: profile.semester ?? existing?.semester ?? 'Genap',
+    email: user.email || profile.email || existing?.email || '',
+    avatar_url: profile.avatarUrl ?? existing?.avatar_url ?? '',
+    active_class_id:
+      profile.activeClassId !== undefined ? profile.activeClassId : (existing?.active_class_id || null),
     updated_at: new Date().toISOString(),
   };
 
@@ -192,6 +206,28 @@ export async function updateClass(cls: ClassRoom): Promise<ClassRoom> {
     jurusan: data.jurusan,
     keterangan: data.keterangan,
     createdAt: data.created_at,
+  };
+}
+
+export async function getClassDependencyCounts(classId: string): Promise<{
+  studentsCount: number;
+  attendanceCount: number;
+  gradesCount: number;
+  agendasCount: number;
+}> {
+  const supabase = getSupabaseClient();
+  const [studentsRes, attendanceRes, gradesRes, agendasRes] = await Promise.all([
+    supabase.from('students').select('id', { count: 'exact', head: true }).eq('class_id', classId),
+    supabase.from('attendance_sessions').select('id', { count: 'exact', head: true }).eq('class_id', classId),
+    supabase.from('student_grades').select('id', { count: 'exact', head: true }).eq('class_id', classId),
+    supabase.from('teaching_agendas').select('id', { count: 'exact', head: true }).eq('class_id', classId),
+  ]);
+
+  return {
+    studentsCount: studentsRes.count || 0,
+    attendanceCount: attendanceRes.count || 0,
+    gradesCount: gradesRes.count || 0,
+    agendasCount: agendasRes.count || 0,
   };
 }
 
@@ -503,6 +539,41 @@ export async function saveStudentGrade(grade: StudentGrade): Promise<StudentGrad
     sumatifAkhir: data.sumatif_akhir !== null ? Number(data.sumatif_akhir) : null,
     catatan: data.catatan || '',
   };
+}
+
+export async function batchUpsertStudentGrades(gradesList: StudentGrade[]): Promise<void> {
+  if (!gradesList || gradesList.length === 0) return;
+  const supabase = getSupabaseClient();
+  const user = await getAuthUser();
+  if (!user) throw new Error('User belum login');
+
+  const now = new Date().toISOString();
+  const rows = gradesList.map((g) => ({
+    id: g.id,
+    student_id: g.studentId,
+    class_id: g.classId,
+    user_id: user.id,
+    formatif1: g.formatif1,
+    formatif2: g.formatif2,
+    formatif3: g.formatif3,
+    formatif4: g.formatif4,
+    formatif5: g.formatif5,
+    formatif6: g.formatif6,
+    formatif7: g.formatif7,
+    formatif8: g.formatif8,
+    formatif9: g.formatif9,
+    formatif10: g.formatif10,
+    sumatif_tengah: g.sumatifTengah,
+    sumatif_akhir: g.sumatifAkhir,
+    catatan: g.catatan || '',
+    updated_at: now,
+  }));
+
+  const { error } = await supabase.from('student_grades').upsert(rows, { onConflict: 'id' });
+  if (error) {
+    console.error('Error batch upserting grades:', error);
+    throw error;
+  }
 }
 
 // ============================================================================

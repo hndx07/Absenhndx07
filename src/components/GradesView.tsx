@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Award,
   Edit3,
@@ -12,7 +12,15 @@ import {
   Copy,
   Sliders,
   X,
+  Upload,
+  Download,
+  AlertTriangle,
+  RefreshCw,
+  CheckCircle2,
+  Clock,
+  Save,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import QRCode from 'qrcode';
 import {
   ClassRoom,
@@ -22,7 +30,7 @@ import {
   TeacherProfile,
   PublicShareRecord,
 } from '../types';
-import { exportGradesToExcel } from '../utils/exportUtils';
+import { exportGradesToExcel, downloadGradesTemplateExcel } from '../utils/exportUtils';
 import { createOrUpdatePublicShare } from '../services/data';
 
 interface GradesViewProps {
@@ -33,6 +41,17 @@ interface GradesViewProps {
   teacher: TeacherProfile;
   onSaveGrade: (grade: StudentGrade) => void;
   onSaveGradeColumns: (cols: GradeColumn[]) => void;
+}
+
+interface GradePreviewRow {
+  rowNum: number;
+  nisn: string;
+  nama: string;
+  studentId?: string;
+  scores: Record<string, number | null>;
+  catatan: string;
+  status: 'valid' | 'duplicate' | 'not_found' | 'invalid';
+  reason?: string;
 }
 
 export const GradesView: React.FC<GradesViewProps> = ({
@@ -49,21 +68,94 @@ export const GradesView: React.FC<GradesViewProps> = ({
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
   const [editingColumns, setEditingColumns] = useState<GradeColumn[]>(gradeColumns);
 
+  // Local State for Instant UI (Zero-Delay Input)
+  const [localGrades, setLocalGrades] = useState<Record<string, StudentGrade>>({});
+  const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const [pendingSaves, setPendingSaves] = useState<Record<string, StudentGrade>>({});
+  const debounceTimerRef = useRef<any>(null);
+
   // Share state
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareQrUrl, setShareQrUrl] = useState('');
   const [shareLink, setShareLink] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const classStudents = students
-    .filter((s) => s.classId === currentClass.id)
-    .sort((a, b) => a.no - b.no);
+  // Import State
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importMode, setImportMode] = useState<'file' | 'paste'>('file');
+  const [importFileName, setImportFileName] = useState('');
+  const [importRawText, setImportRawText] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [parsedGradeRows, setParsedGradeRows] = useState<GradePreviewRow[]>([]);
+  const [overwriteMode, setOverwriteMode] = useState<'skip' | 'update'>('skip');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const filteredStudents = classStudents.filter((s) =>
-    s.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.nisn.includes(searchTerm)
-  );
+  const classStudents = useMemo(() => {
+    return students
+      .filter((s) => s.classId === currentClass.id)
+      .sort((a, b) => a.no - b.no);
+  }, [students, currentClass.id]);
 
+  // Sync prop grades into local state initially and when switching classes
+  useEffect(() => {
+    const map: Record<string, StudentGrade> = {};
+    grades
+      .filter((g) => g.classId === currentClass.id)
+      .forEach((g) => {
+        map[g.studentId] = g;
+      });
+    setLocalGrades(map);
+    setPendingSaves({});
+    setSyncStatus('saved');
+  }, [grades, currentClass.id]);
+
+  useEffect(() => {
+    setEditingColumns(gradeColumns);
+  }, [gradeColumns]);
+
+  // Debounced cloud synchronization
+  const scheduleCloudSync = (updatedRecord: StudentGrade) => {
+    setSyncStatus('saving');
+    setPendingSaves((prev) => ({ ...prev, [updatedRecord.studentId]: updatedRecord }));
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        await onSaveGrade(updatedRecord);
+        setPendingSaves((prev) => {
+          const next = { ...prev };
+          delete next[updatedRecord.studentId];
+          return next;
+        });
+        setSyncStatus('saved');
+      } catch (err) {
+        console.error('Failed to sync grade to cloud:', err);
+        setSyncStatus('error');
+      }
+    }, 900);
+  };
+
+  // Immediate save all pending changes
+  const handleSaveAllNow = async () => {
+    if (Object.keys(pendingSaves).length === 0) return;
+    setSyncStatus('saving');
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+    try {
+      const promises = Object.values(pendingSaves).map((g) => onSaveGrade(g));
+      await Promise.all(promises);
+      setPendingSaves({});
+      setSyncStatus('saved');
+    } catch (err) {
+      console.error('Error saving all grades:', err);
+      setSyncStatus('error');
+    }
+  };
+
+  // Zero-delay Score Input Handler
   const handleScoreChange = (
     studentId: string,
     field: keyof StudentGrade,
@@ -77,51 +169,90 @@ export const GradesView: React.FC<GradesViewProps> = ({
       }
     }
 
-    const existing = grades.find((g) => g.studentId === studentId && g.classId === currentClass.id);
+    const currentRecord = localGrades[studentId];
     const updated: StudentGrade = {
-      id: existing ? existing.id : `grd_${Date.now()}_${studentId}`,
+      id: currentRecord ? currentRecord.id : `grd_${Date.now()}_${studentId}`,
       studentId,
       classId: currentClass.id,
-      catatan: existing ? existing.catatan : '',
-      formatif1: existing?.formatif1 ?? null,
-      formatif2: existing?.formatif2 ?? null,
-      formatif3: existing?.formatif3 ?? null,
-      formatif4: existing?.formatif4 ?? null,
-      formatif5: existing?.formatif5 ?? null,
-      formatif6: existing?.formatif6 ?? null,
-      formatif7: existing?.formatif7 ?? null,
-      formatif8: existing?.formatif8 ?? null,
-      formatif9: existing?.formatif9 ?? null,
-      formatif10: existing?.formatif10 ?? null,
-      sumatifTengah: existing?.sumatifTengah ?? null,
-      sumatifAkhir: existing?.sumatifAkhir ?? null,
+      catatan: currentRecord ? currentRecord.catatan : '',
+      formatif1: currentRecord?.formatif1 ?? null,
+      formatif2: currentRecord?.formatif2 ?? null,
+      formatif3: currentRecord?.formatif3 ?? null,
+      formatif4: currentRecord?.formatif4 ?? null,
+      formatif5: currentRecord?.formatif5 ?? null,
+      formatif6: currentRecord?.formatif6 ?? null,
+      formatif7: currentRecord?.formatif7 ?? null,
+      formatif8: currentRecord?.formatif8 ?? null,
+      formatif9: currentRecord?.formatif9 ?? null,
+      formatif10: currentRecord?.formatif10 ?? null,
+      sumatifTengah: currentRecord?.sumatifTengah ?? null,
+      sumatifAkhir: currentRecord?.sumatifAkhir ?? null,
       [field]: numVal,
     };
 
-    onSaveGrade(updated);
+    // 1. Instant local state update
+    setLocalGrades((prev) => ({ ...prev, [studentId]: updated }));
+
+    // 2. Debounced sync to cloud
+    scheduleCloudSync(updated);
   };
 
   const handleNoteChange = (studentId: string, note: string) => {
-    const existing = grades.find((g) => g.studentId === studentId && g.classId === currentClass.id);
+    const currentRecord = localGrades[studentId];
     const updated: StudentGrade = {
-      id: existing ? existing.id : `grd_${Date.now()}_${studentId}`,
+      id: currentRecord ? currentRecord.id : `grd_${Date.now()}_${studentId}`,
       studentId,
       classId: currentClass.id,
       catatan: note,
-      formatif1: existing?.formatif1 ?? null,
-      formatif2: existing?.formatif2 ?? null,
-      formatif3: existing?.formatif3 ?? null,
-      formatif4: existing?.formatif4 ?? null,
-      formatif5: existing?.formatif5 ?? null,
-      formatif6: existing?.formatif6 ?? null,
-      formatif7: existing?.formatif7 ?? null,
-      formatif8: existing?.formatif8 ?? null,
-      formatif9: existing?.formatif9 ?? null,
-      formatif10: existing?.formatif10 ?? null,
-      sumatifTengah: existing?.sumatifTengah ?? null,
-      sumatifAkhir: existing?.sumatifAkhir ?? null,
+      formatif1: currentRecord?.formatif1 ?? null,
+      formatif2: currentRecord?.formatif2 ?? null,
+      formatif3: currentRecord?.formatif3 ?? null,
+      formatif4: currentRecord?.formatif4 ?? null,
+      formatif5: currentRecord?.formatif5 ?? null,
+      formatif6: currentRecord?.formatif6 ?? null,
+      formatif7: currentRecord?.formatif7 ?? null,
+      formatif8: currentRecord?.formatif8 ?? null,
+      formatif9: currentRecord?.formatif9 ?? null,
+      formatif10: currentRecord?.formatif10 ?? null,
+      sumatifTengah: currentRecord?.sumatifTengah ?? null,
+      sumatifAkhir: currentRecord?.sumatifAkhir ?? null,
     };
-    onSaveGrade(updated);
+
+    setLocalGrades((prev) => ({ ...prev, [studentId]: updated }));
+    scheduleCloudSync(updated);
+  };
+
+  const calculateFinalScore = (grade?: StudentGrade) => {
+    if (!grade) return { finalScore: 0, predicate: 'D', isPassed: false };
+
+    const formatifScores: number[] = [];
+    for (let i = 1; i <= activeColumnsCount; i++) {
+      const val = (grade as any)[`formatif${i}`];
+      if (val !== null && val !== undefined && !isNaN(val)) {
+        formatifScores.push(val);
+      }
+    }
+
+    const formatifAvg =
+      formatifScores.length > 0
+        ? formatifScores.reduce((a, b) => a + b, 0) / formatifScores.length
+        : 0;
+
+    const sts = grade.sumatifTengah ?? 0;
+    const sas = grade.sumatifAkhir ?? 0;
+
+    let finalScore = 0;
+    if (formatifScores.length > 0 || grade.sumatifTengah !== null || grade.sumatifAkhir !== null) {
+      finalScore = Math.round(formatifAvg * 0.4 + sts * 0.3 + sas * 0.3);
+    }
+
+    let predicate = 'D';
+    if (finalScore >= 90) predicate = 'A';
+    else if (finalScore >= 80) predicate = 'B';
+    else if (finalScore >= currentClass.kkm) predicate = 'C';
+
+    const isPassed = finalScore >= currentClass.kkm;
+    return { finalScore, predicate, isPassed };
   };
 
   const handleSaveColumns = () => {
@@ -129,94 +260,253 @@ export const GradesView: React.FC<GradesViewProps> = ({
     setIsColumnEditorOpen(false);
   };
 
-  // Calculations for summary stats
-  let totalTuntas = 0;
-  let totalNilaiAkhir = 0;
-  let evaluatedStudents = 0;
-
-  classStudents.forEach((std) => {
-    const g = grades.find((item) => item.studentId === std.id && item.classId === currentClass.id);
-    const fVals = [
-      g?.formatif1,
-      g?.formatif2,
-      g?.formatif3,
-      g?.formatif4,
-      g?.formatif5,
-      g?.formatif6,
-      g?.formatif7,
-      g?.formatif8,
-      g?.formatif9,
-      g?.formatif10,
-    ].slice(0, activeColumnsCount);
-
-    const filledF = fVals.filter((v): v is number => typeof v === 'number' && !isNaN(v));
-    const avgF = filledF.length > 0 ? filledF.reduce((a, b) => a + b, 0) / filledF.length : 0;
-    const sts = g?.sumatifTengah ?? 0;
-    const sas = g?.sumatifAkhir ?? 0;
-
-    let finalScore = 0;
-    if (sts && sas) {
-      finalScore = Math.round(avgF * 0.5 + sts * 0.25 + sas * 0.25);
-    } else {
-      finalScore = Math.round(avgF);
-    }
-
-    if (finalScore > 0) {
-      evaluatedStudents++;
-      totalNilaiAkhir += finalScore;
-      if (finalScore >= currentClass.kkm) totalTuntas++;
-    }
-  });
-
-  const averageClassScore = evaluatedStudents > 0 ? Math.round(totalNilaiAkhir / evaluatedStudents) : 0;
-  const tuntasRate = evaluatedStudents > 0 ? Math.round((totalTuntas / evaluatedStudents) * 100) : 0;
-
-  // Public Share Link
   const handleOpenShare = async () => {
-    const shareId = `grade_share_${currentClass.id}`;
-    const baseUrl = window.location.origin + window.location.pathname;
-    const fullLink = `${baseUrl}?nilai_share=${shareId}`;
-    setShareLink(fullLink);
-
-    const shareRecord: PublicShareRecord = {
-      id: shareId,
-      type: 'nilai',
-      classId: currentClass.id,
-      title: `Rekapitulasi Nilai Kelas ${currentClass.namaKelas} - SMK Muhammadiyah Bawang`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      data: {
-        className: currentClass.namaKelas,
-        subject: currentClass.mataPelajaran,
-        kkm: currentClass.kkm,
-        teacher: teacher.namaGuru,
-        school: teacher.namaSekolah,
-        students: classStudents,
-        grades: grades.filter((g) => g.classId === currentClass.id),
-        gradeColumns: gradeColumns.slice(0, activeColumnsCount),
-      },
-    };
+    const slug = `${currentClass.id}-${Date.now().toString(36)}`;
+    const fullUrl = `${window.location.origin}/?share=${slug}`;
+    setShareLink(fullUrl);
 
     try {
-      await createOrUpdatePublicShare(shareRecord);
-    } catch (err) {
-      console.warn('Could not sync share to cloud', err);
-    }
+      const qr = await QRCode.toDataURL(fullUrl, { width: 300, margin: 2 });
+      setShareQrUrl(qr);
 
-    try {
-      const qrData = await QRCode.toDataURL(fullLink, { width: 240, margin: 2 });
-      setShareQrUrl(qrData);
+      const record: PublicShareRecord = {
+        id: slug,
+        type: 'nilai',
+        classId: currentClass.id,
+        title: `Nilai ${currentClass.namaKelas} - ${currentClass.mataPelajaran}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        data: {
+          className: currentClass.namaKelas,
+          subject: currentClass.mataPelajaran,
+          teacherName: teacher.namaGuru,
+          kkm: currentClass.kkm,
+          grades: Object.values(localGrades),
+          gradeColumns,
+          students: classStudents,
+        },
+      };
+
+      await createOrUpdatePublicShare(record);
+      setShareModalOpen(true);
     } catch (e) {
       console.error(e);
+      alert('Gagal membuat tautan publik.');
     }
-    setShareModalOpen(true);
   };
 
-  const copyShareLink = () => {
-    navigator.clipboard.writeText(shareLink);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+  // Process raw Excel rows for Grades
+  const processRawGradeRows = (rawData: any[][]) => {
+    if (!rawData || rawData.length === 0) return;
+
+    let headerRowIdx = -1;
+    let colMap: Record<string, number> = { nisn: -1, nama: -1, sts: -1, sas: -1, catatan: -1 };
+    for (let f = 1; f <= 10; f++) colMap[`tp${f}`] = -1;
+
+    for (let i = 0; i < Math.min(6, rawData.length); i++) {
+      const row = rawData[i].map((c) => String(c || '').toLowerCase().trim());
+      const namaIdx = row.findIndex((c) => c.includes('nama') || c.includes('siswa'));
+      if (namaIdx !== -1) {
+        headerRowIdx = i;
+        colMap.nama = namaIdx;
+        colMap.nisn = row.findIndex((c) => c.includes('nisn') || c.includes('nis'));
+        colMap.sts = row.findIndex((c) => c.includes('sts') || c.includes('uts') || c.includes('tengah'));
+        colMap.sas = row.findIndex((c) => c.includes('sas') || c.includes('pas') || c.includes('uas') || c.includes('akhir'));
+        colMap.catatan = row.findIndex((c) => c.includes('catatan') || c.includes('keterangan'));
+
+        // map TP columns
+        for (let f = 1; f <= 10; f++) {
+          colMap[`tp${f}`] = row.findIndex(
+            (c) =>
+              c === `tp ${f}` ||
+              c === `tp${f}` ||
+              c.includes(`tp ${f}`) ||
+              c.includes(`formatif ${f}`) ||
+              c.includes(`f${f}`)
+          );
+        }
+        break;
+      }
+    }
+
+    const dataRows = headerRowIdx !== -1 ? rawData.slice(headerRowIdx + 1) : rawData;
+    const existingGradesByStudentId = new Map(
+      Object.values(localGrades).map((g) => [g.studentId, g])
+    );
+
+    const previews: GradePreviewRow[] = [];
+    const seenStudentIds = new Set<string>();
+
+    dataRows.forEach((row, idx) => {
+      if (!row || row.length === 0 || row.every((c) => !c || String(c).trim() === '')) return;
+
+      let nisn = '';
+      let nama = '';
+      let sts: number | null = null;
+      let sas: number | null = null;
+      let catatan = '';
+      const scores: Record<string, number | null> = {};
+
+      if (headerRowIdx !== -1 && colMap.nama !== -1) {
+        nama = String(row[colMap.nama] || '').trim();
+        nisn = colMap.nisn !== -1 ? String(row[colMap.nisn] || '').trim() : '';
+        catatan = colMap.catatan !== -1 ? String(row[colMap.catatan] || '').trim() : '';
+
+        const parseNum = (v: any) => {
+          if (v === undefined || v === null || String(v).trim() === '') return null;
+          const n = parseFloat(String(v));
+          return isNaN(n) ? null : Math.min(100, Math.max(0, n));
+        };
+
+        if (colMap.sts !== -1) sts = parseNum(row[colMap.sts]);
+        if (colMap.sas !== -1) sas = parseNum(row[colMap.sas]);
+
+        for (let f = 1; f <= 10; f++) {
+          if (colMap[`tp${f}`] !== -1) {
+            scores[`formatif${f}`] = parseNum(row[colMap[`tp${f}`]]);
+          } else {
+            scores[`formatif${f}`] = null;
+          }
+        }
+      } else {
+        // Fallback positional
+        nisn = String(row[0] || '').trim();
+        nama = String(row[1] || '').trim();
+      }
+
+      if (nama.toLowerCase() === 'nama' || nama.toLowerCase() === 'nama siswa') return;
+
+      scores.sumatifTengah = sts;
+      scores.sumatifAkhir = sas;
+
+      // Find student in current class
+      const matchedStudent = classStudents.find(
+        (s) =>
+          (nisn && s.nisn && s.nisn === nisn) ||
+          s.nama.toLowerCase().trim() === nama.toLowerCase().trim()
+      );
+
+      let status: 'valid' | 'duplicate' | 'not_found' | 'invalid' = 'valid';
+      let reason = '';
+
+      if (!matchedStudent) {
+        status = 'not_found';
+        reason = `Siswa "${nama}" tidak ditemukan di daftar kelas ${currentClass.namaKelas}`;
+      } else if (seenStudentIds.has(matchedStudent.id)) {
+        status = 'duplicate';
+        reason = `Data siswa "${matchedStudent.nama}" muncul ganda dalam file Excel ini (dilewati)`;
+      } else if (existingGradesByStudentId.has(matchedStudent.id)) {
+        if (overwriteMode === 'skip') {
+          status = 'duplicate';
+          reason = `Nilai siswa "${matchedStudent.nama}" sudah ada di database (mode: lewati aktif)`;
+        } else {
+          status = 'valid';
+          reason = `Akan memperbarui nilai yang sudah ada`;
+        }
+      }
+
+      if (matchedStudent && status === 'valid') {
+        seenStudentIds.add(matchedStudent.id);
+      }
+
+      previews.push({
+        rowNum: idx + 1,
+        nisn: matchedStudent?.nisn || nisn,
+        nama: matchedStudent?.nama || nama,
+        studentId: matchedStudent?.id,
+        scores,
+        catatan,
+        status,
+        reason,
+      });
+    });
+
+    setParsedGradeRows(previews);
   };
+
+  const handleFileDrop = (file: File) => {
+    setImportFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+        processRawGradeRows(jsonData);
+      } catch (err) {
+        console.error(err);
+        alert('Gagal membaca file Excel.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleCommitGradeImport = async () => {
+    const validRows = parsedGradeRows.filter((r) => r.status === 'valid' && r.studentId);
+    if (validRows.length === 0) {
+      alert('Tidak ada data nilai valid yang dapat disimpan.');
+      return;
+    }
+
+    setSyncStatus('saving');
+    const newGradesMap = { ...localGrades };
+
+    for (const r of validRows) {
+      const studentId = r.studentId!;
+      const existing = localGrades[studentId];
+      const updated: StudentGrade = {
+        id: existing ? existing.id : `grd_imp_${Date.now()}_${studentId}`,
+        studentId,
+        classId: currentClass.id,
+        catatan: r.catatan || existing?.catatan || '',
+        formatif1: r.scores.formatif1 ?? existing?.formatif1 ?? null,
+        formatif2: r.scores.formatif2 ?? existing?.formatif2 ?? null,
+        formatif3: r.scores.formatif3 ?? existing?.formatif3 ?? null,
+        formatif4: r.scores.formatif4 ?? existing?.formatif4 ?? null,
+        formatif5: r.scores.formatif5 ?? existing?.formatif5 ?? null,
+        formatif6: r.scores.formatif6 ?? existing?.formatif6 ?? null,
+        formatif7: r.scores.formatif7 ?? existing?.formatif7 ?? null,
+        formatif8: r.scores.formatif8 ?? existing?.formatif8 ?? null,
+        formatif9: r.scores.formatif9 ?? existing?.formatif9 ?? null,
+        formatif10: r.scores.formatif10 ?? existing?.formatif10 ?? null,
+        sumatifTengah: r.scores.sumatifTengah ?? existing?.sumatifTengah ?? null,
+        sumatifAkhir: r.scores.sumatifAkhir ?? existing?.sumatifAkhir ?? null,
+      };
+
+      newGradesMap[studentId] = updated;
+      await onSaveGrade(updated);
+    }
+
+    setLocalGrades(newGradesMap);
+    setSyncStatus('saved');
+    setIsImportOpen(false);
+    setParsedGradeRows([]);
+    setImportFileName('');
+    alert(`Berhasil mengimpor dan memperbarui nilai ${validRows.length} siswa ke cloud!`);
+  };
+
+  // Metrics calculation
+  const averageClassScore = useMemo(() => {
+    const validScores = classStudents
+      .map((s) => calculateFinalScore(localGrades[s.id]).finalScore)
+      .filter((sc) => sc > 0);
+    if (validScores.length === 0) return 0;
+    return Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length);
+  }, [classStudents, localGrades, activeColumnsCount]);
+
+  const passedCount = useMemo(() => {
+    return classStudents.filter((s) => calculateFinalScore(localGrades[s.id]).isPassed).length;
+  }, [classStudents, localGrades, activeColumnsCount, currentClass.kkm]);
+
+  const passedPercentage = classStudents.length > 0 ? Math.round((passedCount / classStudents.length) * 100) : 0;
+
+  const filteredStudents = classStudents.filter(
+    (s) =>
+      s.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.nisn.includes(searchTerm)
+  );
 
   return (
     <div className="space-y-6">
@@ -230,16 +520,53 @@ export const GradesView: React.FC<GradesViewProps> = ({
               </span>
               <span className="text-xs text-slate-400">&bull;</span>
               <span className="text-xs font-semibold text-slate-600">KKM: {currentClass.kkm}</span>
+              <span className="text-xs text-slate-400">&bull;</span>
+
+              {/* Realtime Save Status Indicator */}
+              <div className="flex items-center gap-1.5 ml-2">
+                {syncStatus === 'saved' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Tersimpan di Cloud
+                  </span>
+                )}
+                {syncStatus === 'saving' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
+                    <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                    Menyimpan ke Cloud...
+                  </span>
+                )}
+                {syncStatus === 'error' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                    Gagal menyimpan
+                  </span>
+                )}
+              </div>
             </div>
+
             <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
               Buku Penilaian Siswa (Kurikulum Merdeka)
             </h2>
             <p className="text-xs text-slate-500">
-              Formatif (TP 1–10), Sumatif Tengah Semester (STS) & Sumatif Akhir (SAS)
+              Pengisian nilai instan tanpa jeda &bull; Otomatis tersinkronisasi aman ke database Supabase
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Save All Pending button if any */}
+            {Object.keys(pendingSaves).length > 0 && (
+              <button
+                type="button"
+                onClick={handleSaveAllNow}
+                className="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm animate-pulse"
+                title="Simpan segera semua perubahan nilai yang belum terkirim"
+              >
+                <Save className="w-4 h-4" />
+                Simpan Semua ({Object.keys(pendingSaves).length})
+              </button>
+            )}
+
             <button
               onClick={() => {
                 setEditingColumns([...gradeColumns]);
@@ -248,7 +575,30 @@ export const GradesView: React.FC<GradesViewProps> = ({
               className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition flex items-center gap-1.5"
             >
               <Sliders className="w-4 h-4" />
-              Atur Judul Kolom TP
+              Atur Kolom TP
+            </button>
+
+            {/* Import Excel Button for Grades */}
+            <button
+              onClick={() => {
+                setParsedGradeRows([]);
+                setImportFileName('');
+                setImportRawText('');
+                setIsImportOpen(true);
+              }}
+              className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5"
+            >
+              <Upload className="w-4 h-4 text-emerald-600" />
+              Impor Excel
+            </button>
+
+            {/* Export Excel Button for Grades */}
+            <button
+              onClick={() => exportGradesToExcel(currentClass, classStudents, Object.values(localGrades), gradeColumns, teacher)}
+              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Ekspor Excel
             </button>
 
             <button
@@ -256,15 +606,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
               className="px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
             >
               <Share2 className="w-4 h-4" />
-              Link Publik Nilai
-            </button>
-
-            <button
-              onClick={() => exportGradesToExcel(currentClass, classStudents, grades, gradeColumns, teacher)}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              Ekspor ke Excel
+              Link Publik
             </button>
           </div>
         </div>
@@ -298,269 +640,458 @@ export const GradesView: React.FC<GradesViewProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="text-slate-400">Ketuntasan KKM:</span>
               <span className="font-mono font-black text-emerald-700 text-sm bg-emerald-50 px-2 py-0.5 rounded-lg">
-                {tuntasRate}% ({totalTuntas}/{classStudents.length})
+                {passedCount} / {classStudents.length} ({passedPercentage}%)
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Grade Table */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2">
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Cari siswa atau NISN..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <p className="text-[11px] text-slate-400">
-            Ketik angka 0-100 pada setiap kolom nilai. Sistem otomatis menyimpan dan menghitung nilai akhir.
-          </p>
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Cari nama atau NISN siswa..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white rounded-2xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 shadow-xs"
+          />
         </div>
+        <p className="text-xs text-slate-500">
+          Menampilkan {filteredStudents.length} dari {classStudents.length} siswa
+        </p>
+      </div>
 
+      {/* Grades Matrix Table */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50 border-y border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                <th className="py-2.5 px-3 text-center w-10">No</th>
-                <th className="py-2.5 px-3 min-w-[170px]">Nama Siswa</th>
-                {gradeColumns.slice(0, activeColumnsCount).map((col) => (
-                  <th key={col.id} className="py-2.5 px-2 text-center min-w-[65px]" title={col.keterangan}>
-                    <div className="leading-tight">
-                      <span>{col.label.split(' ')[0]} {col.label.split(' ')[1]}</span>
-                      {col.keterangan && (
-                        <span className="block text-[9px] text-indigo-600 normal-case">{col.keterangan}</span>
-                      )}
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
+                <th className="py-3 px-3 text-center w-10 sticky left-0 bg-slate-50 z-10 border-r">No</th>
+                <th className="py-3 px-3 min-w-[180px] sticky left-10 bg-slate-50 z-10 border-r">Nama Siswa</th>
+                
+                {/* Formatif TP Columns */}
+                {gradeColumns.slice(0, activeColumnsCount).map((col, idx) => (
+                  <th key={col.id} className="py-2 px-1 text-center w-16 border-r font-medium text-[11px]">
+                    <div className="font-bold text-slate-800">TP {idx + 1}</div>
+                    <div className="text-[9px] text-slate-400 truncate max-w-[60px]" title={col.label}>
+                      {col.label}
                     </div>
                   </th>
                 ))}
-                <th className="py-2.5 px-2 text-center min-w-[65px] bg-indigo-50/70 text-indigo-900">
-                  Rata F
-                </th>
-                <th className="py-2.5 px-2 text-center min-w-[65px] bg-amber-50/70 text-amber-900">
-                  STS
-                </th>
-                <th className="py-2.5 px-2 text-center min-w-[65px] bg-purple-50/70 text-purple-900">
-                  SAS
-                </th>
-                <th className="py-2.5 px-3 text-center min-w-[75px] bg-slate-900 text-white font-black">
-                  Nilai Akhir
-                </th>
-                <th className="py-2.5 px-2 text-center w-12">Predikat</th>
-                <th className="py-2.5 px-3 text-center min-w-[100px]">Status (KKM)</th>
-                <th className="py-2.5 px-3 min-w-[180px]">Catatan Capaian Kompetensi</th>
+
+                <th className="py-3 px-2 text-center w-16 bg-amber-50/50 text-amber-900 border-r">STS</th>
+                <th className="py-3 px-2 text-center w-16 bg-blue-50/50 text-blue-900 border-r">SAS</th>
+                <th className="py-3 px-2 text-center w-16 bg-indigo-50/60 text-indigo-950 border-r font-bold">Nilai Akhir</th>
+                <th className="py-3 px-2 text-center w-12 bg-indigo-50/60 text-indigo-950 border-r font-bold">Predikat</th>
+                <th className="py-3 px-3 min-w-[200px]">Catatan Capaian Kompetensi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
-              {filteredStudents.map((std) => {
-                const g = grades.find(
-                  (item) => item.studentId === std.id && item.classId === currentClass.id
-                );
+            <tbody className="divide-y divide-slate-100 font-sans">
+              {filteredStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={6 + activeColumnsCount} className="py-12 text-center text-slate-400">
+                    <Award className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                    Belum ada siswa di kelas ini atau tidak cocok dengan pencarian.
+                  </td>
+                </tr>
+              ) : (
+                filteredStudents.map((student) => {
+                  const grade = localGrades[student.id];
+                  const { finalScore, predicate, isPassed } = calculateFinalScore(grade);
 
-                const fVals = [
-                  g?.formatif1,
-                  g?.formatif2,
-                  g?.formatif3,
-                  g?.formatif4,
-                  g?.formatif5,
-                  g?.formatif6,
-                  g?.formatif7,
-                  g?.formatif8,
-                  g?.formatif9,
-                  g?.formatif10,
-                ].slice(0, activeColumnsCount);
+                  return (
+                    <tr key={student.id} className="hover:bg-slate-50/60 transition group">
+                      <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-500 sticky left-0 bg-white group-hover:bg-slate-50 border-r">
+                        {student.no}
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-slate-900 sticky left-10 bg-white group-hover:bg-slate-50 border-r">
+                        <div className="truncate max-w-[170px]" title={student.nama}>
+                          {student.nama}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono">{student.nisn || '-'}</div>
+                      </td>
 
-                const filledF = fVals.filter((v): v is number => typeof v === 'number' && !isNaN(v));
-                const avgF = filledF.length > 0 ? Math.round(filledF.reduce((a, b) => a + b, 0) / filledF.length) : 0;
-                const sts = g?.sumatifTengah ?? null;
-                const sas = g?.sumatifAkhir ?? null;
+                      {/* TP Inputs - Zero Delay */}
+                      {Array.from({ length: activeColumnsCount }).map((_, colIdx) => {
+                        const fieldKey = `formatif${colIdx + 1}` as keyof StudentGrade;
+                        const scoreVal = grade ? (grade as any)[fieldKey] : null;
 
-                let finalScore = 0;
-                if (sts !== null && sas !== null) {
-                  finalScore = Math.round(avgF * 0.5 + sts * 0.25 + sas * 0.25);
-                } else {
-                  finalScore = avgF;
-                }
+                        return (
+                          <td key={colIdx} className="py-1 px-1 border-r text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={scoreVal !== null && scoreVal !== undefined ? scoreVal : ''}
+                              onChange={(e) => handleScoreChange(student.id, fieldKey, e.target.value)}
+                              onBlur={handleSaveAllNow}
+                              className={`w-14 text-center py-1.5 rounded-lg border font-mono text-xs transition ${
+                                scoreVal !== null && scoreVal < currentClass.kkm
+                                  ? 'bg-rose-50 border-rose-300 text-rose-700 font-bold'
+                                  : 'border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500'
+                              }`}
+                              placeholder="-"
+                            />
+                          </td>
+                        );
+                      })}
 
-                let predikat = 'D';
-                if (finalScore >= 90) predikat = 'A';
-                else if (finalScore >= 80) predikat = 'B';
-                else if (finalScore >= currentClass.kkm) predikat = 'C';
+                      {/* STS Input */}
+                      <td className="py-1 px-1 border-r text-center bg-amber-50/20">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={grade?.sumatifTengah !== null && grade?.sumatifTengah !== undefined ? grade.sumatifTengah : ''}
+                          onChange={(e) => handleScoreChange(student.id, 'sumatifTengah', e.target.value)}
+                          onBlur={handleSaveAllNow}
+                          className="w-14 text-center py-1.5 rounded-lg border border-amber-200 focus:border-amber-500 font-mono text-xs"
+                          placeholder="-"
+                        />
+                      </td>
 
-                const isTuntas = finalScore >= currentClass.kkm;
+                      {/* SAS Input */}
+                      <td className="py-1 px-1 border-r text-center bg-blue-50/20">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={grade?.sumatifAkhir !== null && grade?.sumatifAkhir !== undefined ? grade.sumatifAkhir : ''}
+                          onChange={(e) => handleScoreChange(student.id, 'sumatifAkhir', e.target.value)}
+                          onBlur={handleSaveAllNow}
+                          className="w-14 text-center py-1.5 rounded-lg border border-blue-200 focus:border-blue-500 font-mono text-xs"
+                          placeholder="-"
+                        />
+                      </td>
 
-                return (
-                  <tr key={std.id} className="hover:bg-slate-50/80 transition">
-                    <td className="py-2 px-3 text-center font-mono font-bold text-slate-500">
-                      {std.no}
-                    </td>
-                    <td className="py-2 px-3 font-bold text-slate-800">
-                      {std.nama}
-                    </td>
+                      {/* Final Score */}
+                      <td className="py-2 px-2 text-center border-r font-mono font-black text-sm bg-indigo-50/30">
+                        <span className={isPassed ? 'text-indigo-900' : 'text-rose-600'}>
+                          {finalScore || '-'}
+                        </span>
+                      </td>
 
-                    {/* Formatif Inputs */}
-                    {gradeColumns.slice(0, activeColumnsCount).map((col, idx) => {
-                      const fieldKey = `formatif${idx + 1}` as keyof StudentGrade;
-                      const rawVal = g ? (g as any)[fieldKey] : null;
-                      const val = typeof rawVal === 'number' ? rawVal : '';
+                      {/* Predicate */}
+                      <td className="py-2 px-2 text-center border-r">
+                        <span
+                          className={`inline-block w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center mx-auto ${
+                            predicate === 'A'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : predicate === 'B'
+                              ? 'bg-blue-100 text-blue-800'
+                              : predicate === 'C'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-rose-100 text-rose-800'
+                          }`}
+                        >
+                          {predicate}
+                        </span>
+                      </td>
 
-                      return (
-                        <td key={col.id} className="py-1 px-1 text-center">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={val}
-                            onChange={(e) => handleScoreChange(std.id, fieldKey, e.target.value)}
-                            className="w-14 text-center py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                          />
-                        </td>
-                      );
-                    })}
-
-                    {/* Rata-Rata Formatif */}
-                    <td className="py-2 px-2 text-center font-mono font-bold text-indigo-700 bg-indigo-50/40">
-                      {avgF || '-'}
-                    </td>
-
-                    {/* Sumatif Tengah (STS) */}
-                    <td className="py-1 px-1 text-center bg-amber-50/30">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={sts !== null ? sts : ''}
-                        onChange={(e) => handleScoreChange(std.id, 'sumatifTengah', e.target.value)}
-                        className="w-14 text-center py-1.5 rounded-lg border border-amber-200 text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-500 bg-white"
-                      />
-                    </td>
-
-                    {/* Sumatif Akhir (SAS) */}
-                    <td className="py-1 px-1 text-center bg-purple-50/30">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={sas !== null ? sas : ''}
-                        onChange={(e) => handleScoreChange(std.id, 'sumatifAkhir', e.target.value)}
-                        className="w-14 text-center py-1.5 rounded-lg border border-purple-200 text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white"
-                      />
-                    </td>
-
-                    {/* Nilai Akhir */}
-                    <td className="py-2 px-3 text-center font-mono font-black text-sm bg-slate-900 text-white">
-                      {finalScore || 0}
-                    </td>
-
-                    {/* Predikat */}
-                    <td className="py-2 px-2 text-center font-bold text-slate-700">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-full font-mono text-xs font-bold ${
-                          predikat === 'A'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : predikat === 'B'
-                            ? 'bg-blue-100 text-blue-800'
-                            : predikat === 'C'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-rose-100 text-rose-800'
-                        }`}
-                      >
-                        {predikat}
-                      </span>
-                    </td>
-
-                    {/* Status Tuntas / Belum Tuntas */}
-                    <td className="py-2 px-3 text-center">
-                      <span
-                        className={`inline-block px-2.5 py-1 rounded-xl text-[11px] font-bold ${
-                          isTuntas
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-rose-50 text-rose-700 border border-rose-200'
-                        }`}
-                      >
-                        {isTuntas ? 'Tuntas' : 'Belum Tuntas'}
-                      </span>
-                    </td>
-
-                    {/* Catatan Guru */}
-                    <td className="py-1 px-3">
-                      <input
-                        type="text"
-                        placeholder="Deskripsi capaian siswa..."
-                        value={g?.catatan || ''}
-                        onChange={(e) => handleNoteChange(std.id, e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
+                      {/* Catatan Input */}
+                      <td className="py-1 px-3">
+                        <input
+                          type="text"
+                          value={grade?.catatan || ''}
+                          onChange={(e) => handleNoteChange(student.id, e.target.value)}
+                          onBlur={handleSaveAllNow}
+                          placeholder="Deskripsi pencapaian kompetensi..."
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-700 focus:border-indigo-500"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal Edit Column Headers */}
-      {isColumnEditorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-slate-900 text-base">
-                Kustomisasi Kolom Formatif / Tujuan Pembelajaran (TP)
-              </h3>
-              <button onClick={() => setIsColumnEditorOpen(false)} className="text-slate-400 hover:text-slate-600">
+      {/* Modal Impor Excel Nilai dengan Validasi & Anti-Duplikasi */}
+      {isImportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in">
+          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col my-auto max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base">
+                    Impor Nilai Siswa dari Excel
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    Kelas: {currentClass.namaKelas} &bull; Mapel: {currentClass.mataPelajaran} &bull; KKM: {currentClass.kkm}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsImportOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="overflow-y-auto space-y-3 flex-1 pr-1">
-              {editingColumns.map((col, idx) => (
-                <div key={col.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Label Kolom</label>
-                    <input
-                      type="text"
-                      value={col.label}
-                      onChange={(e) => {
-                        const copy = [...editingColumns];
-                        copy[idx].label = e.target.value;
-                        setEditingColumns(copy);
-                      }}
-                      className="w-full px-2.5 py-1.5 rounded-lg border text-xs font-semibold bg-white"
-                    />
+            <div className="p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50/50">
+              {/* Options & Template Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+                <div>
+                  <p className="text-xs font-bold text-slate-800">
+                    Mode Penanganan Data Ganda:
+                  </p>
+                  <div className="flex items-center gap-4 mt-1 text-xs">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="overwriteMode"
+                        checked={overwriteMode === 'skip'}
+                        onChange={() => setOverwriteMode('skip')}
+                        className="text-indigo-600"
+                      />
+                      <span>Data sudah ada &ndash; <strong>Lewati</strong></span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="overwriteMode"
+                        checked={overwriteMode === 'update'}
+                        onChange={() => setOverwriteMode('update')}
+                        className="text-indigo-600"
+                      />
+                      <span>Update data nilai yang ada</span>
+                    </label>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Kode TP / Materi</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. TP 1.1"
-                      value={col.keterangan || ''}
-                      onChange={(e) => {
-                        const copy = [...editingColumns];
-                        copy[idx].keterangan = e.target.value;
-                        setEditingColumns(copy);
-                      }}
-                      className="w-full px-2.5 py-1.5 rounded-lg border text-xs bg-white"
-                    />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => downloadGradesTemplateExcel(currentClass, classStudents, gradeColumns, teacher)}
+                  className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-600" />
+                  Unduh Template Nilai Excel
+                </button>
+              </div>
+
+              {/* Upload Drop Zone */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleFileDrop(e.dataTransfer.files[0]);
+                  }
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-3xl p-6 sm:p-8 text-center cursor-pointer transition ${
+                  isDragging
+                    ? 'border-indigo-500 bg-indigo-50/50'
+                    : 'border-slate-300 hover:border-indigo-400 bg-white'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleFileDrop(e.target.files[0]);
+                    }
+                  }}
+                />
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3">
+                  <Upload className="w-6 h-6" />
+                </div>
+                <p className="text-sm font-bold text-slate-800">
+                  {importFileName ? importFileName : 'Klik atau seret file Excel Nilai (.xlsx, .xls, .csv) ke sini'}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Mendukung kolom TP 1..10, STS, SAS, dan Catatan Siswa
+                </p>
+              </div>
+
+              {/* Parsed Summary Cards */}
+              {parsedGradeRows.length > 0 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white p-3.5 rounded-2xl border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Total Baris</span>
+                      <span className="text-xl font-black font-mono text-slate-800 block mt-0.5">
+                        {parsedGradeRows.length}
+                      </span>
+                    </div>
+
+                    <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200">
+                      <span className="text-[10px] font-bold text-emerald-700 uppercase">Siap Diimpor</span>
+                      <span className="text-xl font-black font-mono text-emerald-800 block mt-0.5">
+                        {parsedGradeRows.filter((r) => r.status === 'valid').length} siswa
+                      </span>
+                    </div>
+
+                    <div className="bg-amber-50 p-3.5 rounded-2xl border border-amber-200">
+                      <span className="text-[10px] font-bold text-amber-700 uppercase">Duplikat Dilewati</span>
+                      <span className="text-xl font-black font-mono text-amber-800 block mt-0.5">
+                        {parsedGradeRows.filter((r) => r.status === 'duplicate').length} baris
+                      </span>
+                    </div>
+
+                    <div className="bg-rose-50 p-3.5 rounded-2xl border border-rose-200">
+                      <span className="text-[10px] font-bold text-rose-700 uppercase">Tidak Ditemukan</span>
+                      <span className="text-xl font-black font-mono text-rose-800 block mt-0.5">
+                        {parsedGradeRows.filter((r) => r.status === 'not_found' || r.status === 'invalid').length} baris
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase">Tanggal Asesmen</label>
-                    <input
-                      type="date"
-                      value={col.tanggal || ''}
-                      onChange={(e) => {
-                        const copy = [...editingColumns];
-                        copy[idx].tanggal = e.target.value;
-                        setEditingColumns(copy);
-                      }}
-                      className="w-full px-2.5 py-1.5 rounded-lg border text-xs bg-white font-mono"
-                    />
+
+                  {/* Preview Table */}
+                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                      <p className="text-xs font-bold text-slate-700">
+                        Pratinjau Nilai Siswa
+                      </p>
+                      <span className="text-[11px] text-slate-500">
+                        {parsedGradeRows.filter((r) => r.status === 'valid').length} baris valid
+                      </span>
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-slate-100 text-slate-600 font-bold sticky top-0">
+                            <th className="p-2.5 text-center w-10">No</th>
+                            <th className="p-2.5 w-24">Status</th>
+                            <th className="p-2.5 w-28">NISN</th>
+                            <th className="p-2.5 min-w-[150px]">Nama Siswa</th>
+                            <th className="p-2.5 text-center w-14">STS</th>
+                            <th className="p-2.5 text-center w-14">SAS</th>
+                            <th className="p-2.5">Keterangan</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {parsedGradeRows.map((r) => (
+                            <tr
+                              key={r.rowNum}
+                              className={
+                                r.status === 'valid'
+                                  ? 'hover:bg-emerald-50/40'
+                                  : r.status === 'duplicate'
+                                  ? 'bg-amber-50/50 hover:bg-amber-50 text-amber-900'
+                                  : 'bg-rose-50/50 hover:bg-rose-50 text-rose-900'
+                              }
+                            >
+                              <td className="p-2.5 text-center font-mono text-slate-400 font-bold">{r.rowNum}</td>
+                              <td className="p-2.5">
+                                {r.status === 'valid' && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                    <CheckCircle2 className="w-3 h-3" /> Valid
+                                  </span>
+                                )}
+                                {r.status === 'duplicate' && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                    <AlertTriangle className="w-3 h-3" /> Dilewati
+                                  </span>
+                                )}
+                                {(r.status === 'not_found' || r.status === 'invalid') && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                                    <X className="w-3 h-3" /> Ditolak
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-2.5 font-mono">{r.nisn || '-'}</td>
+                              <td className="p-2.5 font-bold">{r.nama}</td>
+                              <td className="p-2.5 text-center font-mono">{r.scores.sumatifTengah ?? '-'}</td>
+                              <td className="p-2.5 text-center font-mono">{r.scores.sumatifAkhir ?? '-'}</td>
+                              <td className="p-2.5 text-[11px] text-slate-500">
+                                {r.reason || 'Siap diimpor'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="px-6 py-4 bg-slate-50 border-t flex items-center justify-between">
+              <span className="text-xs text-slate-500">
+                {parsedGradeRows.filter((r) => r.status === 'valid').length > 0
+                  ? `${parsedGradeRows.filter((r) => r.status === 'valid').length} nilai siswa siap diterapkan`
+                  : 'Unggah berkas untuk memvalidasi nilai'}
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportOpen(false)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={parsedGradeRows.filter((r) => r.status === 'valid').length === 0}
+                  onClick={handleCommitGradeImport}
+                  className={`px-5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                    parsedGradeRows.filter((r) => r.status === 'valid').length > 0
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm'
+                      : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                  }`}
+                >
+                  <Check className="w-4 h-4" />
+                  Terapkan Nilai ke Cloud
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Custom Kolom TP */}
+      {isColumnEditorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-bold text-slate-900 text-base">Atur Label Tujuan Pembelajaran (TP)</h3>
+              </div>
+              <button
+                onClick={() => setIsColumnEditorOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+              {editingColumns.slice(0, activeColumnsCount).map((col, idx) => (
+                <div key={col.id} className="flex items-center gap-2">
+                  <span className="w-14 font-mono font-bold text-xs text-slate-500">TP {idx + 1}</span>
+                  <input
+                    type="text"
+                    value={col.label}
+                    onChange={(e) => {
+                      const updated = [...editingColumns];
+                      updated[idx] = { ...updated[idx], label: e.target.value };
+                      setEditingColumns(updated);
+                    }}
+                    placeholder={`Nama materi TP ${idx + 1}...`}
+                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold"
+                  />
                 </div>
               ))}
             </div>
@@ -578,65 +1109,59 @@ export const GradesView: React.FC<GradesViewProps> = ({
                 onClick={handleSaveColumns}
                 className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md"
               >
-                Simpan Perubahan Kolom
+                Simpan Konfigurasi Kolom
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Share Public Grades */}
+      {/* Modal Share Publik */}
       {shareModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-5 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto">
               <Share2 className="w-6 h-6" />
             </div>
 
             <div>
-              <h3 className="font-bold text-slate-900 text-lg">
-                Tautan Publik Rekapitulasi Nilai
-              </h3>
+              <h3 className="font-bold text-slate-900 text-lg">Tautan Publik Nilai Aktif</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Wali murid dan siswa dapat mengakses rekap capaian nilai formatif & sumatif secara transparan.
+                Siswa dan wali murid dapat memindai QR code ini untuk melihat buku nilai transparan.
               </p>
             </div>
 
             {shareQrUrl && (
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 inline-block mx-auto">
-                <img src={shareQrUrl} alt="QR Code Share" className="w-48 h-48 mx-auto" />
-                <p className="text-[10px] text-slate-400 mt-1">Scan QR Code untuk membuka di smartphone</p>
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 inline-block mx-auto">
+                <img src={shareQrUrl} alt="QR Code Link Publik" className="w-48 h-48 mx-auto" />
               </div>
             )}
 
-            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200 text-left">
+            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl text-xs">
               <input
                 type="text"
                 readOnly
                 value={shareLink}
-                className="w-full bg-transparent text-xs font-mono text-slate-700 px-2 focus:outline-none"
+                className="bg-transparent flex-1 font-mono text-slate-700 truncate px-2 outline-none"
               />
               <button
-                onClick={copyShareLink}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shrink-0 transition flex items-center gap-1"
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(shareLink);
+                  setCopiedLink(true);
+                  setTimeout(() => setCopiedLink(false), 2000);
+                }}
+                className="px-3 py-1.5 bg-white rounded-xl shadow-xs text-indigo-600 font-bold hover:bg-indigo-50 transition shrink-0"
               >
-                {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copiedLink ? 'Tersalin' : 'Salin'}
+                {copiedLink ? 'Tersalin!' : 'Salin'}
               </button>
             </div>
 
-            <div className="flex justify-between items-center pt-2">
-              <a
-                href={shareLink}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1"
-              >
-                Buka Halaman Publik <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+            <div className="pt-2">
               <button
+                type="button"
                 onClick={() => setShareModalOpen(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-xl"
+                className="w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-2xl"
               >
                 Tutup
               </button>
