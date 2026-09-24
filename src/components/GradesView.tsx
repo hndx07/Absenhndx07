@@ -223,28 +223,97 @@ export const GradesView: React.FC<GradesViewProps> = ({
   };
 
   const calculateFinalScore = (grade?: StudentGrade) => {
-    if (!grade) return { finalScore: 0, predicate: 'D', isPassed: false };
+    if (!grade) {
+      return {
+        finalScore: 0,
+        sumInputted: 0,
+        countInputted: 0,
+        formatifAvg: 0,
+        predicate: '-',
+        isPassed: false,
+        hasAnyScore: false,
+      };
+    }
 
     const formatifScores: number[] = [];
     for (let i = 1; i <= activeColumnsCount; i++) {
       const val = (grade as any)[`formatif${i}`];
-      if (val !== null && val !== undefined && !isNaN(val)) {
-        formatifScores.push(val);
+      if (val !== null && val !== undefined && (val as any) !== '' && !isNaN(Number(val))) {
+        formatifScores.push(Number(val));
       }
     }
 
+    const sts =
+      grade.sumatifTengah !== null &&
+      grade.sumatifTengah !== undefined &&
+      (grade.sumatifTengah as any) !== '' &&
+      !isNaN(Number(grade.sumatifTengah))
+        ? Number(grade.sumatifTengah)
+        : null;
+
+    const sas =
+      grade.sumatifAkhir !== null &&
+      grade.sumatifAkhir !== undefined &&
+      (grade.sumatifAkhir as any) !== '' &&
+      !isNaN(Number(grade.sumatifAkhir))
+        ? Number(grade.sumatifAkhir)
+        : null;
+
+    // HANYA hitung nilai yang sudah diinput saja kedalam total sum (bukan yang kosong)
+    let sumInputted = 0;
+    let countInputted = 0;
+
+    formatifScores.forEach((v) => {
+      sumInputted += v;
+      countInputted++;
+    });
+
+    if (sts !== null) {
+      sumInputted += sts;
+      countInputted++;
+    }
+
+    if (sas !== null) {
+      sumInputted += sas;
+      countInputted++;
+    }
+
+    if (countInputted === 0) {
+      return {
+        finalScore: 0,
+        sumInputted: 0,
+        countInputted: 0,
+        formatifAvg: 0,
+        predicate: '-',
+        isPassed: false,
+        hasAnyScore: false,
+      };
+    }
+
+    // Rata-rata formatif hanya dari kolom TP yang terisi
     const formatifAvg =
       formatifScores.length > 0
         ? formatifScores.reduce((a, b) => a + b, 0) / formatifScores.length
-        : 0;
+        : null;
 
-    const sts = grade.sumatifTengah ?? 0;
-    const sas = grade.sumatifAkhir ?? 0;
+    // Hitung bobot proporsional HANYA untuk komponen yang sudah diinput (bukan semuanya termasuk yang kosong)
+    let totalWeightedScore = 0;
+    let totalWeight = 0;
 
-    let finalScore = 0;
-    if (formatifScores.length > 0 || grade.sumatifTengah !== null || grade.sumatifAkhir !== null) {
-      finalScore = Math.round(formatifAvg * 0.4 + sts * 0.3 + sas * 0.3);
+    if (formatifAvg !== null) {
+      totalWeightedScore += formatifAvg * 0.5;
+      totalWeight += 0.5;
     }
+    if (sts !== null) {
+      totalWeightedScore += sts * 0.25;
+      totalWeight += 0.25;
+    }
+    if (sas !== null) {
+      totalWeightedScore += sas * 0.25;
+      totalWeight += 0.25;
+    }
+
+    const finalScore = totalWeight > 0 ? Math.round(totalWeightedScore / totalWeight) : 0;
 
     let predicate = 'D';
     if (finalScore >= 90) predicate = 'A';
@@ -252,7 +321,15 @@ export const GradesView: React.FC<GradesViewProps> = ({
     else if (finalScore >= currentClass.kkm) predicate = 'C';
 
     const isPassed = finalScore >= currentClass.kkm;
-    return { finalScore, predicate, isPassed };
+    return {
+      finalScore,
+      sumInputted,
+      countInputted,
+      formatifAvg: formatifAvg !== null ? Math.round(formatifAvg) : 0,
+      predicate,
+      isPassed,
+      hasAnyScore: true,
+    };
   };
 
   const handleSaveColumns = () => {
@@ -487,20 +564,76 @@ export const GradesView: React.FC<GradesViewProps> = ({
     alert(`Berhasil mengimpor dan memperbarui nilai ${validRows.length} siswa ke cloud!`);
   };
 
-  // Metrics calculation
-  const averageClassScore = useMemo(() => {
-    const validScores = classStudents
-      .map((s) => calculateFinalScore(localGrades[s.id]).finalScore)
-      .filter((sc) => sc > 0);
-    if (validScores.length === 0) return 0;
-    return Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length);
+  // Metrics calculation - HANYA siswa yang sudah memiliki nilai terinput
+  const studentsWithScores = useMemo(() => {
+    return classStudents.filter((s) => calculateFinalScore(localGrades[s.id]).hasAnyScore);
   }, [classStudents, localGrades, activeColumnsCount]);
 
-  const passedCount = useMemo(() => {
-    return classStudents.filter((s) => calculateFinalScore(localGrades[s.id]).isPassed).length;
-  }, [classStudents, localGrades, activeColumnsCount, currentClass.kkm]);
+  const averageClassScore = useMemo(() => {
+    const validScores = studentsWithScores.map((s) => calculateFinalScore(localGrades[s.id]).finalScore);
+    if (validScores.length === 0) return 0;
+    return Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length);
+  }, [studentsWithScores, localGrades, activeColumnsCount]);
 
-  const passedPercentage = classStudents.length > 0 ? Math.round((passedCount / classStudents.length) * 100) : 0;
+  const passedCount = useMemo(() => {
+    return studentsWithScores.filter((s) => calculateFinalScore(localGrades[s.id]).isPassed).length;
+  }, [studentsWithScores, localGrades, activeColumnsCount, currentClass.kkm]);
+
+  const passedPercentage = studentsWithScores.length > 0
+    ? Math.round((passedCount / studentsWithScores.length) * 100)
+    : 0;
+
+  // Rekap Total Sum & Rata-rata per Kolom: HANYA nilai yang terinput saja (bukan yang kosong)
+  const columnSummary = useMemo(() => {
+    const tpSummaries: { sum: number; count: number; avg: number | string }[] = [];
+    for (let c = 1; c <= activeColumnsCount; c++) {
+      const fieldKey = `formatif${c}` as keyof StudentGrade;
+      let sum = 0;
+      let count = 0;
+      classStudents.forEach((std) => {
+        const val = localGrades[std.id]?.[fieldKey];
+        if (val !== null && val !== undefined && (val as any) !== '' && !isNaN(Number(val))) {
+          sum += Number(val);
+          count++;
+        }
+      });
+      tpSummaries.push({
+        sum,
+        count,
+        avg: count > 0 ? Math.round(sum / count) : '-',
+      });
+    }
+
+    let stsSum = 0;
+    let stsCount = 0;
+    let sasSum = 0;
+    let sasCount = 0;
+    let totalAllSum = 0;
+
+    classStudents.forEach((std) => {
+      const g = localGrades[std.id];
+      const res = calculateFinalScore(g);
+      totalAllSum += res.sumInputted;
+
+      const sts = g?.sumatifTengah;
+      if (sts !== null && sts !== undefined && (sts as any) !== '' && !isNaN(Number(sts))) {
+        stsSum += Number(sts);
+        stsCount++;
+      }
+      const sas = g?.sumatifAkhir;
+      if (sas !== null && sas !== undefined && (sas as any) !== '' && !isNaN(Number(sas))) {
+        sasSum += Number(sas);
+        sasCount++;
+      }
+    });
+
+    return {
+      tpSummaries,
+      sts: { sum: stsSum, count: stsCount, avg: stsCount > 0 ? Math.round(stsSum / stsCount) : '-' },
+      sas: { sum: sasSum, count: sasCount, avg: sasCount > 0 ? Math.round(sasSum / sasCount) : '-' },
+      totalAllSum,
+    };
+  }, [classStudents, localGrades, activeColumnsCount]);
 
   const filteredStudents = classStudents.filter(
     (s) =>
@@ -633,14 +766,14 @@ export const GradesView: React.FC<GradesViewProps> = ({
           <div className="flex items-center gap-4 text-xs">
             <div className="flex items-center gap-1.5">
               <span className="text-slate-400">Rata-rata Kelas:</span>
-              <span className="font-mono font-black text-indigo-700 text-sm bg-indigo-50 px-2 py-0.5 rounded-lg">
-                {averageClassScore}
+              <span className="font-mono font-black text-indigo-700 text-sm bg-indigo-50 px-2 py-0.5 rounded-lg" title="Rata-rata dihitung hanya dari nilai yang sudah diinput">
+                {averageClassScore || '-'}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-slate-400">Ketuntasan KKM:</span>
-              <span className="font-mono font-black text-emerald-700 text-sm bg-emerald-50 px-2 py-0.5 rounded-lg">
-                {passedCount} / {classStudents.length} ({passedPercentage}%)
+              <span className="font-mono font-black text-emerald-700 text-sm bg-emerald-50 px-2 py-0.5 rounded-lg" title="Ketuntasan dihitung hanya dari siswa yang sudah memiliki nilai">
+                {passedCount} / {studentsWithScores.length} Siswa Terinput ({passedPercentage}%)
               </span>
             </div>
           </div>
@@ -660,7 +793,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
           />
         </div>
         <p className="text-xs text-slate-500">
-          Menampilkan {filteredStudents.length} dari {classStudents.length} siswa
+          Menampilkan {filteredStudents.length} dari {classStudents.length} siswa ({studentsWithScores.length} memiliki nilai)
         </p>
       </div>
 
@@ -685,6 +818,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
 
                 <th className="py-3 px-2 text-center w-16 bg-amber-50/50 text-amber-900 border-r">STS</th>
                 <th className="py-3 px-2 text-center w-16 bg-blue-50/50 text-blue-900 border-r">SAS</th>
+                <th className="py-3 px-2 text-center w-16 bg-emerald-50/70 text-emerald-950 border-r font-bold" title="Hanya nilai yang sudah diinput saja yang dihitung kedalam total sum">Total Sum</th>
                 <th className="py-3 px-2 text-center w-16 bg-indigo-50/60 text-indigo-950 border-r font-bold">Nilai Akhir</th>
                 <th className="py-3 px-2 text-center w-12 bg-indigo-50/60 text-indigo-950 border-r font-bold">Predikat</th>
                 <th className="py-3 px-3 min-w-[200px]">Catatan Capaian Kompetensi</th>
@@ -693,7 +827,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
             <tbody className="divide-y divide-slate-100 font-sans">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6 + activeColumnsCount} className="py-12 text-center text-slate-400">
+                  <td colSpan={7 + activeColumnsCount} className="py-12 text-center text-slate-400">
                     <Award className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                     Belum ada siswa di kelas ini atau tidak cocok dengan pencarian.
                   </td>
@@ -701,7 +835,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
               ) : (
                 filteredStudents.map((student) => {
                   const grade = localGrades[student.id];
-                  const { finalScore, predicate, isPassed } = calculateFinalScore(grade);
+                  const { finalScore, predicate, isPassed, sumInputted, countInputted, hasAnyScore } = calculateFinalScore(grade);
 
                   return (
                     <tr key={student.id} className="hover:bg-slate-50/60 transition group">
@@ -768,28 +902,47 @@ export const GradesView: React.FC<GradesViewProps> = ({
                         />
                       </td>
 
+                      {/* Total Sum (Hanya nilai terinput) */}
+                      <td className="py-2 px-2 text-center border-r font-mono font-bold text-xs bg-emerald-50/30 text-emerald-800">
+                        {hasAnyScore ? (
+                          <span title={`Total dari ${countInputted} nilai yang sudah diinput (kosong diabaikan)`}>
+                            {sumInputted}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-normal">-</span>
+                        )}
+                      </td>
+
                       {/* Final Score */}
                       <td className="py-2 px-2 text-center border-r font-mono font-black text-sm bg-indigo-50/30">
-                        <span className={isPassed ? 'text-indigo-900' : 'text-rose-600'}>
-                          {finalScore || '-'}
-                        </span>
+                        {hasAnyScore ? (
+                          <span className={isPassed ? 'text-indigo-900' : 'text-rose-600'}>
+                            {finalScore}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-normal">-</span>
+                        )}
                       </td>
 
                       {/* Predicate */}
                       <td className="py-2 px-2 text-center border-r">
-                        <span
-                          className={`inline-block w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center mx-auto ${
-                            predicate === 'A'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : predicate === 'B'
-                              ? 'bg-blue-100 text-blue-800'
-                              : predicate === 'C'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-rose-100 text-rose-800'
-                          }`}
-                        >
-                          {predicate}
-                        </span>
+                        {hasAnyScore ? (
+                          <span
+                            className={`inline-block w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center mx-auto ${
+                              predicate === 'A'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : predicate === 'B'
+                                ? 'bg-blue-100 text-blue-800'
+                                : predicate === 'C'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}
+                          >
+                            {predicate}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-mono">-</span>
+                        )}
                       </td>
 
                       {/* Catatan Input */}
@@ -808,6 +961,61 @@ export const GradesView: React.FC<GradesViewProps> = ({
                 })
               )}
             </tbody>
+            {/* TFOOT: Total Sum & Rata-rata HANYA nilai yang sudah diinput */}
+            <tfoot className="border-t-2 border-slate-300 bg-slate-50/95 font-mono text-[11px]">
+              {/* Row 1: Total Sum per Kolom */}
+              <tr className="border-b border-slate-200">
+                <td colSpan={2} className="py-2.5 px-3 font-bold text-slate-700 sticky left-0 bg-slate-100 z-10 border-r text-right uppercase tracking-wider text-[10px]">
+                  Total Sum (Hanya Terinput):
+                </td>
+                {columnSummary.tpSummaries.map((tp, idx) => (
+                  <td key={idx} className="py-2 px-1 text-center font-bold text-slate-800 border-r" title={`${tp.count} nilai terisi (kosong diabaikan)`}>
+                    {tp.sum > 0 ? tp.sum : '-'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 text-center font-bold text-amber-900 border-r bg-amber-50/40" title={`${columnSummary.sts.count} nilai terisi`}>
+                  {columnSummary.sts.sum > 0 ? columnSummary.sts.sum : '-'}
+                </td>
+                <td className="py-2 px-2 text-center font-bold text-blue-900 border-r bg-blue-50/40" title={`${columnSummary.sas.count} nilai terisi`}>
+                  {columnSummary.sas.sum > 0 ? columnSummary.sas.sum : '-'}
+                </td>
+                <td className="py-2 px-2 text-center font-black text-emerald-800 border-r bg-emerald-50/60" title="Akumulasi seluruh nilai terinput">
+                  {columnSummary.totalAllSum > 0 ? columnSummary.totalAllSum : '-'}
+                </td>
+                <td className="py-2 px-2 text-center font-bold text-slate-400 border-r bg-indigo-50/20">-</td>
+                <td className="py-2 px-2 text-center font-bold text-slate-400 border-r">-</td>
+                <td className="py-2 px-3 text-slate-400 italic text-[10px] font-sans">
+                  *Nilai kosong diabaikan dari perhitungan total sum
+                </td>
+              </tr>
+              {/* Row 2: Rata-rata per Kolom */}
+              <tr>
+                <td colSpan={2} className="py-2.5 px-3 font-bold text-slate-700 sticky left-0 bg-slate-100 z-10 border-r text-right uppercase tracking-wider text-[10px]">
+                  Rata-rata (Hanya Terinput):
+                </td>
+                {columnSummary.tpSummaries.map((tp, idx) => (
+                  <td key={idx} className="py-2 px-1 text-center font-bold text-slate-800 border-r" title={`Rata-rata dari ${tp.count} nilai terisi`}>
+                    {tp.avg}
+                  </td>
+                ))}
+                <td className="py-2 px-2 text-center font-bold text-amber-900 border-r bg-amber-50/40" title={`Rata-rata dari ${columnSummary.sts.count} nilai terisi`}>
+                  {columnSummary.sts.avg}
+                </td>
+                <td className="py-2 px-2 text-center font-bold text-blue-900 border-r bg-blue-50/40" title={`Rata-rata dari ${columnSummary.sas.count} nilai terisi`}>
+                  {columnSummary.sas.avg}
+                </td>
+                <td className="py-2 px-2 text-center font-bold text-emerald-800 border-r bg-emerald-50/60">-</td>
+                <td className="py-2 px-2 text-center font-black text-indigo-900 border-r bg-indigo-50/60" title="Rata-rata nilai akhir siswa">
+                  {averageClassScore || '-'}
+                </td>
+                <td className="py-2 px-2 text-center font-bold text-slate-600 border-r text-[10px]">
+                  KKM {currentClass.kkm}
+                </td>
+                <td className="py-2 px-3 text-slate-500 text-[10px] font-sans">
+                  {passedCount} dari {studentsWithScores.length} siswa tuntas KKM
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>

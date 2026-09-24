@@ -112,6 +112,7 @@ export function exportGradesToExcel(
     'Nama Siswa',
     'L/P',
     ...colHeaders,
+    'Total Sum',
     'Rata Formatif',
     'STS',
     'SAS',
@@ -135,19 +136,54 @@ export function exportGradesToExcel(
     ];
 
     const filledF = fVals.filter((v): v is number => typeof v === 'number' && !isNaN(v));
-    const avgF = filledF.length > 0 ? Math.round(filledF.reduce((a, b) => a + b, 0) / filledF.length) : 0;
-    const sts = g?.sumatifTengah ?? 0;
-    const sas = g?.sumatifAkhir ?? 0;
+    const avgF = filledF.length > 0 ? Math.round(filledF.reduce((a, b) => a + b, 0) / filledF.length) : null;
+    const sts = typeof g?.sumatifTengah === 'number' && !isNaN(g.sumatifTengah) ? g.sumatifTengah : null;
+    const sas = typeof g?.sumatifAkhir === 'number' && !isNaN(g.sumatifAkhir) ? g.sumatifAkhir : null;
 
-    // Nilai Akhir calculation: 50% Formatif, 25% STS, 25% SAS
-    const finalScore = sts && sas ? Math.round(avgF * 0.5 + sts * 0.25 + sas * 0.25) : avgF || 0;
+    // HANYA hitung nilai yang sudah diinput saja kedalam total sum (bukan yang kosong)
+    let totalSum = 0;
+    let countInputted = 0;
+    filledF.forEach((v) => {
+      totalSum += v;
+      countInputted++;
+    });
+    if (sts !== null) {
+      totalSum += sts;
+      countInputted++;
+    }
+    if (sas !== null) {
+      totalSum += sas;
+      countInputted++;
+    }
 
-    let predikat = 'D';
-    if (finalScore >= 90) predikat = 'A';
-    else if (finalScore >= 80) predikat = 'B';
-    else if (finalScore >= classRoom.kkm) predikat = 'C';
+    const hasAny = countInputted > 0;
 
-    const status = finalScore >= classRoom.kkm ? 'Tuntas' : 'Belum Tuntas';
+    let totalWeighted = 0;
+    let totalW = 0;
+    if (avgF !== null) {
+      totalWeighted += avgF * 0.5;
+      totalW += 0.5;
+    }
+    if (sts !== null) {
+      totalWeighted += sts * 0.25;
+      totalW += 0.25;
+    }
+    if (sas !== null) {
+      totalWeighted += sas * 0.25;
+      totalW += 0.25;
+    }
+
+    const finalScore = totalW > 0 ? Math.round(totalWeighted / totalW) : 0;
+
+    let predikat = '-';
+    if (hasAny) {
+      if (finalScore >= 90) predikat = 'A';
+      else if (finalScore >= 80) predikat = 'B';
+      else if (finalScore >= classRoom.kkm) predikat = 'C';
+      else predikat = 'D';
+    }
+
+    const status = !hasAny ? '-' : finalScore >= classRoom.kkm ? 'Tuntas' : 'Belum Tuntas';
 
     return [
       idx + 1,
@@ -155,10 +191,11 @@ export function exportGradesToExcel(
       std.nama,
       std.gender,
       ...fVals.map((v) => (v !== undefined && v !== null ? v : '')),
-      avgF,
-      sts || '',
-      sas || '',
-      finalScore,
+      hasAny ? totalSum : '',
+      avgF !== null ? avgF : '',
+      sts !== null ? sts : '',
+      sas !== null ? sas : '',
+      hasAny ? finalScore : '',
       predikat,
       status,
       g?.catatan || '',
