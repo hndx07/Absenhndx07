@@ -88,6 +88,12 @@ export interface TeachingAgenda {
   catatan: string;
   hadirCount: number;
   tidakHadirCount: number;
+  classNameSnapshot?: string;
+  mataPelajaran?: string;
+  guruName?: string;
+  pertemuanKe?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface SavingTransaction {
@@ -148,7 +154,7 @@ export interface KartuSoalItem {
 
 export interface PublicShareRecord {
   id: string;
-  type: 'absen' | 'nilai' | 'tabungan';
+  type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
   classId: string;
   studentId?: string;
   title: string;

@@ -63,6 +63,7 @@ import {
   TeachingAgenda,
   SavingTransaction,
 } from './types';
+import { UiStatePersistence, SafeCache } from './utils/storageCache';
 import { exportDataToJsonBackup } from './utils/storage';
 
 // Components
@@ -96,7 +97,7 @@ type NavTab =
 export default function App() {
   // 1. Check for Public Share parameters in URL (accessible without auth)
   const [publicShare, setPublicShare] = useState<{
-    type: 'absen' | 'nilai' | 'tabungan';
+    type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
     shareId: string;
   } | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -110,6 +111,9 @@ export default function App() {
     if (params.get('tabungan_share')) {
       return { type: 'tabungan', shareId: params.get('tabungan_share')! };
     }
+    if (params.get('agenda_share')) {
+      return { type: 'agenda', shareId: params.get('agenda_share')! };
+    }
     return null;
   });
 
@@ -120,7 +124,14 @@ export default function App() {
   // 3. Database State from Supabase
   const [teacher, setTeacher] = useState<TeacherProfile | null>(null);
   const [classes, setClasses] = useState<ClassRoom[]>([]);
-  const [activeClassId, setActiveClassId] = useState<string>('');
+  const [activeClassId, setActiveClassIdState] = useState<string>(() =>
+    UiStatePersistence.get('activeClassId', '')
+  );
+  const setActiveClassId = (clsId: string) => {
+    setActiveClassIdState(clsId);
+    UiStatePersistence.set('activeClassId', clsId);
+  };
+
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceSession[]>([]);
   const [grades, setGrades] = useState<StudentGrade[]>([]);
@@ -128,10 +139,17 @@ export default function App() {
   const [agendas, setAgendas] = useState<TeachingAgenda[]>([]);
   const [savings, setSavings] = useState<SavingTransaction[]>([]);
 
-  // 4. UI States
+  // 4. UI States with safe persistence
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<NavTab>('attendance');
+  const [activeTab, setActiveTabState] = useState<NavTab>(() =>
+    UiStatePersistence.get<NavTab>('activeTab', 'attendance')
+  );
+  const setActiveTab = (tab: NavTab) => {
+    setActiveTabState(tab);
+    UiStatePersistence.set('activeTab', tab);
+  };
+
   const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -155,32 +173,38 @@ export default function App() {
       }
       setTeacher(profile);
 
-      // 2. Fetch classes
+      // 2. Fetch classes (live from Supabase)
       const loadedClasses = await getClasses();
       setClasses(loadedClasses);
+      SafeCache.set('all_classes', loadedClasses);
 
       // Determine active class
-      let currentClassId = targetClassId || profile.activeClassId || '';
+      let currentClassId = targetClassId || activeClassId || profile.activeClassId || '';
       if (!currentClassId && loadedClasses.length > 0) {
         currentClassId = loadedClasses[0].id;
       }
-      setActiveClassId(currentClassId);
+      if (currentClassId) {
+        setActiveClassId(currentClassId);
+      }
 
-      // 3. Fetch related records
+      // 3. Fetch all teaching agendas (Decoupled from active class: User requirement 1, 2, 3)
+      const loadedAgendas = await getTeachingAgendas();
+      setAgendas(loadedAgendas);
+      SafeCache.set('all_agendas', loadedAgendas);
+
+      // 4. Fetch class-specific records
       if (currentClassId) {
         const [
           loadedStudents,
           loadedAttendance,
           loadedGrades,
           loadedGradeCols,
-          loadedAgendas,
           loadedSavings,
         ] = await Promise.all([
           getStudents(currentClassId),
           getAttendanceSessions(currentClassId),
           getStudentGrades(currentClassId),
           getGradeColumns(currentClassId),
-          getTeachingAgendas(currentClassId),
           getSavingTransactions(currentClassId),
         ]);
 
@@ -188,14 +212,20 @@ export default function App() {
         setAttendance(loadedAttendance);
         setGrades(loadedGrades);
         setGradeColumns(loadedGradeCols);
-        setAgendas(loadedAgendas);
         setSavings(loadedSavings);
+
+        SafeCache.set(`class_data_${currentClassId}`, {
+          students: loadedStudents,
+          attendance: loadedAttendance,
+          grades: loadedGrades,
+          gradeColumns: loadedGradeCols,
+          savings: loadedSavings,
+        });
       } else {
         setStudents([]);
         setAttendance([]);
         setGrades([]);
         setGradeColumns([]);
-        setAgendas([]);
         setSavings([]);
       }
     } catch (err: any) {
@@ -207,7 +237,7 @@ export default function App() {
     } finally {
       setIsLoadingData(false);
     }
-  }, []);
+  }, [activeClassId]);
 
   // Check auth session on startup & subscribe to auth changes
   useEffect(() => {
@@ -270,7 +300,7 @@ export default function App() {
     };
   }, [loadUserData]);
 
-  // Handle active class change
+  // Handle active class change with cache-first and background sync
   const handleSelectClass = async (clsId: string) => {
     setActiveClassId(clsId);
     if (teacher) {
@@ -279,21 +309,30 @@ export default function App() {
       createOrUpdateTeacherProfile({ activeClassId: clsId }).catch(console.error);
     }
 
-    setIsLoadingData(true);
+    // Check safe cache first for instant switch without UI blocking
+    const cached = SafeCache.get<any>(`class_data_${clsId}`);
+    if (cached) {
+      setStudents(cached.students || []);
+      setAttendance(cached.attendance || []);
+      setGrades(cached.grades || []);
+      setGradeColumns(cached.gradeColumns || []);
+      setSavings(cached.savings || []);
+    } else {
+      setIsLoadingData(true);
+    }
+
     try {
       const [
         loadedStudents,
         loadedAttendance,
         loadedGrades,
         loadedGradeCols,
-        loadedAgendas,
         loadedSavings,
       ] = await Promise.all([
         getStudents(clsId),
         getAttendanceSessions(clsId),
         getStudentGrades(clsId),
         getGradeColumns(clsId),
-        getTeachingAgendas(clsId),
         getSavingTransactions(clsId),
       ]);
 
@@ -301,8 +340,15 @@ export default function App() {
       setAttendance(loadedAttendance);
       setGrades(loadedGrades);
       setGradeColumns(loadedGradeCols);
-      setAgendas(loadedAgendas);
       setSavings(loadedSavings);
+
+      SafeCache.set(`class_data_${clsId}`, {
+        students: loadedStudents,
+        attendance: loadedAttendance,
+        grades: loadedGrades,
+        gradeColumns: loadedGradeCols,
+        savings: loadedSavings,
+      });
     } catch (e: any) {
       console.error('Error switching class data:', e);
     } finally {
@@ -323,12 +369,16 @@ export default function App() {
         handleSelectClass(created.id);
       }
     }
+    SafeCache.invalidate('all_classes');
   };
 
   const handleDeleteClass = async (clsId: string) => {
     await deleteClass(clsId);
     const updated = classes.filter((c) => c.id !== clsId);
     setClasses(updated);
+    SafeCache.invalidate(`class_data_${clsId}`);
+    SafeCache.invalidate('all_classes');
+
     if (activeClassId === clsId) {
       if (updated.length > 0) {
         handleSelectClass(updated[0].id);
@@ -351,11 +401,13 @@ export default function App() {
       const created = await createStudent(std);
       setStudents((prev) => [...prev, created]);
     }
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
   };
 
   const handleDeleteStudent = async (stdId: string) => {
     await deleteStudent(stdId);
     setStudents((prev) => prev.filter((s) => s.id !== stdId));
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
   };
 
   const handleBatchAddStudents = async (newStds: Student[]) => {
@@ -363,6 +415,7 @@ export default function App() {
     if (activeClassId) {
       const fresh = await getStudents(activeClassId);
       setStudents(fresh);
+      SafeCache.invalidate(`class_data_${activeClassId}`);
     }
   };
 
@@ -370,34 +423,40 @@ export default function App() {
   const handleSaveAttendance = async (sessionData: AttendanceSession) => {
     const saved = await saveAttendanceSession(sessionData);
     setAttendance((prev) => [saved, ...prev.filter((s) => s.id !== saved.id)]);
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
   };
 
   const handleDeleteAttendance = async (sessionId: string) => {
     await deleteAttendanceSession(sessionId);
     setAttendance((prev) => prev.filter((s) => s.id !== sessionId));
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
   };
 
   // 4. Grades Handlers
   const handleSaveGrade = async (gradeData: StudentGrade) => {
     const saved = await saveStudentGrade(gradeData);
     setGrades((prev) => [saved, ...prev.filter((g) => g.id !== saved.id)]);
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
   };
 
   const handleSaveGradeCols = async (cols: GradeColumn[]) => {
     if (!activeClassId) return;
     await saveGradeColumns(cols, activeClassId);
     setGradeColumns(cols);
+    SafeCache.invalidate(`class_data_${activeClassId}`);
   };
 
-  // 5. Teaching Agenda Handlers
+  // 5. Teaching Agenda Handlers (Decoupled from active class)
   const handleSaveAgenda = async (agendaData: TeachingAgenda) => {
     const saved = await saveTeachingAgenda(agendaData);
     setAgendas((prev) => [saved, ...prev.filter((a) => a.id !== saved.id)]);
+    SafeCache.invalidate('all_agendas');
   };
 
   const handleDeleteAgenda = async (agendaId: string) => {
     await deleteTeachingAgenda(agendaId);
     setAgendas((prev) => prev.filter((a) => a.id !== agendaId));
+    SafeCache.invalidate('all_agendas');
   };
 
   // 6. Savings Handlers
@@ -785,9 +844,10 @@ export default function App() {
 
             {activeTab === 'agendas' && (
               <TeachingAgendaView
-                currentClass={activeClass}
+                classes={classes}
                 agendas={agendas}
                 teacher={activeTeacher}
+                currentClass={activeClass}
                 onSaveAgenda={handleSaveAgenda}
                 onDeleteAgenda={handleDeleteAgenda}
               />

@@ -188,46 +188,93 @@ export function exportGradesToExcel(
   XLSX.writeFile(wb, `Nilai_${classRoom.namaKelas.replace(/\s+/g, '_')}_${teacher.tahunAjaran.replace(/\//g, '-')}.xlsx`);
 }
 
-export function exportAgendasToExcel(agendas: TeachingAgenda[], classRoom: ClassRoom, teacher: TeacherProfile) {
+export function exportAgendasToExcel(
+  agendas: TeachingAgenda[],
+  classRoom: ClassRoom | null | undefined,
+  teacher: TeacherProfile,
+  classesMap?: Record<string, string>
+) {
+  const isMultiClass = !classRoom || classRoom.id === 'all';
+  const classNameHeader = isMultiClass ? 'Semua Kelas' : classRoom.namaKelas;
+  const subjectHeader = isMultiClass ? teacher.mataPelajaranUtama || 'Semua Mapel' : classRoom.mataPelajaran;
+
   const header = [
     ['BUKU JURNAL / AGENDA MENGAJAR GURU'],
     [`Sekolah: ${teacher.namaSekolah}`],
     [`Guru: ${teacher.namaGuru} | NBM/NIP: ${teacher.nbm || teacher.nip}`],
-    [`Kelas: ${classRoom.namaKelas} | Mapel: ${classRoom.mataPelajaran} | Semester: ${teacher.semester} ${teacher.tahunAjaran}`],
+    [`Kelas: ${classNameHeader} | Mapel: ${subjectHeader} | Semester: ${teacher.semester} ${teacher.tahunAjaran}`],
     [],
-    ['No', 'Tanggal', 'Hari', 'Jam Ke', 'Rentang Jam', 'Materi / Capaian Pembelajaran', 'Kegiatan Pembelajaran', 'Catatan / Evaluasi', 'Hadir', 'Tidak Hadir'],
+    isMultiClass
+      ? ['No', 'Tanggal', 'Hari', 'Kelas', 'Jam Ke', 'Rentang Jam', 'Materi / Capaian Pembelajaran', 'Kegiatan Pembelajaran', 'Catatan / Evaluasi', 'Hadir', 'Tidak Hadir']
+      : ['No', 'Tanggal', 'Hari', 'Jam Ke', 'Rentang Jam', 'Materi / Capaian Pembelajaran', 'Kegiatan Pembelajaran', 'Catatan / Evaluasi', 'Hadir', 'Tidak Hadir'],
   ];
 
-  const rows = agendas.map((ag, idx) => [
-    idx + 1,
-    ag.tanggal,
-    ag.hari,
-    ag.jamKe,
-    ag.rentangJam,
-    ag.materiAjar,
-    ag.kegiatan,
-    ag.catatan,
-    ag.hadirCount,
-    ag.tidakHadirCount,
-  ]);
+  const rows = agendas.map((ag, idx) => {
+    const clsName = classesMap?.[ag.classId] || ag.classNameSnapshot || ag.classId;
+    if (isMultiClass) {
+      return [
+        idx + 1,
+        ag.tanggal,
+        ag.hari,
+        clsName,
+        ag.jamKe,
+        ag.rentangJam,
+        ag.materiAjar,
+        ag.kegiatan,
+        ag.catatan,
+        ag.hadirCount,
+        ag.tidakHadirCount,
+      ];
+    }
+    return [
+      idx + 1,
+      ag.tanggal,
+      ag.hari,
+      ag.jamKe,
+      ag.rentangJam,
+      ag.materiAjar,
+      ag.kegiatan,
+      ag.catatan,
+      ag.hadirCount,
+      ag.tidakHadirCount,
+    ];
+  });
 
   const ws = XLSX.utils.aoa_to_sheet([...header, ...rows]);
-  ws['!cols'] = [
-    { wch: 5 },
-    { wch: 14 },
-    { wch: 10 },
-    { wch: 10 },
-    { wch: 18 },
-    { wch: 35 },
-    { wch: 40 },
-    { wch: 30 },
-    { wch: 8 },
-    { wch: 12 },
-  ];
+  ws['!cols'] = isMultiClass
+    ? [
+        { wch: 5 },
+        { wch: 14 },
+        { wch: 10 },
+        { wch: 16 },
+        { wch: 10 },
+        { wch: 18 },
+        { wch: 35 },
+        { wch: 40 },
+        { wch: 30 },
+        { wch: 8 },
+        { wch: 12 },
+      ]
+    : [
+        { wch: 5 },
+        { wch: 14 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 18 },
+        { wch: 35 },
+        { wch: 40 },
+        { wch: 30 },
+        { wch: 8 },
+        { wch: 12 },
+      ];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Jurnal_Mengajar');
-  XLSX.writeFile(wb, `Buku_Jurnal_${classRoom.namaKelas.replace(/\s+/g, '_')}.xlsx`);
+  const sheetName = isMultiClass ? 'Jurnal_Semua_Kelas' : `Jurnal_${classRoom.namaKelas.replace(/\s+/g, '_').slice(0, 20)}`;
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  const fileName = isMultiClass
+    ? `Buku_Jurnal_Semua_Kelas_${teacher.tahunAjaran.replace(/\//g, '-')}.xlsx`
+    : `Buku_Jurnal_${classRoom.namaKelas.replace(/\s+/g, '_')}.xlsx`;
+  XLSX.writeFile(wb, fileName);
 }
 
 export function exportToWordDocument(title: string, contentHtml: string) {
@@ -437,10 +484,14 @@ export function exportStudentsToExcel(
  */
 export function exportAgendaToPDF(
   agendas: TeachingAgenda[],
-  classRoom: ClassRoom,
-  teacher: TeacherProfile
+  classRoom: ClassRoom | null | undefined,
+  teacher: TeacherProfile,
+  classesMap?: Record<string, string>
 ) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const isMultiClass = !classRoom || classRoom.id === 'all';
+  const classNameHeader = isMultiClass ? 'Semua Kelas' : classRoom.namaKelas;
+  const subjectHeader = isMultiClass ? teacher.mataPelajaranUtama || 'Semua Mata Pelajaran' : classRoom.mataPelajaran;
 
   // Kop Sekolah
   doc.setFont('helvetica', 'bold');
@@ -466,9 +517,9 @@ export function exportAgendaToPDF(
   doc.setFont('helvetica', 'normal');
   doc.text(`Nama Guru    : ${teacher.namaGuru}`, 14, 43);
   doc.text(`NBM / NIP     : ${teacher.nbm || teacher.nip || '-'}`, 14, 48);
-  doc.text(`Mata Pelajaran: ${classRoom.mataPelajaran}`, 14, 53);
+  doc.text(`Mata Pelajaran: ${subjectHeader}`, 14, 53);
 
-  doc.text(`Kelas / Rombel : ${classRoom.namaKelas}`, 130, 43);
+  doc.text(`Kelas / Rombel : ${classNameHeader}`, 130, 43);
   doc.text(`Tahun Ajaran   : ${teacher.tahunAjaran}`, 130, 48);
   doc.text(`Semester       : ${teacher.semester}`, 130, 53);
 
@@ -481,13 +532,19 @@ export function exportAgendaToPDF(
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text('No', 17, startY + 5.5);
-  doc.text('Hari / Tgl', 26, startY + 5.5);
-  doc.text('Jam', 48, startY + 5.5);
-  doc.text('Materi / Capaian Pembelajaran', 62, startY + 5.5);
-  doc.text('Hadir', 156, startY + 5.5);
-  doc.text('Absen', 168, startY + 5.5);
-  doc.text('TTD', 184, startY + 5.5);
+  doc.text('No', 16, startY + 5.5);
+  doc.text('Hari / Tgl', 24, startY + 5.5);
+  if (isMultiClass) {
+    doc.text('Kelas', 46, startY + 5.5);
+    doc.text('Jam', 66, startY + 5.5);
+    doc.text('Materi / Capaian Pembelajaran', 78, startY + 5.5);
+  } else {
+    doc.text('Jam', 48, startY + 5.5);
+    doc.text('Materi / Capaian Pembelajaran', 62, startY + 5.5);
+  }
+  doc.text('Hdr', 156, startY + 5.5);
+  doc.text('Abs', 167, startY + 5.5);
+  doc.text('TTD', 182, startY + 5.5);
 
   let currentY = startY + 8;
   doc.setFont('helvetica', 'normal');
@@ -499,14 +556,23 @@ export function exportAgendaToPDF(
     }
 
     const rowH = 10;
+    const clsName = classesMap?.[ag.classId] || ag.classNameSnapshot || ag.classId;
     doc.rect(14, currentY, 182, rowH, 'S');
-    doc.text(String(idx + 1), 17, currentY + 6);
-    doc.text(`${ag.hari?.substring(0, 3)}, ${ag.tanggal}`, 26, currentY + 6);
-    doc.text(`Ke-${ag.jamKe}`, 48, currentY + 6);
-    doc.text(ag.materiAjar ? ag.materiAjar.substring(0, 46) : '-', 62, currentY + 6);
+    doc.text(String(idx + 1), 16, currentY + 6);
+    doc.text(`${ag.hari?.substring(0, 3)}, ${ag.tanggal}`, 24, currentY + 6);
+
+    if (isMultiClass) {
+      doc.text(clsName ? clsName.substring(0, 10) : '-', 46, currentY + 6);
+      doc.text(`Ke-${ag.jamKe}`, 66, currentY + 6);
+      doc.text(ag.materiAjar ? ag.materiAjar.substring(0, 38) : '-', 78, currentY + 6);
+    } else {
+      doc.text(`Ke-${ag.jamKe}`, 48, currentY + 6);
+      doc.text(ag.materiAjar ? ag.materiAjar.substring(0, 46) : '-', 62, currentY + 6);
+    }
+
     doc.text(String(ag.hadirCount ?? 0), 158, currentY + 6);
-    doc.text(String(ag.tidakHadirCount ?? 0), 170, currentY + 6);
-    doc.text('...', 185, currentY + 6);
+    doc.text(String(ag.tidakHadirCount ?? 0), 169, currentY + 6);
+    doc.text('...', 184, currentY + 6);
 
     currentY += rowH;
   });
@@ -521,7 +587,10 @@ export function exportAgendaToPDF(
   doc.setFont('helvetica', 'normal');
   doc.text(`NBM/NIP: ${teacher.nbm || teacher.nip || '-'}`, 140, signY + 26);
 
-  doc.save(`Agenda_Mengajar_${classRoom.namaKelas.replace(/\s+/g, '_')}.pdf`);
+  const pdfFileName = isMultiClass
+    ? `Agenda_Mengajar_Semua_Kelas_${teacher.tahunAjaran.replace(/\//g, '-')}.pdf`
+    : `Agenda_Mengajar_${classRoom.namaKelas.replace(/\s+/g, '_')}.pdf`;
+  doc.save(pdfFileName);
 }
 
 /**

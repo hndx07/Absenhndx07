@@ -47,50 +47,94 @@
   background: rgba(100, 116, 139, 0.8);
 }
 
-/* Dark mode overrides for background & text */
+/* Dark mode overrides for background, contrast & text */
 .dark body {
-  background-color: #0f172a;
+  background-color: #0b1120;
   color: #f8fafc;
 }
 
 .dark .bg-white {
-  background-color: #1e293b;
+  background-color: #111827;
   color: #f1f5f9;
 }
 
 .dark .bg-slate-50 {
-  background-color: #0f172a;
+  background-color: #0b1120;
 }
 
 .dark .bg-slate-100 {
-  background-color: #1e293b;
+  background-color: #1f2937;
 }
 
 .dark .border-slate-200,
 .dark .border-slate-200\/80,
 .dark .border-slate-100 {
-  border-color: #334155;
+  border-color: #374151;
 }
 
 .dark .text-slate-900,
 .dark .text-slate-800 {
-  color: #f8fafc;
+  color: #f9fafb;
 }
 
 .dark .text-slate-700 {
-  color: #cbd5e1;
+  color: #e5e7eb;
 }
 
 .dark .text-slate-600 {
-  color: #94a3b8;
+  color: #cbd5e1;
 }
 
+.dark .text-slate-500 {
+  color: #9ca3af;
+}
+
+/* Dark Mode Table Enhancements (High contrast headers, visible borders, legible rows) */
+.dark table {
+  border-color: #374151;
+}
+
+.dark th {
+  background-color: #111827 !important;
+  color: #f3f4f6 !important;
+  border-color: #374151 !important;
+}
+
+.dark td {
+  border-color: #1f2937 !important;
+  color: #e5e7eb;
+}
+
+.dark tr:hover td {
+  background-color: rgba(31, 41, 55, 0.7) !important;
+}
+
+/* Dark Mode Form Inputs, Selects & Placeholders */
 .dark input,
 .dark select,
 .dark textarea {
-  background-color: #1e293b;
-  color: #f8fafc;
-  border-color: #475569;
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+  border-color: #4b5563 !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #6366f1 !important;
+  outline: 2px solid rgba(99, 102, 241, 0.4) !important;
+}
+
+/* Touch targets: mobile ergonomics */
+@media (max-width: 640px) {
+  button, input, select, textarea {
+    min-height: 44px;
+  }
 }
 
 @media print {

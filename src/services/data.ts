@@ -674,6 +674,8 @@ export async function getTeachingAgendas(classId?: string): Promise<TeachingAgen
     catatan: row.catatan || '',
     hadirCount: Number(row.hadir_count) || 0,
     tidakHadirCount: Number(row.tidak_hadir_count) || 0,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
   }));
 }
 
@@ -860,5 +862,14 @@ export async function getPublicShare(shareId: string): Promise<any | null> {
     throw error;
   }
 
-  return data ? data.payload : null;
+  if (!data) return null;
+
+  return {
+    ...(data.payload || {}),
+    shareType: data.type,
+    shareTitle: data.title,
+    classId: data.class_id,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+  };
 }
