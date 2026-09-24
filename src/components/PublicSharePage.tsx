@@ -19,6 +19,13 @@ import {
   UserCheck,
   Users,
   Check,
+  Lock,
+  Printer,
+  Eye,
+  Award,
+  Filter,
+  X,
+  ChevronRight,
 } from 'lucide-react';
 import { getSafeSupabaseClient } from '../services/supabase';
 import { getPublicShare } from '../services/data';
@@ -59,7 +66,7 @@ function formatIndonesianDateTime(isoStr?: string): string {
 }
 
 export const PublicSharePage: React.FC<PublicSharePageProps> = ({
-  type,
+  type: initialType,
   shareId,
 }) => {
   const [data, setData] = useState<any>(null);
@@ -67,6 +74,14 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [copied, setCopied] = useState(false);
+
+  // Nilai view modes & filters
+  const [gradeViewMode, setGradeViewMode] = useState<'summary' | 'detailed'>('summary');
+  const [gradeFilterStatus, setGradeFilterStatus] = useState<'all' | 'tuntas' | 'belum_tuntas'>('all');
+  const [selectedStudentGrade, setSelectedStudentGrade] = useState<any | null>(null);
+
+  const effectiveType: 'absen' | 'nilai' | 'tabungan' | 'agenda' =
+    data?.shareType || initialType;
 
   const loadData = async () => {
     setLoading(true);
@@ -198,6 +213,224 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     };
   }, [data?.sessions, data?.students]);
 
+  // Grade-specific calculations
+  const classStudentsList = useMemo(() => {
+    return Array.isArray(data?.students) ? data.students : [];
+  }, [data?.students]);
+
+  const rawGradesList = useMemo(() => {
+    return Array.isArray(data?.grades) ? data.grades : [];
+  }, [data?.grades]);
+
+  const activeGradeColumns = useMemo(() => {
+    if (data?.gradeColumns && Array.isArray(data.gradeColumns) && data.gradeColumns.length > 0) {
+      return data.gradeColumns;
+    }
+    return [
+      { key: 'formatif1', label: 'TP 1' },
+      { key: 'formatif2', label: 'TP 2' },
+      { key: 'formatif3', label: 'TP 3' },
+    ];
+  }, [data?.gradeColumns]);
+
+  // Precompute computed rows for each student
+  const computedGrades = useMemo(() => {
+    const kkm = Number(data?.kkm) || 75;
+    return classStudentsList.map((std: any, idx: number) => {
+      const g = rawGradesList.find((item: any) => item.studentId === std.id);
+
+      const fVals = [
+        g?.formatif1,
+        g?.formatif2,
+        g?.formatif3,
+        g?.formatif4,
+        g?.formatif5,
+        g?.formatif6,
+        g?.formatif7,
+        g?.formatif8,
+        g?.formatif9,
+        g?.formatif10,
+      ].filter((v): v is number => typeof v === 'number' && !isNaN(v));
+
+      const avgF = fVals.length > 0 ? Math.round(fVals.reduce((a, b) => a + b, 0) / fVals.length) : null;
+      const sts = typeof g?.sumatifTengah === 'number' && !isNaN(g.sumatifTengah) ? g.sumatifTengah : null;
+      const sas = typeof g?.sumatifAkhir === 'number' && !isNaN(g.sumatifAkhir) ? g.sumatifAkhir : null;
+
+      // HANYA hitung nilai yang sudah diinput saja kedalam total sum (bukan yang kosong)
+      let totalSum = 0;
+      let countInputted = 0;
+      fVals.forEach((v) => {
+        totalSum += v;
+        countInputted++;
+      });
+      if (sts !== null) {
+        totalSum += sts;
+        countInputted++;
+      }
+      if (sas !== null) {
+        totalSum += sas;
+        countInputted++;
+      }
+
+      const hasAnyScore = countInputted > 0;
+
+      // Bobot proporsional hanya dari komponen yang sudah terisi
+      let totalWeighted = 0;
+      let totalW = 0;
+      if (avgF !== null) {
+        totalWeighted += avgF * 0.5;
+        totalW += 0.5;
+      }
+      if (sts !== null) {
+        totalWeighted += sts * 0.25;
+        totalW += 0.25;
+      }
+      if (sas !== null) {
+        totalWeighted += sas * 0.25;
+        totalW += 0.25;
+      }
+
+      const finalScore = totalW > 0 ? Math.round(totalWeighted / totalW) : 0;
+
+      let predikat = '-';
+      if (hasAnyScore) {
+        if (finalScore >= 90) predikat = 'A';
+        else if (finalScore >= 80) predikat = 'B';
+        else if (finalScore >= kkm) predikat = 'C';
+        else predikat = 'D';
+      }
+
+      const isTuntas = hasAnyScore && finalScore >= kkm;
+
+      return {
+        student: std,
+        gradeRecord: g,
+        fVals,
+        avgF,
+        sts,
+        sas,
+        totalSum,
+        countInputted,
+        hasAnyScore,
+        finalScore,
+        predikat,
+        isTuntas,
+      };
+    });
+  }, [classStudentsList, rawGradesList, data?.kkm]);
+
+  // Overall class statistics
+  const gradeClassStats = useMemo(() => {
+    const kkm = Number(data?.kkm) || 75;
+    const scoredStudents = computedGrades.filter((c: any) => c.hasAnyScore);
+    const totalScored = scoredStudents.length;
+    if (totalScored === 0) {
+      return {
+        avgScore: 0,
+        tuntasCount: 0,
+        tuntasRate: 0,
+        highestScore: 0,
+        lowestScore: 0,
+        totalScored: 0,
+        totalStudents: computedGrades.length,
+      };
+    }
+    const sumFinal = scoredStudents.reduce((a: number, b: any) => a + b.finalScore, 0);
+    const avgScore = Math.round(sumFinal / totalScored);
+    const tuntasCount = scoredStudents.filter((c: any) => c.isTuntas).length;
+    const tuntasRate = Math.round((tuntasCount / totalScored) * 100);
+    const allFinals = scoredStudents.map((c: any) => c.finalScore);
+    const highestScore = Math.max(...allFinals);
+    const lowestScore = Math.min(...allFinals);
+
+    return {
+      avgScore,
+      tuntasCount,
+      tuntasRate,
+      highestScore,
+      lowestScore,
+      totalScored,
+      totalStudents: computedGrades.length,
+    };
+  }, [computedGrades, data?.kkm]);
+
+  // Column-wise sums and averages for footer
+  const gradeFooterTotals = useMemo(() => {
+    let grandTotalSum = 0;
+    let studentsWithTotalSum = 0;
+
+    let stsSum = 0;
+    let stsCount = 0;
+
+    let sasSum = 0;
+    let sasCount = 0;
+
+    let avgFSum = 0;
+    let avgFCount = 0;
+
+    let finalSum = 0;
+    let finalCount = 0;
+
+    const tpTotals: Record<string, { sum: number; count: number }> = {};
+    activeGradeColumns.forEach((c: any) => {
+      tpTotals[c.key] = { sum: 0, count: 0 };
+    });
+
+    computedGrades.forEach((c: any) => {
+      if (c.hasAnyScore) {
+        grandTotalSum += c.totalSum;
+        studentsWithTotalSum++;
+        finalSum += c.finalScore;
+        finalCount++;
+      }
+      if (c.sts !== null) {
+        stsSum += c.sts;
+        stsCount++;
+      }
+      if (c.sas !== null) {
+        sasSum += c.sas;
+        sasCount++;
+      }
+      if (c.avgF !== null) {
+        avgFSum += c.avgF;
+        avgFCount++;
+      }
+
+      activeGradeColumns.forEach((col: any) => {
+        const val = c.gradeRecord?.[col.key];
+        if (typeof val === 'number' && !isNaN(val)) {
+          tpTotals[col.key].sum += val;
+          tpTotals[col.key].count++;
+        }
+      });
+    });
+
+    return {
+      grandTotalSum,
+      avgFinal: finalCount > 0 ? Math.round(finalSum / finalCount) : 0,
+      stsSum,
+      stsAvg: stsCount > 0 ? Math.round(stsSum / stsCount) : null,
+      sasSum,
+      sasAvg: sasCount > 0 ? Math.round(sasSum / sasCount) : null,
+      avgFSum,
+      avgFAvg: avgFCount > 0 ? Math.round(avgFSum / avgFCount) : null,
+      tpTotals,
+    };
+  }, [computedGrades, activeGradeColumns]);
+
+  const filteredComputedGrades = useMemo(() => {
+    return computedGrades.filter((item: any) => {
+      const matchSearch =
+        (item.student.nama || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.student.nisn || '').includes(searchTerm);
+      if (!matchSearch) return false;
+
+      if (gradeFilterStatus === 'tuntas') return item.isTuntas;
+      if (gradeFilterStatus === 'belum_tuntas') return item.hasAnyScore && !item.isTuntas;
+      return true;
+    });
+  }, [computedGrades, searchTerm, gradeFilterStatus]);
+
   if (loading && !data) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
@@ -212,6 +445,36 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Memuat data transparansi resmi SMK Muhammadiyah Bawang
             </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!loading && !data) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <div className="text-center space-y-4 max-w-md bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="w-16 h-16 rounded-3xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 flex items-center justify-center mx-auto text-amber-600 dark:text-amber-400">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-lg">
+              Tautan Publik Tidak Ditemukan
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+              Tautan publik ini mungkin belum dibagikan atau tautan yang Anda masukkan kurang tepat. Pastikan Anda membuka link resmi yang dibagikan oleh guru mata pelajaran SMK Muhammadiyah Bawang.
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={loadData}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 mx-auto cursor-pointer shadow-sm shadow-indigo-600/20"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Coba Segarkan Lagi
+            </button>
           </div>
         </div>
       </div>
@@ -283,16 +546,49 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
 
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        {/* Official Isolated Read-Only Assurance Notice */}
+        <div className="bg-gradient-to-r from-indigo-900/10 via-purple-900/10 to-indigo-900/10 dark:from-indigo-950/50 dark:via-purple-950/40 dark:to-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/80 rounded-3xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-600/30">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-slate-900 dark:text-white text-sm">
+                  Portal Publik Resmi (Hanya Lihat / Read-Only)
+                </p>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                  Terisolasi
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                Halaman ini disiapkan khusus bagi peserta didik dan orang tua tanpa hak akses perubahan atau edit data.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 rounded-2xl border border-slate-200 dark:border-slate-700 font-bold text-xs transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title="Cetak atau Simpan PDF"
+            >
+              <Printer className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <span>Cetak / Simpan PDF</span>
+            </button>
+          </div>
+        </div>
+
         {/* Info Card with Real Timestamp */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-full text-xs font-bold border border-indigo-100 dark:border-indigo-900">
-                {type === 'absen'
+                {effectiveType === 'absen'
                   ? 'Rekap Presensi Siswa'
-                  : type === 'nilai'
+                  : effectiveType === 'nilai'
                   ? 'Rekap Asesmen / Nilai'
-                  : type === 'agenda'
+                  : effectiveType === 'agenda'
                   ? 'Agenda Mengajar Guru'
                   : 'Laporan Tabungan & Kas'}
               </span>
@@ -331,7 +627,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         </div>
 
         {/* Search Bar */}
-        {(type === 'absen' || type === 'nilai' || type === 'tabungan') && (
+        {(effectiveType === 'absen' || effectiveType === 'nilai' || effectiveType === 'tabungan') && (
           <div className="relative w-full max-w-md">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -345,7 +641,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         )}
 
         {/* 1. TYPE ABSENSI */}
-        {type === 'absen' && (
+        {effectiveType === 'absen' && (
           <div className="space-y-4">
             {/* Bilah Navigasi / Tab Pilihan Tampilan Presensi */}
             <div className="bg-white dark:bg-slate-900 p-2.5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
@@ -752,163 +1048,637 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         )}
 
         {/* 2. TYPE NILAI */}
-        {type === 'nilai' && (
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
-                Rekap Capaian Asesmen (KKM: {data?.kkm || 75})
-              </h3>
+        {effectiveType === 'nilai' && (
+          <div className="space-y-5">
+            {/* Ringkasan Statistik Asesmen Kelas (Read-Only KPI Cards) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100 dark:border-indigo-900">
+                  <BarChart3 className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block truncate">
+                    Rata-Rata Kelas
+                  </span>
+                  <p className="text-xl font-black font-mono text-slate-900 dark:text-white">
+                    {gradeClassStats.avgScore > 0 ? gradeClassStats.avgScore : '-'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block truncate">
+                    Ketuntasan KKM
+                  </span>
+                  <p className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+                    {gradeClassStats.totalScored > 0 ? `${gradeClassStats.tuntasRate}%` : '-'}
+                  </p>
+                  <span className="text-[10px] text-slate-400 block truncate">
+                    {gradeClassStats.tuntasCount} dari {gradeClassStats.totalScored} siswa
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-100 dark:border-purple-900">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block truncate">
+                    Tertinggi / Terendah
+                  </span>
+                  <p className="text-xl font-black font-mono text-purple-600 dark:text-purple-400">
+                    {gradeClassStats.totalScored > 0
+                      ? `${gradeClassStats.highestScore} / ${gradeClassStats.lowestScore}`
+                      : '-'}
+                  </p>
+                  <span className="text-[10px] text-slate-400 block truncate">
+                    Skor akhir siswa
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block truncate">
+                    Standar KKM
+                  </span>
+                  <p className="text-xl font-black font-mono text-slate-900 dark:text-white">
+                    {data?.kkm || 75}
+                  </p>
+                  <span className="text-[10px] text-slate-400 block truncate">
+                    Batas ketuntasan
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                    <th className="py-3 px-3 text-center w-12">No</th>
-                    <th className="py-3 px-4 min-w-[190px]">Nama Peserta Didik</th>
-                    <th className="py-3 px-3 text-center w-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 font-bold" title="Hanya nilai yang sudah diinput saja yang dihitung">Total Sum</th>
-                    <th className="py-3 px-3 text-center w-20">Rata Formatif</th>
-                    <th className="py-3 px-3 text-center w-16">STS</th>
-                    <th className="py-3 px-3 text-center w-16">SAS</th>
-                    <th className="py-3 px-4 text-center w-24 bg-slate-900 text-white">Nilai Akhir</th>
-                    <th className="py-3 px-3 text-center w-16">Predikat</th>
-                    <th className="py-3 px-4 text-center w-28">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {(data?.students || [])
-                    .filter((s: any) => (s.nama || '').toLowerCase().includes(searchTerm.toLowerCase()))
-                    .map((std: any, idx: number) => {
-                      const g = (data.grades || []).find((item: any) => item.studentId === std.id);
-                      const fVals = [
-                        g?.formatif1,
-                        g?.formatif2,
-                        g?.formatif3,
-                        g?.formatif4,
-                        g?.formatif5,
-                        g?.formatif6,
-                        g?.formatif7,
-                        g?.formatif8,
-                        g?.formatif9,
-                        g?.formatif10,
-                      ].filter((v): v is number => typeof v === 'number' && !isNaN(v));
+            {/* Bilah Kontrol & Filter Tampilan (Read-Only) */}
+            <div className="bg-white dark:bg-slate-900 p-3 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Filter Status */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+                <button
+                  type="button"
+                  onClick={() => setGradeFilterStatus('all')}
+                  className={`px-3 py-1.5 rounded-2xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                    gradeFilterStatus === 'all'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  Semua Siswa ({computedGrades.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGradeFilterStatus('tuntas')}
+                  className={`px-3 py-1.5 rounded-2xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                    gradeFilterStatus === 'tuntas'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  Tuntas ({gradeClassStats.tuntasCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGradeFilterStatus('belum_tuntas')}
+                  className={`px-3 py-1.5 rounded-2xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                    gradeFilterStatus === 'belum_tuntas'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  Belum Tuntas ({Math.max(0, gradeClassStats.totalScored - gradeClassStats.tuntasCount)})
+                </button>
+              </div>
 
-                      const avgF = fVals.length > 0 ? Math.round(fVals.reduce((a, b) => a + b, 0) / fVals.length) : null;
-                      const sts = typeof g?.sumatifTengah === 'number' && !isNaN(g.sumatifTengah) ? g.sumatifTengah : null;
-                      const sas = typeof g?.sumatifAkhir === 'number' && !isNaN(g.sumatifAkhir) ? g.sumatifAkhir : null;
+              {/* Toggle Mode Tampilan Tabel */}
+              <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+                <span className="text-[11px] text-slate-400 font-semibold hidden sm:inline">Mode Tabel:</span>
+                <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setGradeViewMode('summary')}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      gradeViewMode === 'summary'
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Ringkasan Standar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGradeViewMode('detailed')}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      gradeViewMode === 'detailed'
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Rincian TP Lengkap
+                  </button>
+                </div>
+              </div>
+            </div>
 
-                      // HANYA hitung nilai yang sudah diinput saja kedalam total sum (bukan yang kosong)
-                      let totalSum = 0;
-                      let countInputted = 0;
-                      fVals.forEach((v) => {
-                        totalSum += v;
-                        countInputted++;
-                      });
-                      if (sts !== null) {
-                        totalSum += sts;
-                        countInputted++;
-                      }
-                      if (sas !== null) {
-                        totalSum += sas;
-                        countInputted++;
-                      }
+            {/* Tabel Nilai Terisolasi Read-Only */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="p-4 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm uppercase tracking-wider">
+                    Daftar Nilai Siswa (KKM: {data?.kkm || 75})
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Hanya nilai yang sudah diinput saja yang dihitung kedalam Total Sum & Rata-rata.
+                  </p>
+                </div>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                  Menampilkan {filteredComputedGrades.length} dari {computedGrades.length} siswa
+                </span>
+              </div>
 
-                      const hasAnyScore = countInputted > 0;
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      <th className="py-3 px-3 text-center w-12 sticky left-0 bg-slate-50 dark:bg-slate-850 z-10">No</th>
+                      <th className="py-3 px-4 min-w-[200px] sticky left-12 bg-slate-50 dark:bg-slate-850 z-10">Nama Peserta Didik</th>
+                      
+                      {gradeViewMode === 'detailed' ? (
+                        <>
+                          {activeGradeColumns.map((col: any) => (
+                            <th key={col.key} className="py-3 px-3 text-center w-16 whitespace-nowrap">
+                              {col.label}
+                            </th>
+                          ))}
+                          <th className="py-3 px-3 text-center w-20">Rata Formatif</th>
+                          <th className="py-3 px-3 text-center w-16">STS</th>
+                          <th className="py-3 px-3 text-center w-16">SAS</th>
+                          <th
+                            className="py-3 px-3 text-center w-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 font-bold"
+                            title="Hanya nilai yang sudah diinput saja yang dihitung kedalam total sum"
+                          >
+                            Total Sum
+                          </th>
+                          <th className="py-3 px-4 text-center w-24 bg-slate-900 text-white">Nilai Akhir</th>
+                          <th className="py-3 px-3 text-center w-16">Predikat</th>
+                          <th className="py-3 px-4 text-center w-28">Status</th>
+                        </>
+                      ) : (
+                        <>
+                          <th
+                            className="py-3 px-3 text-center w-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 font-bold"
+                            title="Hanya nilai yang sudah diinput saja yang dihitung kedalam total sum"
+                          >
+                            Total Sum
+                          </th>
+                          <th className="py-3 px-3 text-center w-20">Rata Formatif</th>
+                          <th className="py-3 px-3 text-center w-16">STS</th>
+                          <th className="py-3 px-3 text-center w-16">SAS</th>
+                          <th className="py-3 px-4 text-center w-24 bg-slate-900 text-white">Nilai Akhir</th>
+                          <th className="py-3 px-3 text-center w-16">Predikat</th>
+                          <th className="py-3 px-4 text-center w-28">Status</th>
+                          <th className="py-3 px-3 text-center w-24">Rapor</th>
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredComputedGrades.length > 0 ? (
+                      filteredComputedGrades.map((item: any, idx: number) => {
+                        const {
+                          student: std,
+                          gradeRecord: g,
+                          avgF,
+                          sts,
+                          sas,
+                          totalSum,
+                          countInputted,
+                          hasAnyScore,
+                          finalScore,
+                          predikat,
+                          isTuntas,
+                        } = item;
 
-                      // Bobot proporsional hanya dari komponen yang sudah terisi
-                      let totalWeighted = 0;
-                      let totalW = 0;
-                      if (avgF !== null) {
-                        totalWeighted += avgF * 0.5;
-                        totalW += 0.5;
-                      }
-                      if (sts !== null) {
-                        totalWeighted += sts * 0.25;
-                        totalW += 0.25;
-                      }
-                      if (sas !== null) {
-                        totalWeighted += sas * 0.25;
-                        totalW += 0.25;
-                      }
-
-                      const finalScore = totalW > 0 ? Math.round(totalWeighted / totalW) : 0;
-
-                      let predikat = '-';
-                      if (hasAnyScore) {
-                        if (finalScore >= 90) predikat = 'A';
-                        else if (finalScore >= 80) predikat = 'B';
-                        else if (finalScore >= (data?.kkm || 75)) predikat = 'C';
-                        else predikat = 'D';
-                      }
-
-                      const isTuntas = hasAnyScore && finalScore >= (data?.kkm || 75);
-
-                      return (
-                        <tr key={std.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
-                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-400 dark:text-slate-500">
-                            {idx + 1}
-                          </td>
-                          <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                            {std.nama}
-                            <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-normal">
-                              NISN: {std.nisn || '-'}
-                            </span>
-                          </td>
-                          {/* Total Sum */}
-                          <td className="py-3 px-3 text-center font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-950/20">
-                            {hasAnyScore ? (
-                              <span title={`Total dari ${countInputted} nilai terisi (kosong diabaikan)`}>
-                                {totalSum}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 text-center font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                            {avgF !== null ? avgF : '-'}
-                          </td>
-                          <td className="py-3 px-3 text-center font-mono text-slate-700 dark:text-slate-300">
-                            {sts !== null ? sts : '-'}
-                          </td>
-                          <td className="py-3 px-3 text-center font-mono text-slate-700 dark:text-slate-300">
-                            {sas !== null ? sas : '-'}
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-black text-sm bg-slate-900 dark:bg-slate-950 text-white">
-                            {hasAnyScore ? finalScore : '-'}
-                          </td>
-                          <td className="py-3 px-3 text-center font-bold">
-                            <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono text-xs">
-                              {predikat}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            {!hasAnyScore ? (
-                              <span className="inline-block px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                Belum Ada Nilai
-                              </span>
-                            ) : (
-                              <span
-                                className={`inline-block px-2.5 py-1 rounded-xl text-[11px] font-bold ${
-                                  isTuntas
-                                    ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                                    : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-                                }`}
+                        return (
+                          <tr
+                            key={std.id}
+                            className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors"
+                          >
+                            <td className="py-3 px-3 text-center font-mono font-bold text-slate-400 dark:text-slate-500 sticky left-0 bg-white dark:bg-slate-900">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-4 font-bold text-slate-900 dark:text-white sticky left-12 bg-white dark:bg-slate-900">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedStudentGrade(item)}
+                                className="text-left hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer group"
                               >
-                                {isTuntas ? 'Tuntas' : 'Belum Tuntas'}
-                              </span>
+                                <span className="group-hover:underline">{std.nama}</span>
+                                <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-normal">
+                                  NISN: {std.nisn || '-'}
+                                </span>
+                              </button>
+                            </td>
+
+                            {gradeViewMode === 'detailed' ? (
+                              <>
+                                {activeGradeColumns.map((col: any) => {
+                                  const val = g?.[col.key];
+                                  const hasVal = typeof val === 'number' && !isNaN(val);
+                                  return (
+                                    <td
+                                      key={col.key}
+                                      className="py-3 px-3 text-center font-mono font-medium text-slate-700 dark:text-slate-300"
+                                    >
+                                      {hasVal ? val : <span className="text-slate-300 dark:text-slate-600">-</span>}
+                                    </td>
+                                  );
+                                })}
+                                <td className="py-3 px-3 text-center font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                                  {avgF !== null ? avgF : '-'}
+                                </td>
+                                <td className="py-3 px-3 text-center font-mono text-slate-700 dark:text-slate-300">
+                                  {sts !== null ? sts : '-'}
+                                </td>
+                                <td className="py-3 px-3 text-center font-mono text-slate-700 dark:text-slate-300">
+                                  {sas !== null ? sas : '-'}
+                                </td>
+                                <td className="py-3 px-3 text-center font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-950/20">
+                                  {hasAnyScore ? (
+                                    <span title={`Total dari ${countInputted} nilai terisi (kosong diabaikan)`}>
+                                      {totalSum}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-center font-mono font-black text-sm bg-slate-900 dark:bg-slate-950 text-white">
+                                  {hasAnyScore ? finalScore : '-'}
+                                </td>
+                                <td className="py-3 px-3 text-center font-bold">
+                                  <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono text-xs">
+                                    {predikat}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  {!hasAnyScore ? (
+                                    <span className="inline-block px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                      Belum Ada Nilai
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className={`inline-block px-2.5 py-1 rounded-xl text-[11px] font-bold ${
+                                        isTuntas
+                                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                          : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                      }`}
+                                    >
+                                      {isTuntas ? 'Tuntas' : 'Belum Tuntas'}
+                                    </span>
+                                  )}
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="py-3 px-3 text-center font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-950/20">
+                                  {hasAnyScore ? (
+                                    <span title={`Total dari ${countInputted} nilai terisi (kosong diabaikan)`}>
+                                      {totalSum}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3 text-center font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                                  {avgF !== null ? avgF : '-'}
+                                </td>
+                                <td className="py-3 px-3 text-center font-mono text-slate-700 dark:text-slate-300">
+                                  {sts !== null ? sts : '-'}
+                                </td>
+                                <td className="py-3 px-3 text-center font-mono text-slate-700 dark:text-slate-300">
+                                  {sas !== null ? sas : '-'}
+                                </td>
+                                <td className="py-3 px-4 text-center font-mono font-black text-sm bg-slate-900 dark:bg-slate-950 text-white">
+                                  {hasAnyScore ? finalScore : '-'}
+                                </td>
+                                <td className="py-3 px-3 text-center font-bold">
+                                  <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono text-xs">
+                                    {predikat}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  {!hasAnyScore ? (
+                                    <span className="inline-block px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                      Belum Ada Nilai
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className={`inline-block px-2.5 py-1 rounded-xl text-[11px] font-bold ${
+                                        isTuntas
+                                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                          : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                      }`}
+                                    >
+                                      {isTuntas ? 'Tuntas' : 'Belum Tuntas'}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedStudentGrade(item)}
+                                    className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 text-indigo-600 dark:text-indigo-400 rounded-xl font-bold text-[11px] transition inline-flex items-center gap-1 cursor-pointer"
+                                    title="Lihat Rapor Capaian Individu"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    <span>Rapor</span>
+                                  </button>
+                                </td>
+                              </>
                             )}
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={gradeViewMode === 'detailed' ? 8 + activeGradeColumns.length : 10}
+                          className="py-8 text-center text-slate-400 dark:text-slate-500"
+                        >
+                          Tidak ada peserta didik yang sesuai dengan filter atau kata kunci pencarian.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+
+                  {/* Footer Ringkasan: Total Sum & Rata-rata */}
+                  <tfoot className="border-t-2 border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-850 font-bold text-[11px]">
+                    {/* Baris Total Sum (Hanya nilai terisi) */}
+                    <tr className="border-b border-slate-200 dark:border-slate-750">
+                      <td colSpan={2} className="py-2.5 px-4 text-right font-black uppercase text-slate-700 dark:text-slate-200 sticky left-0 bg-slate-50 dark:bg-slate-850">
+                        Total Sum (Terisi Sahaja):
+                      </td>
+                      {gradeViewMode === 'detailed' ? (
+                        <>
+                          {activeGradeColumns.map((col: any) => (
+                            <td key={col.key} className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                              {gradeFooterTotals.tpTotals[col.key]?.sum || 0}
+                            </td>
+                          ))}
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                            {gradeFooterTotals.avgFSum}
                           </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {gradeFooterTotals.stsSum}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {gradeFooterTotals.sasSum}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/60">
+                            {gradeFooterTotals.grandTotalSum}
+                          </td>
+                          <td colSpan={3} className="py-2.5 px-3 text-center text-[10px] text-slate-400 font-normal">
+                            Akumulasi Seluruh Nilai Siswa
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="py-2.5 px-3 text-center font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/60">
+                            {gradeFooterTotals.grandTotalSum}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                            {gradeFooterTotals.avgFSum}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {gradeFooterTotals.stsSum}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {gradeFooterTotals.sasSum}
+                          </td>
+                          <td colSpan={4} className="py-2.5 px-3 text-center text-[10px] text-slate-400 font-normal">
+                            Akumulasi Seluruh Nilai Siswa
+                          </td>
+                        </>
+                      )}
+                    </tr>
+
+                    {/* Baris Rata-rata Kelas */}
+                    <tr>
+                      <td colSpan={2} className="py-2.5 px-4 text-right font-black uppercase text-slate-700 dark:text-slate-200 sticky left-0 bg-slate-50 dark:bg-slate-850">
+                        Rata-Rata Kelas:
+                      </td>
+                      {gradeViewMode === 'detailed' ? (
+                        <>
+                          {activeGradeColumns.map((col: any) => {
+                            const info = gradeFooterTotals.tpTotals[col.key];
+                            const avgVal = info && info.count > 0 ? Math.round(info.sum / info.count) : '-';
+                            return (
+                              <td key={col.key} className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                                {avgVal}
+                              </td>
+                            );
+                          })}
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                            {gradeFooterTotals.avgFAvg ?? '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {gradeFooterTotals.stsAvg ?? '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {gradeFooterTotals.sasAvg ?? '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/60">
+                            -
+                          </td>
+                          <td className="py-2.5 px-4 text-center font-mono font-black text-sm bg-slate-900 text-white">
+                            {gradeFooterTotals.avgFinal}
+                          </td>
+                          <td colSpan={2} className="py-2.5 px-3 text-center text-[10px] text-slate-400 font-normal">
+                            Target KKM: {data?.kkm || 75}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/60">
+                            -
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                            {gradeFooterTotals.avgFAvg ?? '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {gradeFooterTotals.stsAvg ?? '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
+                            {gradeFooterTotals.sasAvg ?? '-'}
+                          </td>
+                          <td className="py-2.5 px-4 text-center font-mono font-black text-sm bg-slate-900 text-white">
+                            {gradeFooterTotals.avgFinal}
+                          </td>
+                          <td colSpan={3} className="py-2.5 px-3 text-center text-[10px] text-slate-400 font-normal">
+                            Target KKM: {data?.kkm || 75}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
+
+            {/* Modal Detail Rapor Capaian Individu Siswa (Read-Only) */}
+            {selectedStudentGrade && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+                <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                        <Award className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                          Rapor Capaian Peserta Didik
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {data?.className} &bull; {data?.subject || 'Mata Pelajaran'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStudentGrade(null)}
+                      className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Student Identity Box */}
+                  <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 space-y-1">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                      Identitas Peserta Didik
+                    </span>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white">
+                      {selectedStudentGrade.student.nama}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400 pt-0.5 font-mono">
+                      <span>NISN: {selectedStudentGrade.student.nisn || '-'}</span>
+                      <span>Guru: {data?.teacher || data?.teacherName || 'Guru Pengampu'}</span>
+                    </div>
+                  </div>
+
+                  {/* Rincian Asesmen Individu */}
+                  <div className="space-y-2">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                      Rincian Capaian Asesmen:
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                      {activeGradeColumns.map((col: any) => {
+                        const val = selectedStudentGrade.gradeRecord?.[col.key];
+                        const hasVal = typeof val === 'number' && !isNaN(val);
+                        return (
+                          <div
+                            key={col.key}
+                            className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-750"
+                          >
+                            <span className="text-[10px] text-slate-400 block font-semibold truncate">{col.label}</span>
+                            <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                              {hasVal ? val : '-'}
+                            </p>
+                          </div>
+                        );
+                      })}
+                      <div className="bg-indigo-50/50 dark:bg-indigo-950/40 p-2.5 rounded-xl border border-indigo-100 dark:border-indigo-900">
+                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400 block font-semibold">Rata Formatif</span>
+                        <p className="font-mono font-bold text-indigo-700 dark:text-indigo-300 text-sm">
+                          {selectedStudentGrade.avgF !== null ? selectedStudentGrade.avgF : '-'}
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-750">
+                        <span className="text-[10px] text-slate-400 block font-semibold">STS (Tengah Sem.)</span>
+                        <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                          {selectedStudentGrade.sts !== null ? selectedStudentGrade.sts : '-'}
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-750">
+                        <span className="text-[10px] text-slate-400 block font-semibold">SAS (Akhir Sem.)</span>
+                        <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                          {selectedStudentGrade.sas !== null ? selectedStudentGrade.sas : '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Hasil Akhir & Status KKM */}
+                  <div className="bg-slate-900 dark:bg-slate-950 text-white p-4 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
+                        Nilai Akhir Rapor
+                      </span>
+                      <div className="flex items-baseline gap-2 mt-0.5">
+                        <span className="text-3xl font-black font-mono">
+                          {selectedStudentGrade.hasAnyScore ? selectedStudentGrade.finalScore : '-'}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md bg-white/10 text-xs font-mono font-bold">
+                          Predikat: {selectedStudentGrade.predikat}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-1">
+                        Status Ketuntasan (KKM: {data?.kkm || 75})
+                      </span>
+                      {!selectedStudentGrade.hasAnyScore ? (
+                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                          Belum Ada Nilai
+                        </span>
+                      ) : selectedStudentGrade.isTuntas ? (
+                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-emerald-500 text-white shadow-xs">
+                          Tuntas Capaian
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-rose-500 text-white shadow-xs">
+                          Perlu Bimbingan / Remedial
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/20 cursor-pointer"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      Cetak Rapor Siswa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStudentGrade(null)}
+                      className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-2xl transition cursor-pointer"
+                    >
+                      Tutup
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* 3. TYPE TABUNGAN & KAS */}
-        {type === 'tabungan' && (
+        {effectiveType === 'tabungan' && (
           <div className="space-y-6">
             <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-purple-950 text-white rounded-3xl p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-indigo-800/50">
               <div>
@@ -965,7 +1735,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         )}
 
         {/* 4. TYPE AGENDA */}
-        {type === 'agenda' && (
+        {effectiveType === 'agenda' && (
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="p-4 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 flex items-center justify-between">
               <h3 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">

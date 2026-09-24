@@ -1,5 +1,6 @@
-import { getSupabaseClient, getAuthUser } from './supabase';
+import { getSupabaseClient, getSafeSupabaseClient, getAuthUser } from './supabase';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
+import { SafeCache } from '../utils/storageCache';
 import {
   TeacherProfile,
   ClassRoom,
@@ -826,7 +827,26 @@ export async function deleteSavingTransaction(txId: string): Promise<void> {
 // ============================================================================
 
 export async function createOrUpdatePublicShare(record: PublicShareRecord): Promise<void> {
-  const supabase = getSupabaseClient();
+  const resultPayload = {
+    ...(record.data || {}),
+    shareType: record.type,
+    shareTitle: record.title,
+    classId: record.classId,
+    created_at: record.createdAt,
+    updated_at: record.updatedAt,
+  };
+
+  // Immediate local cache for zero-latency preview
+  SafeCache.set(`pub_share_${record.id}`, resultPayload, 24 * 60 * 60 * 1000);
+  try {
+    localStorage.setItem(`pub_share_${record.id}`, JSON.stringify(resultPayload));
+  } catch (err) {
+    console.warn('localStorage cache failed for public share', err);
+  }
+
+  const supabase = getSafeSupabaseClient();
+  if (!supabase) return;
+
   const user = await getAuthUser();
 
   const payload = {
@@ -844,32 +864,57 @@ export async function createOrUpdatePublicShare(record: PublicShareRecord): Prom
     .upsert(payload, { onConflict: 'id' });
 
   if (error) {
-    console.error('Error creating public share:', error);
-    throw error;
+    console.error('Error creating public share in Supabase:', error);
+    // Do not throw if local cache already has it, to avoid blocking UI flow
   }
 }
 
 export async function getPublicShare(shareId: string): Promise<any | null> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('public_shares')
-    .select('*')
-    .eq('id', shareId)
-    .maybeSingle();
+  // 1. Check in-memory & session cache
+  const cached = SafeCache.get<any>(`pub_share_${shareId}`);
+  if (cached) return cached;
 
-  if (error) {
-    console.error('Error fetching public share:', error);
-    throw error;
+  // 2. Check localStorage
+  let localStored: any = null;
+  try {
+    const raw = localStorage.getItem(`pub_share_${shareId}`);
+    if (raw) {
+      localStored = JSON.parse(raw);
+    }
+  } catch (err) {
+    console.warn('Could not read public share from localStorage', err);
   }
 
-  if (!data) return null;
+  // 3. Query Supabase (allowed for anon by RLS)
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('public_shares')
+        .select('*')
+        .eq('id', shareId)
+        .maybeSingle();
 
-  return {
-    ...(data.payload || {}),
-    shareType: data.type,
-    shareTitle: data.title,
-    classId: data.class_id,
-    created_at: data.created_at,
-    updated_at: data.updated_at,
-  };
+      if (!error && data) {
+        const payloadData = {
+          ...(data.payload || {}),
+          shareType: data.type,
+          shareTitle: data.title,
+          classId: data.class_id,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+        };
+        // Update caches
+        SafeCache.set(`pub_share_${shareId}`, payloadData, 24 * 60 * 60 * 1000);
+        try {
+          localStorage.setItem(`pub_share_${shareId}`, JSON.stringify(payloadData));
+        } catch {}
+        return payloadData;
+      }
+    } catch (err) {
+      console.warn('Error fetching public share from cloud:', err);
+    }
+  }
+
+  return localStored || null;
 }

@@ -94,28 +94,73 @@ type NavTab =
   | 'parent_report'
   | 'school_map';
 
+function parsePublicShareFromUrl(): {
+  type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
+  shareId: string;
+} | null {
+  if (typeof window === 'undefined') return null;
+
+  const checkParams = (params: URLSearchParams) => {
+    if (params.get('nilai_share')) {
+      return { type: 'nilai' as const, shareId: params.get('nilai_share')! };
+    }
+    if (params.get('absen_share')) {
+      return { type: 'absen' as const, shareId: params.get('absen_share')! };
+    }
+    if (params.get('tabungan_share')) {
+      return { type: 'tabungan' as const, shareId: params.get('tabungan_share')! };
+    }
+    if (params.get('agenda_share')) {
+      return { type: 'agenda' as const, shareId: params.get('agenda_share')! };
+    }
+    // Generic fallback for links like ?share=... or ?share_id=...
+    const genericShare = params.get('share') || params.get('share_id');
+    if (genericShare) {
+      let detectedType: 'absen' | 'nilai' | 'tabungan' | 'agenda' = 'nilai';
+      if (genericShare.startsWith('att_') || genericShare.includes('absen')) detectedType = 'absen';
+      else if (genericShare.startsWith('sav_') || genericShare.includes('tabungan')) detectedType = 'tabungan';
+      else if (genericShare.startsWith('age_') || genericShare.includes('agenda')) detectedType = 'agenda';
+      return { type: detectedType, shareId: genericShare };
+    }
+    return null;
+  };
+
+  // 1. Search in window.location.search
+  const fromSearch = checkParams(new URLSearchParams(window.location.search));
+  if (fromSearch) return fromSearch;
+
+  // 2. Search in window.location.hash if present
+  if (window.location.hash && window.location.hash.includes('?')) {
+    const hashQuery = window.location.hash.slice(window.location.hash.indexOf('?') + 1);
+    const fromHash = checkParams(new URLSearchParams(hashQuery));
+    if (fromHash) return fromHash;
+  }
+
+  return null;
+}
+
 export default function App() {
   // 1. Check for Public Share parameters in URL (accessible without auth)
   const [publicShare, setPublicShare] = useState<{
     type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
     shareId: string;
-  } | null>(() => {
-    if (typeof window === 'undefined') return null;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('absen_share')) {
-      return { type: 'absen', shareId: params.get('absen_share')! };
-    }
-    if (params.get('nilai_share')) {
-      return { type: 'nilai', shareId: params.get('nilai_share')! };
-    }
-    if (params.get('tabungan_share')) {
-      return { type: 'tabungan', shareId: params.get('tabungan_share')! };
-    }
-    if (params.get('agenda_share')) {
-      return { type: 'agenda', shareId: params.get('agenda_share')! };
-    }
-    return null;
-  });
+  } | null>(() => parsePublicShareFromUrl());
+
+  // Listen for navigation or URL query updates
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const parsed = parsePublicShareFromUrl();
+      if (parsed) {
+        setPublicShare(parsed);
+      }
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
 
   // 2. Auth Session State (Source of Truth)
   const [session, setSession] = useState<any>(null);

@@ -338,8 +338,9 @@ export const GradesView: React.FC<GradesViewProps> = ({
   };
 
   const handleOpenShare = async () => {
-    const slug = `${currentClass.id}-${Date.now().toString(36)}`;
-    const fullUrl = `${window.location.origin}/?share=${slug}`;
+    const shareId = `grade_share_${currentClass.id}`;
+    const baseUrl = window.location.origin + window.location.pathname;
+    const fullUrl = `${baseUrl}?nilai_share=${shareId}`;
     setShareLink(fullUrl);
 
     try {
@@ -347,10 +348,10 @@ export const GradesView: React.FC<GradesViewProps> = ({
       setShareQrUrl(qr);
 
       const record: PublicShareRecord = {
-        id: slug,
+        id: shareId,
         type: 'nilai',
         classId: currentClass.id,
-        title: `Nilai ${currentClass.namaKelas} - ${currentClass.mataPelajaran}`,
+        title: `Rekapitulasi Nilai Siswa Kelas ${currentClass.namaKelas} - ${currentClass.mataPelajaran}`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         data: {
@@ -1333,9 +1334,12 @@ export const GradesView: React.FC<GradesViewProps> = ({
             </div>
 
             <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 font-bold text-xs rounded-full border border-purple-200 mb-2">
+                <span>🔒 Mode Publik (Read-Only Terisolasi)</span>
+              </div>
               <h3 className="font-bold text-slate-900 text-lg">Tautan Publik Nilai Aktif</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Siswa dan wali murid dapat memindai QR code ini untuk melihat buku nilai transparan.
+                Siswa dan orang tua dapat membuka tautan ini tanpa login untuk melihat transparansi buku nilai secara aman dan read-only.
               </p>
             </div>
 
@@ -1359,17 +1363,27 @@ export const GradesView: React.FC<GradesViewProps> = ({
                   setCopiedLink(true);
                   setTimeout(() => setCopiedLink(false), 2000);
                 }}
-                className="px-3 py-1.5 bg-white rounded-xl shadow-xs text-indigo-600 font-bold hover:bg-indigo-50 transition shrink-0"
+                className="px-3 py-1.5 bg-white rounded-xl shadow-xs text-indigo-600 font-bold hover:bg-indigo-50 transition shrink-0 cursor-pointer"
               >
                 {copiedLink ? 'Tersalin!' : 'Salin'}
               </button>
             </div>
 
-            <div className="pt-2">
+            <div className="flex flex-col gap-2 pt-2">
+              <a
+                href={shareLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/20"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Buka Halaman Preview Publik (Tab Baru)
+              </a>
+
               <button
                 type="button"
                 onClick={() => setShareModalOpen(false)}
-                className="w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-2xl"
+                className="w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-2xl cursor-pointer"
               >
                 Tutup
               </button>
