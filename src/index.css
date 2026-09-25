@@ -167,6 +167,67 @@ html.dark,
   border-color: #475569 !important;
 }
 
+/* Optimized Dark Mode for Public Preview Links (Hitam Pekat & Opacity dengan Huruf Putih Maksimal) */
+.dark .public-share-page,
+.public-share-page.dark {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+.dark .public-share-page header,
+.dark .public-share-page main,
+.dark .public-share-page .public-card,
+.dark .public-share-page .bg-white,
+.dark .public-share-page .bg-slate-50,
+.dark .public-share-page .bg-slate-100,
+.dark .public-share-page .bg-slate-800,
+.dark .public-share-page .bg-slate-900 {
+  background-color: rgba(5, 5, 5, 0.92) !important;
+  border-color: #27272a !important;
+  color: #ffffff !important;
+}
+
+.dark .public-share-page table {
+  background-color: #000000 !important;
+  border-color: #27272a !important;
+}
+
+.dark .public-share-page thead tr,
+.dark .public-share-page th {
+  background-color: #09090b !important;
+  color: #ffffff !important;
+  border-color: #27272a !important;
+}
+
+.dark .public-share-page td {
+  background-color: transparent !important;
+  color: #ffffff !important;
+  border-color: #1f1f23 !important;
+}
+
+.dark .public-share-page tr:hover td {
+  background-color: rgba(39, 39, 42, 0.7) !important;
+}
+
+.dark .public-share-page input,
+.dark .public-share-page select {
+  background-color: #09090b !important;
+  border-color: #3f3f46 !important;
+  color: #ffffff !important;
+}
+
+.dark .public-share-page p,
+.dark .public-share-page span,
+.dark .public-share-page h1,
+.dark .public-share-page h2,
+.dark .public-share-page h3,
+.dark .public-share-page h4,
+.dark .public-share-page strong,
+.dark .public-share-page b,
+.dark .public-share-page label {
+  color: #ffffff !important;
+}
+
 .dark input::placeholder,
 .dark textarea::placeholder {
   color: #94a3b8 !important;

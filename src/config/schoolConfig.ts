@@ -8,6 +8,8 @@ export const SCHOOL_CONFIG = {
   namaSingkat: 'SMK Muhiba',
   logoUrl: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgzWdtCjCcX2chJuhLX_26N5MmkVK-1SkyO7kgXznQQJPQa6_TB_EJzD1WWpztg7yX9RBRE7rGn0t2Z3FdG06mwwT6pQix8t6vnlcOBm_EgGl9z0jeJemJkppP0KIIjkXGksQvaCLh2dz-gOF6a2H213VQBL6Am8Elhmd76OOnphogk-EoTTbkYbg0TQJhv/s512/34690.png',
   logoFallback: '/logo-smk.png',
+  bgImageUrl: 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjG8XVKrvlj5jkknTYzKlB2DYIKwYl1h-gKegies3GGfKcyk-1dkSbyfvt4Ghj1yFFkXhzsQ40PCyNUVALlRtkvQmnQtzCJe2vo7XL3Im96N_eQqnsxxRJkirDNC5NorqApzII5S2-bswtbk3wH3eUwOc6JCuHVkpKC3QCxZa2T2JPHtIJ9tvOEaMz45ZRb/s320/44857.png',
+  bgImageFallback: '/bg-school.png',
   website: 'www.smkmuhiba.sch.id',
   websiteUrl: 'https://www.smkmuhiba.sch.id/',
   alamat: 'Jl. Bawang-Sukorejo KM 01, Jlamprang, Bawang, 51274',

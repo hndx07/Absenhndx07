@@ -163,40 +163,54 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
       </div>
 
-      {/* Center Auth Card */}
+      {/* Center Auth Card with Opacity 0.5 and Background Image 44857.png */}
       <div className="relative z-10 max-w-md w-full mx-auto my-auto py-6">
-        <div className="bg-white text-slate-900 rounded-3xl p-7 sm:p-8 shadow-2xl border border-slate-100/90 space-y-6 backdrop-blur-sm">
-          {/* Header with School Logo */}
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-50/80 border border-indigo-100 flex items-center justify-center mx-auto shadow-xs p-2">
-              <img
-                src={SCHOOL_CONFIG.logoUrl}
-                alt="Logo SMK"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
-                }}
-              />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                Masuk Akun Guru
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                SMK Muhammadiyah Bawang &bull; Presensi & Penilaian
-              </p>
-            </div>
+        <div className="relative overflow-hidden rounded-3xl p-7 sm:p-8 shadow-2xl border border-white/60 dark:border-white/20 space-y-6 backdrop-blur-md bg-white/50 dark:bg-black/50">
+          {/* Background Image (44857.png) inside the login form */}
+          <div className="absolute inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden">
+            <img
+              src={SCHOOL_CONFIG.bgImageUrl}
+              alt="Latar Belakang Form Login SMK Muhiba"
+              className="w-3/4 max-h-[70%] object-contain opacity-25 dark:opacity-30 select-none filter drop-shadow-md"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.bgImageFallback;
+              }}
+            />
           </div>
 
-          {/* Alert Error Messages */}
-          {errorMessage && (
-            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-medium leading-relaxed">{errorMessage}</p>
+          {/* Form Content */}
+          <div className="relative z-10 space-y-6">
+            {/* Header with School Logo */}
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 rounded-2xl bg-white/80 dark:bg-zinc-900/80 border border-indigo-100 dark:border-zinc-700 flex items-center justify-center mx-auto shadow-xs p-2">
+                <img
+                  src={SCHOOL_CONFIG.logoUrl}
+                  alt="Logo SMK"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
+                  }}
+                />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  Masuk Akun Guru
+                </h2>
+                <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1">
+                  SMK Muhammadiyah Bawang &bull; Presensi & Penilaian
+                </p>
               </div>
             </div>
-          )}
+
+            {/* Alert Error Messages */}
+            {errorMessage && (
+              <div className="p-3.5 rounded-2xl bg-rose-50/90 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs flex items-start gap-2.5 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-medium leading-relaxed">{errorMessage}</p>
+                </div>
+              </div>
+            )}
 
           {/* Form Login Email & Password */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -275,14 +289,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             </button>
           </form>
 
-          <div className="pt-2 border-t border-slate-100 text-center space-y-2">
-            <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1">
+          <div className="pt-2 border-t border-slate-200/60 dark:border-zinc-800 text-center space-y-2">
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center justify-center gap-1 font-medium">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
               Keamanan dilindungi Row Level Security (RLS) PostgreSQL Supabase
             </p>
           </div>
         </div>
       </div>
+    </div>
 
       {/* Footer */}
       <footer className="relative z-10 text-center text-xs text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] font-medium py-3">

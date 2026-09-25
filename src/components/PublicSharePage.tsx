@@ -482,9 +482,25 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-indigo-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100 pb-16 transition-colors">
+    <div className="public-share-page min-h-screen relative bg-slate-50 dark:bg-black text-slate-900 dark:text-white pb-16 transition-colors selection:bg-indigo-500 selection:text-white">
+      {/* Background Image Watermark from 44857.png across all preview links */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center">
+        {/* Pitch black background in dark mode */}
+        <div className="absolute inset-0 bg-slate-50/60 dark:bg-black" />
+        <img
+          src={SCHOOL_CONFIG.bgImageUrl}
+          alt="Watermark SMK Muhiba"
+          className="w-[85vw] max-w-xl max-h-[80vh] object-contain opacity-10 dark:opacity-20 pointer-events-none filter drop-shadow-2xl select-none"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.bgImageFallback;
+          }}
+        />
+        {/* Subtle vignette/contrast overlay so pure white text reads with 100% clarity */}
+        <div className="absolute inset-0 bg-transparent dark:bg-black/50 pointer-events-none" />
+      </div>
+
       {/* Official School Header */}
-      <header className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-md sticky top-0 z-30 border-b border-indigo-900/40">
+      <header className="relative z-20 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 dark:from-black dark:via-zinc-950 dark:to-black text-white shadow-md sticky top-0 border-b border-indigo-900/40 dark:border-zinc-800">
         <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 truncate">
             <img
@@ -550,7 +566,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       </header>
 
       {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      <main className="relative z-10 max-w-5xl mx-auto px-4 py-6 space-y-6">
         {/* Official Isolated Read-Only Assurance Notice */}
         <div className="bg-gradient-to-r from-indigo-900/10 via-purple-900/10 to-indigo-900/10 dark:from-indigo-950/50 dark:via-purple-950/40 dark:to-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/80 rounded-3xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
           <div className="flex items-center gap-3">

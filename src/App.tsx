@@ -203,16 +203,10 @@ export default function App() {
   const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isNavbarHidden, setIsNavbarHidden] = useState<boolean>(() =>
-    UiStatePersistence.get<boolean>('isNavbarHidden', false)
-  );
+  const [isSideNavOpen, setIsSideNavOpen] = useState(false);
 
-  const toggleNavbar = () => {
-    setIsNavbarHidden((prev) => {
-      const next = !prev;
-      UiStatePersistence.set('isNavbarHidden', next);
-      return next;
-    });
+  const toggleSideNav = () => {
+    setIsSideNavOpen((prev) => !prev);
   };
 
   // Load all user data from Supabase
@@ -637,13 +631,13 @@ export default function App() {
           <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
             {/* Hamburger (Garis Tiga) & Brand */}
             <div className="flex items-center gap-3 shrink-0">
-              {/* Tombol Garis Tiga (Hamburger) untuk Sembunyikan / Tampilkan Menu Navigasi */}
+              {/* Tombol Garis Tiga (Hamburger) untuk Membuka Navbar Kesamping (Side Drawer) */}
               <button
                 type="button"
-                onClick={toggleNavbar}
+                onClick={toggleSideNav}
                 className="p-2 sm:p-2.5 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-indigo-600 transition border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center shrink-0 cursor-pointer"
-                title={isNavbarHidden ? 'Tampilkan Menu Navigasi (Garis Tiga)' : 'Sembunyikan Menu Navigasi (Garis Tiga)'}
-                aria-label="Toggle Menu Navigasi"
+                title="Buka Menu Navigasi Kesamping (Garis Tiga)"
+                aria-label="Buka Menu Navigasi Kesamping"
               >
                 <Menu className="w-5 h-5 text-slate-700 dark:text-slate-200" />
               </button>
@@ -673,7 +667,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Active Class Switcher & Compact Tab Indicator when navbar is hidden */}
+            {/* Active Class Switcher */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsClassModalOpen(true)}
@@ -685,18 +679,6 @@ export default function App() {
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-indigo-400" />
               </button>
-
-              {isNavbarHidden && (
-                <button
-                  type="button"
-                  onClick={toggleNavbar}
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-600 transition border border-slate-200 dark:border-slate-700"
-                  title="Menu navigasi disembunyikan. Klik untuk menampilkan kembali seluruh menu tab"
-                >
-                  <Eye className="w-3.5 h-3.5 text-indigo-500" />
-                  <span className="capitalize">Tab: {activeTab.replace('_', ' ')}</span>
-                </button>
-              )}
             </div>
 
             {/* Controls, Theme Toggle & Teacher Profile */}
@@ -740,9 +722,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Secondary Subnavigation Bar (Bisa disembunyikan / ditampilkan via Garis Tiga) */}
-        {!isNavbarHidden && (
-          <div className="border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 transition-all duration-200">
+        {/* Secondary Subnavigation Bar */}
+        <div className="border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 transition-all duration-200">
             <div className="max-w-7xl mx-auto px-4 sm:px-6">
               <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-2 scrollbar-none text-xs font-semibold">
                 <button
@@ -855,8 +836,168 @@ export default function App() {
               </nav>
             </div>
           </div>
-        )}
       </header>
+
+      {/* Side Navigation Drawer (Navbar Kesamping) */}
+      {isSideNavOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200 cursor-pointer"
+            onClick={() => setIsSideNavOpen(false)}
+          />
+
+          {/* Drawer Sidebar */}
+          <div className="fixed inset-y-0 left-0 max-w-full flex">
+            <aside className="w-80 max-w-[85vw] bg-white dark:bg-black text-slate-900 dark:text-white shadow-2xl flex flex-col border-r border-slate-200 dark:border-zinc-800 animate-in slide-in-from-left duration-200">
+              {/* Drawer Header */}
+              <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-zinc-950">
+                <div className="flex items-center gap-3 truncate">
+                  <img
+                    src={SCHOOL_CONFIG.logoUrl}
+                    alt="Logo SMK Muhammadiyah Bawang"
+                    className="w-10 h-10 object-contain drop-shadow-sm rounded-xl p-0.5 bg-white border border-slate-200 dark:border-zinc-700 shrink-0"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
+                    }}
+                  />
+                  <div className="truncate">
+                    <h2 className="font-extrabold text-sm sm:text-base tracking-tight truncate text-slate-900 dark:text-white">
+                      SMK Muhiba
+                    </h2>
+                    <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold truncate">
+                      Navigasi Menu Kesamping
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsSideNavOpen(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                  title="Tutup Menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Class Info Box inside Drawer */}
+              <div className="p-4 bg-indigo-50/70 dark:bg-zinc-900/80 border-b border-indigo-100/50 dark:border-zinc-800">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="truncate">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400 block">
+                      Kelas Aktif
+                    </span>
+                    <p className="font-extrabold text-sm text-slate-900 dark:text-white truncate">
+                      {activeClass.namaKelas}
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">
+                      {activeClass.jurusan}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSideNavOpen(false);
+                      setIsClassModalOpen(true);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 transition shrink-0 cursor-pointer"
+                  >
+                    Ganti
+                  </button>
+                </div>
+              </div>
+
+              {/* Navigation Items in Side Drawer */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+                {[
+                  { id: 'attendance', label: 'Presensi Siswa', icon: CalendarCheck, desc: 'Input kehadiran harian siswa' },
+                  { id: 'recap', label: 'Rekap Absensi', icon: FileCheck, desc: 'Rekap bulanan, cetak & ekspor Excel' },
+                  { id: 'grades', label: 'Penilaian & KKM', icon: Award, desc: 'Asesmen sumatif & formatif' },
+                  { id: 'students', label: 'Data Peserta Didik', icon: Users, desc: 'Kelola siswa & impor Excel' },
+                  { id: 'agendas', label: 'Buku Jurnal Guru', icon: BookMarked, desc: 'Catatan agenda kegiatan KBM' },
+                  { id: 'savings', label: 'Tabungan & Kas', icon: Wallet, desc: 'Buku kas & tabungan kelas' },
+                  { id: 'statistics', label: 'Statistik & Resume', icon: BarChart3, desc: 'Grafik & ringkasan analitik' },
+                  { id: 'parent_report', label: 'Laporan WhatsApp Wali', icon: MessageSquare, desc: 'Kirim rekap ke orang tua' },
+                  { id: 'school_map', label: 'Peta Kampus', icon: MapPin, desc: 'Profil & lokasi SMK Muhiba' },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab(item.id as NavTab);
+                        setIsSideNavOpen(false);
+                      }}
+                      className={`w-full text-left p-3 rounded-2xl transition flex items-start gap-3 cursor-pointer ${
+                        isActive
+                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 font-bold'
+                          : 'hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-700 dark:text-zinc-200'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-xl shrink-0 ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400'}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-bold leading-tight ${isActive ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                          {item.label}
+                        </p>
+                        <p className={`text-[10px] mt-0.5 truncate ${isActive ? 'text-indigo-100' : 'text-slate-400 dark:text-zinc-400'}`}>
+                          {item.desc}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-3 border-t border-slate-100 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-950 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSideNavOpen(false);
+                    setIsProfileModalOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-zinc-900 text-left transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                      {activeTeacher.namaGuru.charAt(0)}
+                    </div>
+                    <div className="truncate">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                        {activeTeacher.namaGuru}
+                      </p>
+                      <p className="text-[10px] text-slate-400 truncate">
+                        {activeTeacher.email}
+                      </p>
+                    </div>
+                  </div>
+                  <Settings className="w-4 h-4 text-slate-400 shrink-0" />
+                </button>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSideNavOpen(false);
+                      setIsCloudModalOpen(true);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
+                  >
+                    <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Supabase Cloud</span>
+                  </button>
+                  <ThemeToggle />
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
