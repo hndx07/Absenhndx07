@@ -487,9 +487,14 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       <header className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-md sticky top-0 z-30 border-b border-indigo-900/40">
         <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 truncate">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0 shadow-inner">
-              <GraduationCap className="w-5 h-5" />
-            </div>
+            <img
+              src={SCHOOL_CONFIG.logoUrl}
+              alt="Logo SMK Muhammadiyah Bawang"
+              className="w-10 h-10 object-contain drop-shadow-md rounded-xl p-0.5 bg-white/10 border border-white/20 shrink-0"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
+              }}
+            />
             <div className="truncate">
               <h1 className="font-black text-sm sm:text-base leading-tight tracking-tight uppercase truncate">
                 {SCHOOL_CONFIG.namaSekolah}

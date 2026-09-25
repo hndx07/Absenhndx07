@@ -8,13 +8,15 @@ import {
   CheckCircle2,
   AlertCircle,
   ShieldCheck,
-  GraduationCap,
+  ExternalLink,
+  Play,
 } from 'lucide-react';
 import {
   signInWithEmailPassword,
   isSupabaseConfigured,
 } from '../services/supabase';
 import { ThemeToggle } from './ThemeToggle';
+import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface LoginViewProps {
   onLoginSuccess: () => void;
@@ -94,15 +96,36 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 flex flex-col justify-between p-4 sm:p-6 text-slate-100 selection:bg-indigo-500 selection:text-white">
+    <div className="relative min-h-screen bg-slate-950 flex flex-col justify-between p-4 sm:p-6 text-slate-100 selection:bg-indigo-500 selection:text-white overflow-hidden">
+      {/* Background Looping Video from TikTok https://vt.tiktok.com/ZSbNppdrX/ */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0 bg-slate-950">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-full object-cover filter brightness-95 contrast-105 pointer-events-none scale-105 transition-opacity duration-700"
+          style={{ opacity: 0.2 }}
+        >
+          <source src="/login-bg.mp4" type="video/mp4" />
+        </video>
+        {/* Subtle dark gradient overlay for crystal clear contrast */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-slate-950/75 pointer-events-none" />
+      </div>
+
       {/* Top Navbar Minimal */}
-      <div className="max-w-5xl w-full mx-auto flex items-center justify-between py-2">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-600/40 border border-indigo-400/30 flex items-center justify-center text-indigo-200 shadow-xs">
-            <GraduationCap className="w-5 h-5" />
-          </div>
+      <div className="relative z-10 max-w-5xl w-full mx-auto flex items-center justify-between py-2">
+        <div className="flex items-center gap-3">
+          <img
+            src={SCHOOL_CONFIG.logoUrl}
+            alt="Logo SMK Muhammadiyah Bawang"
+            className="w-11 h-11 object-contain drop-shadow-md rounded-xl bg-white/10 p-1 border border-white/20 backdrop-blur-xs"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
+            }}
+          />
           <div>
-            <span className="font-extrabold text-white text-sm tracking-tight block leading-tight">
+            <span className="font-extrabold text-white text-sm sm:text-base tracking-tight block leading-tight">
               SMK Muhammadiyah Bawang
             </span>
             <span className="text-[10px] text-indigo-300 font-mono">
@@ -112,24 +135,44 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* TikTok Video Badge */}
+          <a
+            href="https://vt.tiktok.com/ZSbNppdrX/"
+            target="_blank"
+            rel="noreferrer"
+            title="Tonton video profil Smart Classroom 4.0 SMK Muhiba di TikTok"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold border border-white/15 backdrop-blur-md transition shadow-xs"
+          >
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            <span>Video Smart Classroom</span>
+            <ExternalLink className="w-3 h-3 text-slate-400" />
+          </a>
+
           <ThemeToggle />
         </div>
       </div>
 
       {/* Center Auth Card */}
-      <div className="max-w-md w-full mx-auto my-auto py-6">
-        <div className="bg-white text-slate-900 rounded-3xl p-7 sm:p-8 shadow-2xl border border-slate-100 space-y-6">
-          {/* Header */}
+      <div className="relative z-10 max-w-md w-full mx-auto my-auto py-6">
+        <div className="bg-white text-slate-900 rounded-3xl p-7 sm:p-8 shadow-2xl border border-slate-100/90 space-y-6 backdrop-blur-sm">
+          {/* Header with School Logo */}
           <div className="text-center space-y-2">
-            <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto shadow-xs">
-              <Lock className="w-6 h-6" />
+            <div className="w-16 h-16 rounded-2xl bg-indigo-50/80 border border-indigo-100 flex items-center justify-center mx-auto shadow-xs p-2">
+              <img
+                src={SCHOOL_CONFIG.logoUrl}
+                alt="Logo SMK"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
+                }}
+              />
             </div>
             <div>
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">
                 Masuk Akun Guru
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Silakan masukkan kredensial akun guru Anda
+                SMK Muhammadiyah Bawang &bull; Presensi & Penilaian
               </p>
             </div>
           </div>

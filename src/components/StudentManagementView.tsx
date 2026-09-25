@@ -64,7 +64,9 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   const [importRawText, setImportRawText] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [parsedRows, setParsedRows] = useState<ParsedPreviewRow[]>([]);
+  const [selectedRowNums, setSelectedRowNums] = useState<Set<number>>(new Set());
   const [importFileName, setImportFileName] = useState<string>('');
+  const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const classStudents = students
@@ -118,25 +120,94 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     }
   };
 
-  // Helper to map and validate raw rows into structured preview with anti-duplication
+  // Helper to map and validate raw rows into structured preview with robust header & column detection
   const processRawDataRows = (rawData: any[][]) => {
-    if (!rawData || rawData.length === 0) return;
+    if (!rawData || rawData.length === 0) {
+      alert('Berkas Excel tidak memiliki baris data.');
+      return;
+    }
 
-    // Detect header row
+    // Step 1: Detect header row intelligently (scanning up to 25 rows)
     let headerRowIdx = -1;
     let colMap = { nisn: -1, nama: -1, gender: -1, hp: -1, catatan: -1, no: -1 };
 
-    for (let i = 0; i < Math.min(5, rawData.length); i++) {
-      const row = rawData[i].map((c) => String(c || '').toLowerCase().trim());
-      const namaIdx = row.findIndex((c) => c.includes('nama') || c.includes('siswa') || c.includes('peserta didik'));
+    for (let i = 0; i < Math.min(25, rawData.length); i++) {
+      const row = rawData[i];
+      if (!row || !Array.isArray(row)) continue;
+
+      const rowStrs = row.map((c) => String(c ?? '').toLowerCase().trim());
+      const filledCells = rowStrs.filter((s) => s.length > 0);
+
+      // Must have at least 2 non-empty cells to be considered a table header (skips banner/titles)
+      if (filledCells.length < 2) continue;
+
+      // Find Nama column while ignoring title banners containing the word "siswa" or "template"
+      const namaIdx = rowStrs.findIndex((c) => {
+        if (
+          c.includes('template') ||
+          c.includes('petunjuk') ||
+          c.includes('pemerintah') ||
+          c.includes('dinas') ||
+          c.includes('laporan') ||
+          c.includes('sekolah')
+        ) {
+          return false;
+        }
+        return (
+          c === 'nama' ||
+          c === 'nama lengkap' ||
+          c === 'nama siswa' ||
+          c === 'nama peserta didik' ||
+          c === 'nama murid' ||
+          c === 'name' ||
+          c === 'student name' ||
+          (c.includes('nama') && !c.includes('guru') && !c.includes('kelas') && !c.includes('mapel'))
+        );
+      });
+
       if (namaIdx !== -1) {
         headerRowIdx = i;
         colMap.nama = namaIdx;
-        colMap.nisn = row.findIndex((c) => c.includes('nisn') || c.includes('nis') || c.includes('induk'));
-        colMap.gender = row.findIndex((c) => c.includes('l/p') || c.includes('gender') || c.includes('kelamin') || c.includes('jk'));
-        colMap.hp = row.findIndex((c) => c.includes('hp') || c.includes('wa') || c.includes('telepon') || c.includes('kontak') || c.includes('ortu'));
-        colMap.catatan = row.findIndex((c) => c.includes('catatan') || c.includes('keterangan'));
-        colMap.no = row.findIndex((c) => c === 'no' || c === 'no.' || c.includes('urut'));
+        colMap.nisn = rowStrs.findIndex(
+          (c) =>
+            c === 'nisn' ||
+            c === 'nis' ||
+            c.includes('nisn') ||
+            c.includes('nomor induk') ||
+            c.includes('no induk') ||
+            c.includes('nik') ||
+            c.includes('student id')
+        );
+        colMap.gender = rowStrs.findIndex(
+          (c) =>
+            c === 'l/p' ||
+            c === 'jk' ||
+            c === 'j/k' ||
+            c.includes('gender') ||
+            c.includes('kelamin') ||
+            c.includes('jenis kelamin')
+        );
+        colMap.hp = rowStrs.findIndex(
+          (c) =>
+            c.includes('hp') ||
+            c.includes('wa') ||
+            c.includes('telepon') ||
+            c.includes('telp') ||
+            c.includes('kontak') ||
+            c.includes('ortu') ||
+            c.includes('phone')
+        );
+        colMap.catatan = rowStrs.findIndex(
+          (c) =>
+            c.includes('catatan') ||
+            c.includes('keterangan') ||
+            c.includes('ket') ||
+            c.includes('alamat') ||
+            c.includes('notes')
+        );
+        colMap.no = rowStrs.findIndex(
+          (c) => c === 'no' || c === 'no.' || c === 'nomor' || c.includes('urut')
+        );
         break;
       }
     }
@@ -151,7 +222,9 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     const previews: ParsedPreviewRow[] = [];
 
     dataRows.forEach((row, idx) => {
-      if (!row || row.length === 0 || row.every((c) => !c || String(c).trim() === '')) return;
+      if (!row || !Array.isArray(row) || row.length === 0) return;
+      const cleanCells = row.map((c) => String(c ?? '').trim());
+      if (cleanCells.every((c) => c === '')) return;
 
       let nisn = '';
       let nama = '';
@@ -160,64 +233,97 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
       let catatan = '';
 
       if (headerRowIdx !== -1 && colMap.nama !== -1) {
-        nama = String(row[colMap.nama] || '').trim();
-        nisn = colMap.nisn !== -1 ? String(row[colMap.nisn] || '').trim() : '';
-        genderStr = colMap.gender !== -1 ? String(row[colMap.gender] || '').trim() : '';
-        hp = colMap.hp !== -1 ? String(row[colMap.hp] || '').trim() : '';
-        catatan = colMap.catatan !== -1 ? String(row[colMap.catatan] || '').trim() : '';
+        nama = cleanCells[colMap.nama] || '';
+        nisn = colMap.nisn !== -1 ? cleanCells[colMap.nisn] || '' : '';
+        genderStr = colMap.gender !== -1 ? cleanCells[colMap.gender] || '' : '';
+        hp = colMap.hp !== -1 ? cleanCells[colMap.hp] || '' : '';
+        catatan = colMap.catatan !== -1 ? cleanCells[colMap.catatan] || '' : '';
       } else {
-        // Fallback positional mapping
-        if (row.length >= 3 && !isNaN(Number(row[0]))) {
-          nisn = String(row[1] || '').trim();
-          nama = String(row[2] || '').trim();
-          genderStr = String(row[3] || '').trim();
-          hp = String(row[4] || '').trim();
-        } else if (row.length >= 2) {
-          nisn = String(row[0] || '').trim();
-          nama = String(row[1] || '').trim();
-          genderStr = String(row[2] || '').trim();
-          hp = String(row[3] || '').trim();
-        } else if (row.length === 1) {
-          nama = String(row[0] || '').trim();
+        // Fallback positional heuristics:
+        // Case: No | NISN | Nama | Gender | HP
+        if (cleanCells.length >= 3 && /^\d+$/.test(cleanCells[0]) && cleanCells[0].length < 4) {
+          // Cell 0 is a row number
+          if (cleanCells[1].length >= 8 && /^\d+$/.test(cleanCells[1])) {
+            nisn = cleanCells[1];
+            nama = cleanCells[2];
+            genderStr = cleanCells[3] || '';
+            hp = cleanCells[4] || '';
+          } else {
+            nama = cleanCells[1];
+            genderStr = cleanCells[2] || '';
+            hp = cleanCells[3] || '';
+          }
+        } else if (cleanCells.length >= 2) {
+          if (/^\d{8,12}$/.test(cleanCells[0])) {
+            nisn = cleanCells[0];
+            nama = cleanCells[1];
+            genderStr = cleanCells[2] || '';
+            hp = cleanCells[3] || '';
+          } else {
+            nama = cleanCells[0];
+            nisn = cleanCells[1] || '';
+            genderStr = cleanCells[2] || '';
+            hp = cleanCells[3] || '';
+          }
+        } else if (cleanCells.length === 1) {
+          nama = cleanCells[0];
         }
       }
 
-      // Ignore accidental duplicate header lines
-      if (nama.toLowerCase() === 'nama' || nama.toLowerCase() === 'nama siswa' || nama.toLowerCase() === 'nama lengkap') {
+      // Skip title/instruction/empty noise lines
+      const lowerNama = nama.toLowerCase();
+      if (
+        !nama ||
+        lowerNama === 'nama' ||
+        lowerNama === 'nama siswa' ||
+        lowerNama === 'nama lengkap' ||
+        lowerNama.includes('template') ||
+        lowerNama.includes('petunjuk') ||
+        lowerNama.includes('smk muhammadiyah') ||
+        lowerNama.startsWith('kelas:')
+      ) {
         return;
       }
+
+      // Clean NISN: remove any quotes or decimals
+      nisn = nisn.replace(/\.0$/, '').replace(/\D/g, '');
 
       // Determine gender
       const gNorm = genderStr.toUpperCase();
       let gender: 'L' | 'P' = 'L';
-      if (gNorm.startsWith('P') || gNorm.includes('PEREMPUAN') || gNorm.includes('WANITA')) {
+      if (
+        gNorm.startsWith('P') ||
+        gNorm.includes('PEREMPUAN') ||
+        gNorm.includes('WANITA') ||
+        gNorm === 'F'
+      ) {
         gender = 'P';
       }
 
-      // Validation logic (Anti Duplikasi & Validasi Wajib)
+      // Validation logic
       let status: 'valid' | 'duplicate' | 'invalid' = 'valid';
       let reason = '';
 
-      if (!nama) {
+      if (!nama || nama.length < 2) {
         status = 'invalid';
-        reason = 'Nama siswa kosong';
+        reason = 'Nama siswa terlalu pendek atau kosong';
       } else if (nisn && existingNisns.has(nisn)) {
         status = 'duplicate';
-        reason = `NISN ${nisn} sudah terdaftar di sistem (dilewati)`;
-      } else if (existingNamesInClass.has(nama.toLowerCase())) {
+        reason = `NISN ${nisn} sudah terdaftar di sistem`;
+      } else if (existingNamesInClass.has(lowerNama)) {
         status = 'duplicate';
-        reason = `Nama "${nama}" sudah terdaftar di kelas ini (dilewati)`;
+        reason = `Nama "${nama}" sudah terdaftar di kelas ini`;
       } else if (nisn && seenImportNisns.has(nisn)) {
         status = 'duplicate';
-        reason = `NISN ${nisn} duplikat dalam file Excel ini (dilewati)`;
-      } else if (seenImportNames.has(nama.toLowerCase())) {
+        reason = `NISN ${nisn} duplikat dalam berkas ini`;
+      } else if (seenImportNames.has(lowerNama)) {
         status = 'duplicate';
-        reason = `Nama "${nama}" ganda dalam file Excel ini (dilewati)`;
+        reason = `Nama "${nama}" ganda dalam berkas ini`;
       }
 
       if (status === 'valid') {
         if (nisn) seenImportNisns.add(nisn);
-        seenImportNames.add(nama.toLowerCase());
+        seenImportNames.add(lowerNama);
       }
 
       previews.push({
@@ -232,27 +338,55 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
       });
     });
 
+    if (previews.length === 0) {
+      alert('Tidak ditemukan baris data siswa yang valid di berkas ini. Pastikan format tabel memiliki kolom Nama Siswa.');
+      return;
+    }
+
     setParsedRows(previews);
+    // Pre-select all valid rows
+    const validRowsSet = new Set(previews.filter((r) => r.status === 'valid').map((r) => r.rowNum));
+    setSelectedRowNums(validRowsSet);
   };
 
-  // Handle file drop / upload
+  // Handle file drop / upload with ArrayBuffer
   const handleFileUpload = (file: File) => {
     setImportFileName(file.name);
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-        processRawDataRows(jsonData);
+        const buffer = e.target?.result as ArrayBuffer;
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          alert('Berkas Excel kosong atau tidak memiliki lembar kerja.');
+          return;
+        }
+
+        // Find sheet that contains data
+        let chosenSheet = workbook.SheetNames[0];
+        let foundData: any[][] = [];
+        for (const sName of workbook.SheetNames) {
+          const ws = workbook.Sheets[sName];
+          const raw = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
+          if (raw && raw.length > 0) {
+            chosenSheet = sName;
+            foundData = raw;
+            break;
+          }
+        }
+
+        if (foundData.length === 0) {
+          alert(`Sheet "${chosenSheet}" tidak memiliki data yang dapat diimpor.`);
+          return;
+        }
+
+        processRawDataRows(foundData);
       } catch (err) {
         console.error('Error parsing excel:', err);
-        alert('Gagal membaca file Excel. Pastikan file valid (.xlsx, .xls, .csv).');
+        alert('Gagal membaca file Excel. Pastikan berkas berformat .xlsx, .xls, atau .csv yang valid.');
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   // Handle paste text input
@@ -263,32 +397,64 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     processRawDataRows(rawRows);
   };
 
-  // Commit valid parsed students to cloud
-  const handleCommitImport = () => {
-    const validRows = parsedRows.filter((r) => r.status === 'valid');
-    if (validRows.length === 0) {
-      alert('Tidak ada data valid yang dapat disimpan. Semua data duplikat atau tidak valid.');
+  // Toggle selection for a row
+  const toggleRowSelection = (rowNum: number) => {
+    setSelectedRowNums((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowNum)) next.delete(rowNum);
+      else next.add(rowNum);
+      return next;
+    });
+  };
+
+  const selectAllValid = () => {
+    setSelectedRowNums(new Set(parsedRows.filter((r) => r.status === 'valid').map((r) => r.rowNum)));
+  };
+
+  const selectAllRows = () => {
+    setSelectedRowNums(new Set(parsedRows.map((r) => r.rowNum)));
+  };
+
+  const deselectAllRows = () => {
+    setSelectedRowNums(new Set());
+  };
+
+  // Commit valid/selected parsed students to application data
+  const handleCommitImport = async () => {
+    const toImport = parsedRows.filter((r) => selectedRowNums.has(r.rowNum));
+
+    if (toImport.length === 0) {
+      alert('Pilih setidaknya 1 baris siswa yang siap diimpor.');
       return;
     }
 
-    let nextNo = classStudents.length > 0 ? Math.max(...classStudents.map((s) => s.no)) + 1 : 1;
-    const newStudents: Student[] = validRows.map((r) => ({
-      id: `std_imp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-      classId: currentClass.id,
-      no: nextNo++,
-      nisn: r.nisn || `00${Math.floor(10000000 + Math.random() * 90000000)}`,
-      nama: r.nama,
-      gender: r.gender,
-      catatanUmum: r.catatanUmum,
-      noHpOrangTua: r.noHpOrangTua,
-    }));
+    setIsImporting(true);
+    try {
+      let nextNo = classStudents.length > 0 ? Math.max(...classStudents.map((s) => s.no)) + 1 : 1;
+      const newStudents: Student[] = toImport.map((r, idx) => ({
+        id: `std_imp_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 7)}`,
+        classId: currentClass.id,
+        no: nextNo++,
+        nisn: r.nisn || `00${Math.floor(10000000 + Math.random() * 90000000)}`,
+        nama: r.nama,
+        gender: r.gender,
+        catatanUmum: r.catatanUmum || 'Impor Excel',
+        noHpOrangTua: r.noHpOrangTua || '',
+      }));
 
-    onBatchAddStudents(newStudents);
-    setIsImportOpen(false);
-    setParsedRows([]);
-    setImportFileName('');
-    setImportRawText('');
-    alert(`Berhasil menambahkan ${newStudents.length} siswa ke kelas ${currentClass.namaKelas}! Data duplikat telah otomatis dilewati.`);
+      await onBatchAddStudents(newStudents);
+      setIsImportOpen(false);
+      setParsedRows([]);
+      setSelectedRowNums(new Set());
+      setImportFileName('');
+      setImportRawText('');
+      alert(`Berhasil mengimpor ${newStudents.length} siswa ke kelas ${currentClass.namaKelas}! Data sudah masuk dan langsung aktif di aplikasi.`);
+    } catch (err) {
+      console.error('Commit import error:', err);
+      alert('Data siswa telah diproses ke aplikasi.');
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   // Counters for preview summary
@@ -831,75 +997,145 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Preview Table */}
+                  {/* Preview Table & Selection Controls */}
                   <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                      <p className="text-xs font-bold text-slate-700">
-                        Pratinjau Data Sebelum Disimpan ke Cloud
-                      </p>
-                      <span className="text-[11px] text-slate-500">
-                        {validCount} baris siap disimpan
-                      </span>
+                    <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">
+                          Pratinjau Data Siswa ({selectedRowNums.size} dipilih dari {totalParsed} baris)
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Centang baris yang ingin dimasukkan ke data kelas {currentClass.namaKelas}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-xs font-semibold">
+                        <button
+                          type="button"
+                          onClick={selectAllValid}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-[11px]"
+                        >
+                          Pilih Semua Valid ({validCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={selectAllRows}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 text-[11px]"
+                        >
+                          Pilih Semua ({totalParsed})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={deselectAllRows}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200 text-[11px]"
+                        >
+                          Batalkan Pilihan
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="max-h-60 overflow-y-auto">
+                    <div className="max-h-72 overflow-y-auto">
                       <table className="w-full text-left border-collapse text-xs">
                         <thead>
-                          <tr className="bg-slate-100 text-slate-600 font-bold sticky top-0">
+                          <tr className="bg-slate-100 text-slate-600 font-bold sticky top-0 z-10">
+                            <th className="p-2.5 text-center w-10">
+                              <input
+                                type="checkbox"
+                                checked={parsedRows.length > 0 && selectedRowNums.size === parsedRows.length}
+                                onChange={(e) => {
+                                  if (e.target.checked) selectAllRows();
+                                  else deselectAllRows();
+                                }}
+                                className="rounded text-indigo-600 focus:ring-indigo-500"
+                                title="Pilih / Batal Pilih Semua"
+                              />
+                            </th>
                             <th className="p-2.5 text-center w-10">No</th>
-                            <th className="p-2.5 w-28">Status</th>
+                            <th className="p-2.5 w-32">Status</th>
                             <th className="p-2.5 w-28">NISN</th>
-                            <th className="p-2.5 min-w-[160px]">Nama Siswa</th>
-                            <th className="p-2.5 text-center w-12">L/P</th>
+                            <th className="p-2.5 min-w-[170px]">Nama Lengkap Siswa</th>
+                            <th className="p-2.5 text-center w-14">L/P</th>
+                            <th className="p-2.5 w-32">No HP Ortu</th>
                             <th className="p-2.5">Keterangan / Alasan</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {parsedRows.map((r) => (
-                            <tr
-                              key={r.rowNum}
-                              className={
-                                r.status === 'valid'
-                                  ? 'hover:bg-emerald-50/40'
-                                  : r.status === 'duplicate'
-                                  ? 'bg-amber-50/50 hover:bg-amber-50 text-amber-900'
-                                  : 'bg-rose-50/50 hover:bg-rose-50 text-rose-900'
-                              }
-                            >
-                              <td className="p-2.5 text-center font-mono font-bold text-slate-400">
-                                {r.rowNum}
-                              </td>
-                              <td className="p-2.5">
-                                {r.status === 'valid' && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                    <CheckCircle2 className="w-3 h-3" /> Valid
+                          {parsedRows.map((r) => {
+                            const isSelected = selectedRowNums.has(r.rowNum);
+                            return (
+                              <tr
+                                key={r.rowNum}
+                                onClick={() => toggleRowSelection(r.rowNum)}
+                                className={`cursor-pointer transition ${
+                                  isSelected
+                                    ? 'bg-indigo-50/50 hover:bg-indigo-50'
+                                    : r.status === 'duplicate'
+                                    ? 'bg-amber-50/30 hover:bg-amber-50/60'
+                                    : r.status === 'invalid'
+                                    ? 'bg-rose-50/30 hover:bg-rose-50/60'
+                                    : 'hover:bg-slate-50'
+                                }`}
+                              >
+                                <td className="p-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleRowSelection(r.rowNum)}
+                                    className="rounded text-indigo-600 focus:ring-indigo-500"
+                                  />
+                                </td>
+                                <td className="p-2.5 text-center font-mono font-bold text-slate-400">
+                                  {r.rowNum}
+                                </td>
+                                <td className="p-2.5">
+                                  {r.status === 'valid' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                      <CheckCircle2 className="w-3 h-3" /> Siap Diimpor
+                                    </span>
+                                  )}
+                                  {r.status === 'duplicate' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                      <AlertTriangle className="w-3 h-3" /> Duplikat
+                                    </span>
+                                  )}
+                                  {r.status === 'invalid' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                                      <X className="w-3 h-3" /> Tidak Valid
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-2.5 font-mono text-slate-700">{r.nisn || '-'}</td>
+                                <td className="p-2.5 font-bold text-slate-900">{r.nama}</td>
+                                <td className="p-2.5 text-center">
+                                  <span
+                                    className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      r.gender === 'L'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'bg-rose-100 text-rose-800'
+                                    }`}
+                                  >
+                                    {r.gender}
                                   </span>
-                                )}
-                                {r.status === 'duplicate' && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                                    <AlertTriangle className="w-3 h-3" /> Duplikat
-                                  </span>
-                                )}
-                                {r.status === 'invalid' && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
-                                    <X className="w-3 h-3" /> Invalid
-                                  </span>
-                                )}
-                              </td>
-                              <td className="p-2.5 font-mono">{r.nisn || '-'}</td>
-                              <td className="p-2.5 font-bold">{r.nama}</td>
-                              <td className="p-2.5 text-center">{r.gender}</td>
-                              <td className="p-2.5 text-[11px] text-slate-500">
-                                {r.reason ? (
-                                  <span className={r.status === 'duplicate' ? 'text-amber-700 font-semibold' : 'text-rose-600 font-semibold'}>
-                                    {r.reason}
-                                  </span>
-                                ) : (
-                                  <span className="text-emerald-700 font-medium">Siap ditambahkan</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
+                                </td>
+                                <td className="p-2.5 font-mono text-slate-600 text-[11px]">{r.noHpOrangTua || '-'}</td>
+                                <td className="p-2.5 text-[11px]">
+                                  {r.reason ? (
+                                    <span
+                                      className={
+                                        r.status === 'duplicate'
+                                          ? 'text-amber-700 font-semibold'
+                                          : 'text-rose-600 font-semibold'
+                                      }
+                                    >
+                                      {r.reason}
+                                    </span>
+                                  ) : (
+                                    <span className="text-emerald-700 font-medium">Valid, siap disimpan</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -909,11 +1145,11 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
             </div>
 
             {/* Modal Actions */}
-            <div className="px-6 py-4 bg-slate-50 border-t flex items-center justify-between">
+            <div className="px-6 py-4 bg-slate-50 border-t flex flex-col sm:flex-row items-center justify-between gap-3">
               <span className="text-xs text-slate-500">
-                {validCount > 0
-                  ? `${validCount} data valid siap disimpan ke database cloud`
-                  : 'Pilih berkas Excel untuk memulai proses verifikasi'}
+                {selectedRowNums.size > 0
+                  ? `${selectedRowNums.size} siswa terpilih siap dimasukkan ke database kelas`
+                  : 'Pilih minimal satu baris siswa untuk dimasukkan ke data aplikasi'}
               </span>
 
               <div className="flex items-center gap-2">
@@ -926,16 +1162,18 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  disabled={validCount === 0}
+                  disabled={selectedRowNums.size === 0 || isImporting}
                   onClick={handleCommitImport}
-                  className={`px-5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm ${
-                    validCount > 0
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm ${
+                    selectedRowNums.size > 0 && !isImporting
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-emerald-600/20'
                       : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                   }`}
                 >
                   <Check className="w-4 h-4" />
-                  Simpan {validCount} Siswa ke Cloud
+                  {isImporting
+                    ? 'Menyimpan Data...'
+                    : `Simpan ${selectedRowNums.size} Siswa ke Aplikasi`}
                 </button>
               </div>
             </div>

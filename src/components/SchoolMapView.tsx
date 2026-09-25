@@ -1,5 +1,6 @@
 import React from 'react';
 import { MapPin, Phone, Mail, Globe, Navigation, GraduationCap } from 'lucide-react';
+import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 export const SchoolMapView: React.FC = () => {
   return (
@@ -61,8 +62,15 @@ export const SchoolMapView: React.FC = () => {
         {/* School Profile Sidebar */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
           <div className="text-center pb-4 border-b border-slate-100">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-2 shadow-xs">
-              <GraduationCap className="w-8 h-8" />
+            <div className="w-16 h-16 rounded-2xl bg-indigo-50/80 border border-indigo-100 flex items-center justify-center mx-auto mb-2 shadow-xs p-1.5">
+              <img
+                src={SCHOOL_CONFIG.logoUrl}
+                alt="Logo SMK Muhammadiyah Bawang"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
+                }}
+              />
             </div>
             <h3 className="font-extrabold text-slate-900 text-base mt-2">
               SMK Muhammadiyah Bawang

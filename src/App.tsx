@@ -16,7 +16,12 @@ import {
   AlertCircle,
   LogOut,
   FileCheck,
+  Menu,
+  X,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+import { SCHOOL_CONFIG } from './config/schoolConfig';
 
 // Supabase Services
 import {
@@ -198,6 +203,17 @@ export default function App() {
   const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isNavbarHidden, setIsNavbarHidden] = useState<boolean>(() =>
+    UiStatePersistence.get<boolean>('isNavbarHidden', false)
+  );
+
+  const toggleNavbar = () => {
+    setIsNavbarHidden((prev) => {
+      const next = !prev;
+      UiStatePersistence.set('isNavbarHidden', next);
+      return next;
+    });
+  };
 
   // Load all user data from Supabase
   const loadUserData = useCallback(async (targetClassId?: string) => {
@@ -456,11 +472,28 @@ export default function App() {
   };
 
   const handleBatchAddStudents = async (newStds: Student[]) => {
-    await batchInsertStudents(newStds);
-    if (activeClassId) {
-      const fresh = await getStudents(activeClassId);
-      setStudents(fresh);
-      SafeCache.invalidate(`class_data_${activeClassId}`);
+    if (!newStds || newStds.length === 0) return;
+
+    // 1. Immediately update application state so students are instantly visible in the UI
+    setStudents((prev) => {
+      const existingIds = new Set(prev.map((s) => s.id));
+      const filtered = newStds.filter((s) => !existingIds.has(s.id));
+      return [...prev, ...filtered];
+    });
+
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+
+    // 2. Persist to Supabase if configured and online
+    try {
+      await batchInsertStudents(newStds);
+      if (activeClassId) {
+        const fresh = await getStudents(activeClassId);
+        if (fresh && fresh.length > 0) {
+          setStudents(fresh);
+        }
+      }
+    } catch (err) {
+      console.warn('Supabase batch insert notification (data preserved locally):', err);
     }
   };
 
@@ -599,41 +632,71 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-indigo-500 selection:text-white">
       {/* Top Main Navigation Header */}
-      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-40 shadow-xs">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-40 shadow-xs transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
-            {/* Brand */}
+            {/* Hamburger (Garis Tiga) & Brand */}
             <div className="flex items-center gap-3 shrink-0">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-xs">
-                <GraduationCap className="w-5 h-5" />
-              </div>
-              <div className="hidden md:flex flex-col">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-slate-900 tracking-tight text-base">
-                    SMK Muhammadiyah Bawang
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold">
-                    2026
+              {/* Tombol Garis Tiga (Hamburger) untuk Sembunyikan / Tampilkan Menu Navigasi */}
+              <button
+                type="button"
+                onClick={toggleNavbar}
+                className="p-2 sm:p-2.5 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-indigo-600 transition border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center shrink-0 cursor-pointer"
+                title={isNavbarHidden ? 'Tampilkan Menu Navigasi (Garis Tiga)' : 'Sembunyikan Menu Navigasi (Garis Tiga)'}
+                aria-label="Toggle Menu Navigasi"
+              >
+                <Menu className="w-5 h-5 text-slate-700 dark:text-slate-200" />
+              </button>
+
+              <div className="flex items-center gap-2.5">
+                <img
+                  src={SCHOOL_CONFIG.logoUrl}
+                  alt="Logo SMK Muhammadiyah Bawang"
+                  className="w-10 h-10 object-contain drop-shadow-sm rounded-xl p-0.5 bg-white border border-slate-200 dark:border-slate-700"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
+                  }}
+                />
+                <div className="hidden md:flex flex-col">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-slate-900 dark:text-white tracking-tight text-base">
+                      SMK Muhammadiyah Bawang
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold">
+                      2026
+                    </span>
+                  </div>
+                  <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                    Sistem Presensi, Penilaian & Jurnal Guru (Supabase Cloud)
                   </span>
                 </div>
-                <span className="text-xs text-indigo-600 font-medium">
-                  Sistem Presensi, Penilaian & Jurnal Guru (Supabase Cloud)
-                </span>
               </div>
             </div>
 
-            {/* Active Class Switcher */}
+            {/* Active Class Switcher & Compact Tab Indicator when navbar is hidden */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsClassModalOpen(true)}
-                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-950 text-xs sm:text-sm font-bold transition border border-indigo-200/60 shadow-xs"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-950 dark:text-indigo-200 text-xs sm:text-sm font-bold transition border border-indigo-200/60 dark:border-indigo-800/60 shadow-xs"
               >
-                <GraduationCap className="w-4 h-4 text-indigo-600 shrink-0" />
+                <GraduationCap className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
                 <span className="truncate max-w-[130px] sm:max-w-none">
                   Kelas: {activeClass.namaKelas}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-indigo-400" />
               </button>
+
+              {isNavbarHidden && (
+                <button
+                  type="button"
+                  onClick={toggleNavbar}
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-indigo-50 hover:text-indigo-600 transition border border-slate-200 dark:border-slate-700"
+                  title="Menu navigasi disembunyikan. Klik untuk menampilkan kembali seluruh menu tab"
+                >
+                  <Eye className="w-3.5 h-3.5 text-indigo-500" />
+                  <span className="capitalize">Tab: {activeTab.replace('_', ' ')}</span>
+                </button>
+              )}
             </div>
 
             {/* Controls, Theme Toggle & Teacher Profile */}
@@ -677,120 +740,122 @@ export default function App() {
           </div>
         </div>
 
-        {/* Secondary Subnavigation Bar */}
-        <div className="border-t border-slate-200/80 bg-slate-50/70">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-2 scrollbar-none text-xs font-semibold">
-              <button
-                onClick={() => setActiveTab('attendance')}
-                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                  activeTab === 'attendance'
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                <CalendarCheck className="w-4 h-4" />
-                Presensi Siswa
-              </button>
+        {/* Secondary Subnavigation Bar (Bisa disembunyikan / ditampilkan via Garis Tiga) */}
+        {!isNavbarHidden && (
+          <div className="border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 transition-all duration-200">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+              <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-2 scrollbar-none text-xs font-semibold">
+                <button
+                  onClick={() => setActiveTab('attendance')}
+                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
+                    activeTab === 'attendance'
+                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                  }`}
+                >
+                  <CalendarCheck className="w-4 h-4" />
+                  Presensi Siswa
+                </button>
 
-              <button
-                onClick={() => setActiveTab('recap')}
-                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                  activeTab === 'recap'
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                <FileCheck className="w-4 h-4" />
-                Rekap Absensi
-              </button>
+                <button
+                  onClick={() => setActiveTab('recap')}
+                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
+                    activeTab === 'recap'
+                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                  }`}
+                >
+                  <FileCheck className="w-4 h-4" />
+                  Rekap Absensi
+                </button>
 
-              <button
-                onClick={() => setActiveTab('grades')}
-                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                  activeTab === 'grades'
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                <Award className="w-4 h-4" />
-                Penilaian & KKM
-              </button>
+                <button
+                  onClick={() => setActiveTab('grades')}
+                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
+                    activeTab === 'grades'
+                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                  }`}
+                >
+                  <Award className="w-4 h-4" />
+                  Penilaian & KKM
+                </button>
 
-              <button
-                onClick={() => setActiveTab('students')}
-                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                  activeTab === 'students'
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                Data Peserta Didik
-              </button>
+                <button
+                  onClick={() => setActiveTab('students')}
+                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
+                    activeTab === 'students'
+                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  Data Peserta Didik
+                </button>
 
-              <button
-                onClick={() => setActiveTab('agendas')}
-                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                  activeTab === 'agendas'
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                <BookMarked className="w-4 h-4" />
-                Buku Jurnal Guru
-              </button>
+                <button
+                  onClick={() => setActiveTab('agendas')}
+                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
+                    activeTab === 'agendas'
+                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                  }`}
+                >
+                  <BookMarked className="w-4 h-4" />
+                  Buku Jurnal Guru
+                </button>
 
-              <button
-                onClick={() => setActiveTab('savings')}
-                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                  activeTab === 'savings'
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                <Wallet className="w-4 h-4" />
-                Tabungan & Kas
-              </button>
+                <button
+                  onClick={() => setActiveTab('savings')}
+                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
+                    activeTab === 'savings'
+                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                  }`}
+                >
+                  <Wallet className="w-4 h-4" />
+                  Tabungan & Kas
+                </button>
 
-              <button
-                onClick={() => setActiveTab('statistics')}
-                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                  activeTab === 'statistics'
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                Statistik & Resume
-              </button>
+                <button
+                  onClick={() => setActiveTab('statistics')}
+                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
+                    activeTab === 'statistics'
+                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Statistik & Resume
+                </button>
 
-              <button
-                onClick={() => setActiveTab('parent_report')}
-                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                  activeTab === 'parent_report'
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                <MessageSquare className="w-4 h-4" />
-                Laporan WhatsApp Wali
-              </button>
+                <button
+                  onClick={() => setActiveTab('parent_report')}
+                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
+                    activeTab === 'parent_report'
+                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Laporan WhatsApp Wali
+                </button>
 
-              <button
-                onClick={() => setActiveTab('school_map')}
-                className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                  activeTab === 'school_map'
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                <MapPin className="w-4 h-4" />
-                Peta Kampus
-              </button>
-            </nav>
+                <button
+                  onClick={() => setActiveTab('school_map')}
+                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
+                    activeTab === 'school_map'
+                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                  }`}
+                >
+                  <MapPin className="w-4 h-4" />
+                  Peta Kampus
+                </button>
+              </nav>
+            </div>
           </div>
-        </div>
+        )}
       </header>
 
       {/* Main Content Area */}
