@@ -96,21 +96,32 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="relative min-h-screen bg-slate-950 flex flex-col justify-between p-4 sm:p-6 text-slate-100 selection:bg-indigo-500 selection:text-white overflow-hidden">
-      {/* Background Looping Video from TikTok https://vt.tiktok.com/ZSbNppdrX/ */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0 bg-slate-950">
+    <div className="relative min-h-screen bg-slate-900 flex flex-col justify-between p-4 sm:p-6 text-slate-100 selection:bg-indigo-500 selection:text-white overflow-hidden">
+      {/* Background Looping Video with Light Blue Gradient Overlay (Opacity 20% so video stays clearly visible) */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        {/* Base Light Blue Gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600" />
+
+        {/* Clear Looping Video (Tidak tertutup, berjalan otomatis dan looping) */}
         <video
           autoPlay
           loop
           muted
           playsInline
-          className="w-full h-full object-cover filter brightness-95 contrast-105 pointer-events-none scale-105 transition-opacity duration-700"
-          style={{ opacity: 0.2 }}
+          className="w-full h-full object-cover pointer-events-none scale-105"
         >
           <source src="/login-bg.mp4" type="video/mp4" />
         </video>
-        {/* Subtle dark gradient overlay for crystal clear contrast */}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-slate-950/75 pointer-events-none" />
+
+        {/* Warna Biru Muda Gradient dengan Opacity 20% (Tidak menutup videonya) */}
+        <div
+          className="absolute inset-0 bg-gradient-to-br from-sky-300 via-sky-400 to-blue-500 mix-blend-color pointer-events-none"
+          style={{ opacity: 0.2 }}
+        />
+        {/* Soft subtle tint so login form and text stay perfectly crisp */}
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-slate-950/40 pointer-events-none"
+        />
       </div>
 
       {/* Top Navbar Minimal */}
@@ -119,16 +130,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           <img
             src={SCHOOL_CONFIG.logoUrl}
             alt="Logo SMK Muhammadiyah Bawang"
-            className="w-11 h-11 object-contain drop-shadow-md rounded-xl bg-white/10 p-1 border border-white/20 backdrop-blur-xs"
+            className="w-11 h-11 object-contain drop-shadow-md rounded-xl bg-white p-1 border border-white/80 shadow-md"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
             }}
           />
           <div>
-            <span className="font-extrabold text-white text-sm sm:text-base tracking-tight block leading-tight">
+            <span className="font-extrabold text-white text-sm sm:text-base tracking-tight block leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
               SMK Muhammadiyah Bawang
             </span>
-            <span className="text-[10px] text-indigo-300 font-mono">
+            <span className="text-[10px] text-sky-200 font-mono font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
               Sistem Informasi Presensi & Penilaian 2026
             </span>
           </div>
@@ -141,11 +152,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             target="_blank"
             rel="noreferrer"
             title="Tonton video profil Smart Classroom 4.0 SMK Muhiba di TikTok"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold border border-white/15 backdrop-blur-md transition shadow-xs"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 text-white text-xs font-semibold border border-white/30 backdrop-blur-md transition shadow-md"
           >
             <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
             <span>Video Smart Classroom</span>
-            <ExternalLink className="w-3 h-3 text-slate-400" />
+            <ExternalLink className="w-3 h-3 text-slate-300" />
           </a>
 
           <ThemeToggle />
@@ -274,7 +285,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       </div>
 
       {/* Footer */}
-      <footer className="text-center text-xs text-indigo-200/70 py-3">
+      <footer className="relative z-10 text-center text-xs text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] font-medium py-3">
         &copy; 2026 SMK Muhammadiyah Bawang, Batang &bull; Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; developed by @hndx07
       </footer>
     </div>
