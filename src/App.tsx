@@ -606,16 +606,9 @@ export default function App() {
   // Not Logged In -> Login Screen (Supabase Auth Only)
   if (!session) {
     return (
-      <>
-        <LoginView
-          onLoginSuccess={() => loadUserData()}
-          onOpenCloudModal={() => setIsCloudModalOpen(true)}
-        />
-        <CloudSupabaseModal
-          isOpen={isCloudModalOpen}
-          onClose={() => setIsCloudModalOpen(false)}
-        />
-      </>
+      <LoginView
+        onLoginSuccess={() => loadUserData()}
+      />
     );
   }
 

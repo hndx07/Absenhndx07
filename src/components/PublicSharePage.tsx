@@ -483,14 +483,15 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
 
   return (
     <div className="public-share-page min-h-screen relative bg-slate-50 dark:bg-black text-slate-900 dark:text-white pb-16 transition-colors selection:bg-indigo-500 selection:text-white">
-      {/* Background Image Watermark from 44857.png across all preview links */}
+      {/* Background Image Watermark from 44857.png across all preview links with 0.5 opacity */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center">
         {/* Pitch black background in dark mode */}
         <div className="absolute inset-0 bg-slate-50/60 dark:bg-black" />
         <img
           src={SCHOOL_CONFIG.bgImageUrl}
           alt="Watermark SMK Muhiba"
-          className="w-[85vw] max-w-xl max-h-[80vh] object-contain opacity-[0.04] dark:opacity-[0.07] pointer-events-none filter drop-shadow-xl select-none"
+          className="w-[85vw] max-w-xl max-h-[80vh] object-contain opacity-50 dark:opacity-50 pointer-events-none filter drop-shadow-xl select-none"
+          style={{ opacity: 0.5 }}
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.bgImageFallback;
           }}
