@@ -10,8 +10,18 @@ import {
   ShieldCheck,
   X,
   Server,
+  KeyRound,
+  ExternalLink,
 } from 'lucide-react';
-import { checkSupabaseConnection, isSupabaseConfigured } from '../services/supabase';
+import {
+  checkSupabaseConnection,
+  isSupabaseConfigured,
+  getSupabaseUrl,
+  getSupabaseAnonKey,
+  setCustomSupabaseConfig,
+  clearCustomSupabaseConfig,
+  isValidHttpUrl,
+} from '../services/supabase';
 import {
   checkHasLegacyLocalData,
   getLegacyDataSummary,
@@ -42,19 +52,25 @@ export const CloudSupabaseModal: React.FC<CloudSupabaseModalProps> = ({
     message: string;
   }>({ tested: false, ok: false, message: '' });
   const [copiedSchema, setCopiedSchema] = useState(false);
-  const [activeTab, setActiveTab] = useState<'status' | 'schema' | 'migration'>('status');
+  const [activeTab, setActiveTab] = useState<'status' | 'config' | 'schema' | 'migration'>('status');
+
+  const [inputUrl, setInputUrl] = useState(() => getSupabaseUrl());
+  const [inputKey, setInputKey] = useState(() => getSupabaseAnonKey());
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationResult, setMigrationResult] = useState<string | null>(null);
 
-  const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
-  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const currentUrl = getSupabaseUrl();
+  const currentKey = getSupabaseAnonKey();
   const isConfigured = isSupabaseConfigured();
   const hasLegacyData = checkHasLegacyLocalData();
   const legacySummary = getLegacyDataSummary();
 
   useEffect(() => {
     if (isOpen) {
+      setInputUrl(getSupabaseUrl());
+      setInputKey(getSupabaseAnonKey());
       handleTestConnection();
     }
   }, [isOpen]);
@@ -74,6 +90,34 @@ export const CloudSupabaseModal: React.FC<CloudSupabaseModalProps> = ({
       message: res.message,
     });
     setIsChecking(false);
+  };
+
+  const handleSaveConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanUrl = inputUrl.trim();
+    const cleanKey = inputKey.trim();
+
+    if (!isValidHttpUrl(cleanUrl)) {
+      alert('URL Supabase tidak valid! URL harus diawali dengan https:// (contoh: https://xyzcompany.supabase.co).');
+      return;
+    }
+
+    setCustomSupabaseConfig(cleanUrl, cleanKey);
+    setSaveSuccessMsg('Kredensial Supabase berhasil disimpan! Sedang menguji koneksi...');
+    setTimeout(() => setSaveSuccessMsg(null), 4000);
+    await handleTestConnection();
+    setActiveTab('status');
+  };
+
+  const handleResetConfig = async () => {
+    if (confirm('Reset kredensial kembali ke nilai Environment Variables (.env)?')) {
+      clearCustomSupabaseConfig();
+      setInputUrl(getSupabaseUrl());
+      setInputKey(getSupabaseAnonKey());
+      setSaveSuccessMsg('Kredensial direset ke environment bawaan.');
+      setTimeout(() => setSaveSuccessMsg(null), 3000);
+      await handleTestConnection();
+    }
   };
 
   const handleRunMigration = async () => {
@@ -137,21 +181,32 @@ export const CloudSupabaseModal: React.FC<CloudSupabaseModalProps> = ({
         </div>
 
         {/* Tab Selector */}
-        <div className="flex border-b border-slate-200 bg-slate-50/70 px-6 pt-2">
+        <div className="flex border-b border-slate-200 bg-slate-50/70 px-6 pt-2 overflow-x-auto scrollbar-none">
           <button
             onClick={() => setActiveTab('status')}
-            className={`pb-3 px-4 text-sm font-semibold border-b-2 transition flex items-center gap-2 ${
+            className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold border-b-2 transition flex items-center gap-1.5 shrink-0 ${
               activeTab === 'status'
                 ? 'border-indigo-600 text-indigo-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <Server className="w-4 h-4" />
-            Status & Environment
+            Status Server
+          </button>
+          <button
+            onClick={() => setActiveTab('config')}
+            className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold border-b-2 transition flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'config'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <KeyRound className="w-4 h-4" />
+            Konfigurasi URL & Kunci
           </button>
           <button
             onClick={() => setActiveTab('migration')}
-            className={`pb-3 px-4 text-sm font-semibold border-b-2 transition flex items-center gap-2 ${
+            className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold border-b-2 transition flex items-center gap-1.5 shrink-0 ${
               activeTab === 'migration'
                 ? 'border-indigo-600 text-indigo-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -162,14 +217,14 @@ export const CloudSupabaseModal: React.FC<CloudSupabaseModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('schema')}
-            className={`pb-3 px-4 text-sm font-semibold border-b-2 transition flex items-center gap-2 ${
+            className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold border-b-2 transition flex items-center gap-1.5 shrink-0 ${
               activeTab === 'schema'
                 ? 'border-indigo-600 text-indigo-600'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            Skrip SQL (supabase-schema.sql)
+            Skrip SQL (DDL)
           </button>
         </div>
 
@@ -202,6 +257,24 @@ export const CloudSupabaseModal: React.FC<CloudSupabaseModalProps> = ({
                     {connectionStatus.message || (isConfigured ? 'Memeriksa...' : 'Variabel lingkungan belum terpasang.')}
                   </p>
                 </div>
+              </div>
+
+              {/* Current URL diagnostic */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-700">Project URL Supabase:</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isValidHttpUrl(currentUrl) ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                    {isValidHttpUrl(currentUrl) ? 'URL VALID' : 'URL TIDAK VALID'}
+                  </span>
+                </div>
+                <p className="font-mono text-[11px] text-slate-600 bg-white p-2 rounded-xl border border-slate-200 truncate">
+                  {currentUrl || '(Belum dikonfigurasi)'}
+                </p>
+                {!isValidHttpUrl(currentUrl) && (
+                  <p className="text-[11px] text-rose-600 font-semibold pt-0.5">
+                    Peringatan: Nilai di atas bukan URL HTTP/HTTPS. Silakan buka tab <button type="button" onClick={() => setActiveTab('config')} className="underline font-bold text-indigo-600 cursor-pointer">Konfigurasi URL & Kunci</button> untuk memasukkan URL project Anda.
+                  </p>
+                )}
               </div>
 
               {/* Detailed Diagnostic Matrix */}
@@ -254,6 +327,81 @@ export const CloudSupabaseModal: React.FC<CloudSupabaseModalProps> = ({
                   {isChecking ? 'Menguji Koneksi...' : 'Uji Koneksi Ulang'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'config' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl text-xs space-y-2">
+                <h4 className="font-bold text-indigo-900 flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-indigo-700" />
+                  Konfigurasi URL & Kunci Proyek Supabase
+                </h4>
+                <p className="text-indigo-800 leading-relaxed">
+                  Jika environment variable Vercel atau hosting belum terpasang atau salah memasukkan token, Anda dapat memasukkan URL project dan Public/Anon Key langsung di sini. Pengaturan ini akan disimpan di browser ini.
+                </p>
+              </div>
+
+              {saveSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs rounded-xl font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{saveSuccessMsg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveConfig} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Supabase Project URL:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="https://xyzcompany.supabase.co"
+                    value={inputUrl}
+                    onChange={(e) => setInputUrl(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Format: <span className="font-mono text-indigo-600 font-bold">https://&lt;project-id&gt;.supabase.co</span> (Bukan token sb_secret_...).
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Supabase Public / Anon Key:
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    value={inputKey}
+                    onChange={(e) => setInputKey(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Kunci Anon/Public dapat disalin dari Dashboard Supabase &rarr; Project Settings &rarr; API &rarr; Project API keys (anon public).
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-200 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetConfig}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    Reset ke Bawaan (.env)
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Simpan & Terapkan Kredensial</span>
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 

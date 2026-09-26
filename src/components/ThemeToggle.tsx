@@ -31,7 +31,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ className = '', showLa
       onClick={() => setIsDark((prev) => !prev)}
       aria-label={isDark ? 'Beralih ke mode terang' : 'Beralih ke mode gelap'}
       title={isDark ? 'Mode Terang (Light Mode)' : 'Mode Gelap (Dark Mode)'}
-      className={`relative inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all duration-300 select-none shadow-xs group ${
+      className={`relative inline-flex items-center justify-center p-2 rounded-2xl border transition-all duration-300 select-none shadow-xs group cursor-pointer ${
         isDark
           ? 'bg-slate-800/90 border-slate-700 text-amber-300 hover:bg-slate-800 hover:border-slate-600'
           : 'bg-white/90 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
@@ -45,13 +45,9 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ className = '', showLa
         )}
       </div>
 
-      {showLabel ? (
-        <span className="text-xs font-semibold tracking-tight">
+      {showLabel && (
+        <span className="text-xs font-semibold tracking-tight ml-2">
           {isDark ? 'Gelap' : 'Terang'}
-        </span>
-      ) : (
-        <span className="hidden sm:inline text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-          {isDark ? 'Dark' : 'Light'}
         </span>
       )}
     </button>

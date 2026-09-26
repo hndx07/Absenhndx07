@@ -10,21 +10,25 @@ import {
   ShieldCheck,
   ExternalLink,
   Play,
+  Cloud,
 } from 'lucide-react';
 import {
   signInWithEmailPassword,
   isSupabaseConfigured,
+  getSupabaseUrl,
+  isValidHttpUrl,
 } from '../services/supabase';
 import { ThemeToggle } from './ThemeToggle';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface LoginViewProps {
   onLoginSuccess: () => void;
+  onOpenCloudModal?: () => void;
 }
 
 const STORAGE_SAVED_EMAIL = 'smk_saved_login_email';
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenCloudModal }) => {
   const [email, setEmail] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_SAVED_EMAIL) || '';
@@ -55,9 +59,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
 
     if (!isConfigured) {
-      setErrorMessage(
-        'Supabase belum dikonfigurasi di Environment Variables (VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY).'
-      );
+      const url = getSupabaseUrl();
+      if (!isValidHttpUrl(url)) {
+        setErrorMessage(
+          'URL Supabase tidak valid (harus berupa tautan https://... bukan token rahasia). Silakan klik ikon Cloud di kanan atas untuk memasukkan URL project Anda.'
+        );
+      } else {
+        setErrorMessage(
+          'Supabase belum terkonfigurasi dengan benar. Harap periksa VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY.'
+        );
+      }
       return;
     }
 
@@ -158,6 +169,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <span>Video Smart Classroom</span>
             <ExternalLink className="w-3 h-3 text-slate-300" />
           </a>
+
+          {onOpenCloudModal && (
+            <button
+              type="button"
+              onClick={onOpenCloudModal}
+              title="Status & Konfigurasi Supabase Cloud"
+              className="p-2 rounded-2xl bg-white/80 dark:bg-slate-800/80 hover:bg-white dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition shadow-xs cursor-pointer flex items-center justify-center"
+            >
+              <Cloud className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            </button>
+          )}
 
           <ThemeToggle />
         </div>

@@ -1,16 +1,66 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export function isValidHttpUrl(str: string | undefined | null): boolean {
+  if (!str || typeof str !== 'string') return false;
+  const trimmed = str.trim();
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    return false;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+export function getSupabaseUrl(): string {
+  try {
+    if (typeof window !== 'undefined') {
+      const custom = localStorage.getItem('smk_supabase_url');
+      if (custom && isValidHttpUrl(custom)) return custom.trim();
+    }
+  } catch {}
+  return (import.meta.env.VITE_SUPABASE_URL || '').trim();
+}
+
+export function getSupabaseAnonKey(): string {
+  try {
+    if (typeof window !== 'undefined') {
+      const custom = localStorage.getItem('smk_supabase_anon_key');
+      if (custom && custom.trim() !== '') return custom.trim();
+    }
+  } catch {}
+  return (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+}
 
 export function isSupabaseConfigured(): boolean {
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
   return Boolean(
-    supabaseUrl &&
-    supabaseAnonKey &&
-    supabaseUrl.trim() !== '' &&
-    supabaseAnonKey.trim() !== '' &&
-    !supabaseUrl.includes('your-project')
+    url &&
+    key &&
+    isValidHttpUrl(url) &&
+    !url.includes('your-project') &&
+    key.trim() !== '' &&
+    key.trim() !== 'your-anon-key-here'
   );
+}
+
+export function setCustomSupabaseConfig(url: string, key: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('smk_supabase_url', url.trim());
+    localStorage.setItem('smk_supabase_anon_key', key.trim());
+    clientInstance = null;
+  }
+}
+
+export function clearCustomSupabaseConfig() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('smk_supabase_url');
+    localStorage.removeItem('smk_supabase_anon_key');
+    clientInstance = null;
+  }
 }
 
 let clientInstance: SupabaseClient | null = null;
@@ -18,13 +68,18 @@ let clientInstance: SupabaseClient | null = null;
 export function getSupabaseClient(): SupabaseClient {
   if (clientInstance) return clientInstance;
 
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
+
   if (!isSupabaseConfigured()) {
     throw new Error(
-      'Kredensial Supabase belum dikonfigurasi. Harap atur environment variable VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY di Vercel atau file .env.'
+      isValidHttpUrl(url)
+        ? 'Kredensial Supabase belum lengkap. Harap atur VITE_SUPABASE_ANON_KEY yang valid.'
+        : `URL Supabase belum valid (${url || 'kosong'}). URL harus berupa link HTTP/HTTPS valid seperti https://xyzcompany.supabase.co.`
     );
   }
 
-  clientInstance = createClient(supabaseUrl!, supabaseAnonKey!, {
+  clientInstance = createClient(url, key, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
@@ -38,6 +93,7 @@ export function getSupabaseClient(): SupabaseClient {
 // Safe client getter for cases where client might be checked conditionally
 export function getSafeSupabaseClient(): SupabaseClient | null {
   try {
+    if (!isSupabaseConfigured()) return null;
     return getSupabaseClient();
   } catch {
     return null;
