@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Edit2, BookOpen, GraduationCap, Check, AlertTriangle, AlertCircle } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, BookOpen, GraduationCap, Check, AlertTriangle, AlertCircle, Cloud, RefreshCw, Save } from 'lucide-react';
 import { ClassRoom } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { getClassDependencyCounts } from '../services/data';
@@ -32,6 +32,7 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
     gradesCount: number;
   } | null>(null);
   const [isCheckingDeps, setIsCheckingDeps] = useState(false);
+  const [isSavingClass, setIsSavingClass] = useState(false);
 
   if (!isOpen) return null;
 
@@ -53,15 +54,22 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
     setIsFormOpen(true);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingClass?.namaKelas || !editingClass?.mataPelajaran) {
       alert('Nama kelas dan mata pelajaran wajib diisi!');
       return;
     }
-    onSaveClass(editingClass as ClassRoom);
-    setIsFormOpen(false);
-    setEditingClass(null);
+    setIsSavingClass(true);
+    try {
+      await onSaveClass(editingClass as ClassRoom);
+      setIsFormOpen(false);
+      setEditingClass(null);
+    } catch (err: any) {
+      alert('Gagal menyimpan kelas: ' + (err.message || 'Error'));
+    } finally {
+      setIsSavingClass(false);
+    }
   };
 
   const handleDeleteClick = async (cls: ClassRoom) => {
@@ -352,10 +360,20 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5"
+                  disabled={isSavingClass}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <Check className="w-4 h-4" />
-                  Simpan Kelas
+                  {isSavingClass ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Menyimpan ke Cloud...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Cloud className="w-4 h-4" />
+                      <span>Simpan Kelas ke Cloud</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

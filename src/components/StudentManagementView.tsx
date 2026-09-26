@@ -17,6 +17,9 @@ import {
   ChevronDown,
   CheckCircle2,
   FileDown,
+  Save,
+  Cloud,
+  RefreshCw,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Student, ClassRoom, TeacherProfile } from '../types';
@@ -67,6 +70,9 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   const [selectedRowNums, setSelectedRowNums] = useState<Set<number>>(new Set());
   const [importFileName, setImportFileName] = useState<string>('');
   const [isImporting, setIsImporting] = useState(false);
+  const [isSavingStudent, setIsSavingStudent] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const classStudents = students
@@ -101,15 +107,52 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSubmitStudent = (e: React.FormEvent) => {
+  const handleSubmitStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent?.nama?.trim()) {
       alert('Nama siswa wajib diisi!');
       return;
     }
-    onSaveStudent(editingStudent as Student);
-    setIsModalOpen(false);
-    setEditingStudent(null);
+    setIsSavingStudent(true);
+    try {
+      await onSaveStudent(editingStudent as Student);
+      const timeStr = new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }) + ' WIB';
+      setLastSyncTime(timeStr);
+      setSyncStatusMsg(`Data siswa ${editingStudent.nama} berhasil disimpan ke Cloud Supabase!`);
+      setTimeout(() => setSyncStatusMsg(null), 4000);
+      setIsModalOpen(false);
+      setEditingStudent(null);
+    } catch (err: any) {
+      alert(`Gagal menyimpan ke cloud: ${err.message || 'Koneksi terputus'}`);
+    } finally {
+      setIsSavingStudent(false);
+    }
+  };
+
+  // Force sync / save all students to Cloud Supabase
+  const handleSyncAllStudents = async () => {
+    if (classStudents.length === 0) return;
+    setIsSavingStudent(true);
+    try {
+      const promises = classStudents.map((std) => onSaveStudent(std));
+      await Promise.all(promises);
+      const timeStr = new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }) + ' WIB';
+      setLastSyncTime(timeStr);
+      setSyncStatusMsg(`Seluruh ${classStudents.length} data siswa kelas ${currentClass.namaKelas} berhasil disimpan ke Cloud Supabase!`);
+      setTimeout(() => setSyncStatusMsg(null), 4000);
+    } catch (err: any) {
+      alert(`Gagal menyimpan ke cloud: ${err.message || 'Koneksi terputus'}`);
+    } finally {
+      setIsSavingStudent(false);
+    }
   };
 
   // Manual Delete Student with confirmation
@@ -484,6 +527,27 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Tombol Simpan & Sinkronkan Data Siswa ke Cloud */}
+          <button
+            type="button"
+            onClick={handleSyncAllStudents}
+            disabled={isSavingStudent || classStudents.length === 0}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer disabled:opacity-50"
+            title="Simpan dan sinkronkan seluruh data siswa kelas ini ke Cloud Supabase secara real-time"
+          >
+            {isSavingStudent ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Menyimpan ke Cloud...</span>
+              </>
+            ) : (
+              <>
+                <Cloud className="w-4 h-4" />
+                <span>Simpan Siswa ke Cloud</span>
+              </>
+            )}
+          </button>
+
           {/* Export Excel Button with choice */}
           <div className="flex items-center rounded-2xl border border-emerald-200 bg-emerald-50/60 p-1">
             <button
@@ -528,6 +592,21 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Real-time Save Notification Banner */}
+      {syncStatusMsg && (
+        <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-bold rounded-2xl flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{syncStatusMsg}</span>
+          </div>
+          {lastSyncTime && (
+            <span className="text-[11px] text-emerald-700 dark:text-emerald-300 font-mono">
+              {lastSyncTime}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -759,10 +838,20 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1"
+                  disabled={isSavingStudent}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <Check className="w-4 h-4" />
-                  Simpan Perubahan
+                  {isSavingStudent ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Menyimpan ke Cloud...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Cloud className="w-4 h-4" />
+                      <span>Simpan Siswa ke Cloud</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -1170,10 +1259,10 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                       : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                   }`}
                 >
-                  <Check className="w-4 h-4" />
+                  <Cloud className="w-4 h-4" />
                   {isImporting
-                    ? 'Menyimpan Data...'
-                    : `Simpan ${selectedRowNums.size} Siswa ke Aplikasi`}
+                    ? 'Menyimpan ke Cloud Supabase...'
+                    : `Simpan ${selectedRowNums.size} Siswa ke Cloud`}
                 </button>
               </div>
             </div>

@@ -13,6 +13,10 @@ import {
   ExternalLink,
   DollarSign,
   Receipt,
+  Cloud,
+  RefreshCw,
+  Save,
+  CheckCircle2,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { SavingTransaction, Student, ClassRoom, TeacherProfile, PublicShareRecord } from '../types';
@@ -45,6 +49,11 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
   const [shareQrUrl, setShareQrUrl] = useState('');
   const [shareLink, setShareLink] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Cloud Real-time Save States
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
 
   const classStudents = students
     .filter((s) => s.classId === currentClass.id)
@@ -90,15 +99,51 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTx?.jumlah || editingTx.jumlah <= 0) {
       alert('Jumlah nominal harus lebih besar dari 0!');
       return;
     }
-    onSaveTransaction(editingTx as SavingTransaction);
-    setIsModalOpen(false);
-    setEditingTx(null);
+    setIsSaving(true);
+    try {
+      await onSaveTransaction(editingTx as SavingTransaction);
+      const timeStr = new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }) + ' WIB';
+      setLastSyncTime(timeStr);
+      setSyncStatusMsg(`Transaksi senilai ${formatRupiah(editingTx.jumlah)} berhasil disimpan ke Cloud Supabase!`);
+      setTimeout(() => setSyncStatusMsg(null), 4000);
+      setIsModalOpen(false);
+      setEditingTx(null);
+    } catch (err: any) {
+      alert('Gagal menyimpan transaksi: ' + (err.message || 'Error'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSyncAllSavings = async () => {
+    if (classTxList.length === 0) return;
+    setIsSaving(true);
+    try {
+      const promises = classTxList.map((tx) => onSaveTransaction(tx));
+      await Promise.all(promises);
+      const timeStr = new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }) + ' WIB';
+      setLastSyncTime(timeStr);
+      setSyncStatusMsg(`Seluruh ${classTxList.length} transaksi kas/tabungan berhasil disinkronkan ke Cloud Supabase!`);
+      setTimeout(() => setSyncStatusMsg(null), 4000);
+    } catch (err: any) {
+      alert('Gagal menyimpan ke cloud: ' + (err.message || 'Error'));
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const formatRupiah = (amount: number) => {
@@ -180,6 +225,27 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Tombol Simpan Kas & Tabungan ke Cloud Supabase */}
+          <button
+            type="button"
+            onClick={handleSyncAllSavings}
+            disabled={isSaving || classTxList.length === 0}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer disabled:opacity-50"
+            title="Simpan seluruh mutasi kas dan tabungan kelas ke database cloud Supabase secara real-time"
+          >
+            {isSaving ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Menyimpan ke Cloud...</span>
+              </>
+            ) : (
+              <>
+                <Cloud className="w-4 h-4" />
+                <span>Simpan Tabungan ke Cloud</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={handleOpenShare}
             className="px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
@@ -197,6 +263,21 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Real-time Save Notification Banner */}
+      {syncStatusMsg && (
+        <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-bold rounded-2xl flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{syncStatusMsg}</span>
+          </div>
+          {lastSyncTime && (
+            <span className="text-[11px] text-emerald-700 dark:text-emerald-300 font-mono">
+              {lastSyncTime}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -523,10 +604,20 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1"
+                  disabled={isSaving}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <Check className="w-4 h-4" />
-                  Simpan Transaksi
+                  {isSaving ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Menyimpan ke Cloud Supabase...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Cloud className="w-4 h-4" />
+                      <span>Simpan Transaksi ke Cloud</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

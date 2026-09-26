@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Clock,
   Save,
+  Cloud,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import QRCode from 'qrcode';
@@ -138,16 +139,32 @@ export const GradesView: React.FC<GradesViewProps> = ({
     }, 900);
   };
 
-  // Immediate save all pending changes
+  // Immediate save all pending changes or all current grades to Cloud
   const handleSaveAllNow = async () => {
-    if (Object.keys(pendingSaves).length === 0) return;
     setSyncStatus('saving');
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
 
     try {
-      const promises = Object.values(pendingSaves).map((g) => onSaveGrade(g));
-      await Promise.all(promises);
-      setPendingSaves({});
+      const pendingList = Object.values(pendingSaves);
+      if (pendingList.length > 0) {
+        const promises = pendingList.map((g) => onSaveGrade(g));
+        await Promise.all(promises);
+        setPendingSaves({});
+      } else {
+        // Save all students' grade records for the active class to Cloud
+        const allGrades = classStudents.map((std) => {
+          return (
+            localGrades[std.id] || {
+              id: `grd_${currentClass.id}_${std.id}`,
+              studentId: std.id,
+              classId: currentClass.id,
+              catatan: '',
+            }
+          );
+        });
+        const promises = allGrades.map((g) => onSaveGrade(g));
+        await Promise.all(promises);
+      }
       setSyncStatus('saved');
     } catch (err) {
       console.error('Error saving all grades:', err);
@@ -688,18 +705,35 @@ export const GradesView: React.FC<GradesViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Save All Pending button if any */}
-            {Object.keys(pendingSaves).length > 0 && (
-              <button
-                type="button"
-                onClick={handleSaveAllNow}
-                className="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm animate-pulse"
-                title="Simpan segera semua perubahan nilai yang belum terkirim"
-              >
-                <Save className="w-4 h-4" />
-                Simpan Semua ({Object.keys(pendingSaves).length})
-              </button>
-            )}
+            {/* Tombol Simpan Nilai ke Cloud (Selalu tampil & jelas) */}
+            <button
+              type="button"
+              onClick={handleSaveAllNow}
+              disabled={syncStatus === 'saving'}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-md cursor-pointer ${
+                Object.keys(pendingSaves).length > 0
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 ring-2 ring-emerald-400 animate-pulse'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+              } disabled:opacity-50`}
+              title="Simpan seluruh nilai peserta didik ke database cloud Supabase secara real-time"
+            >
+              {syncStatus === 'saving' ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Menyimpan ke Cloud...</span>
+                </>
+              ) : (
+                <>
+                  <Cloud className="w-4 h-4" />
+                  <span>Simpan Nilai ke Cloud</span>
+                  {Object.keys(pendingSaves).length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-white text-emerald-800 text-[10px] font-mono font-bold">
+                      {Object.keys(pendingSaves).length}
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
 
             <button
               onClick={() => {
@@ -1018,6 +1052,45 @@ export const GradesView: React.FC<GradesViewProps> = ({
               </tr>
             </tfoot>
           </table>
+
+          {/* Table Footer with Prominent Save Button */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <Cloud className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                {syncStatus === 'saved'
+                  ? 'Semua nilai siswa tersimpan aman di database Cloud PostgreSQL Supabase.'
+                  : syncStatus === 'saving'
+                  ? 'Sedang menyimpan ke cloud...'
+                  : syncStatus === 'error'
+                  ? 'Gagal menyimpan, silakan coba lagi.'
+                  : 'Klik tombol simpan untuk memastikan seluruh data nilai tersimpan ke cloud.'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveAllNow}
+              disabled={syncStatus === 'saving'}
+              className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 cursor-pointer disabled:opacity-50"
+            >
+              {syncStatus === 'saving' ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Menyimpan ke Cloud Supabase...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Simpan Semua Nilai ke Cloud</span>
+                  {Object.keys(pendingSaves).length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-white text-emerald-800 text-[10px] font-mono font-bold">
+                      {Object.keys(pendingSaves).length}
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1316,9 +1389,10 @@ export const GradesView: React.FC<GradesViewProps> = ({
               <button
                 type="button"
                 onClick={handleSaveColumns}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md"
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
               >
-                Simpan Konfigurasi Kolom
+                <Cloud className="w-4 h-4" />
+                Simpan Konfigurasi ke Cloud
               </button>
             </div>
           </div>

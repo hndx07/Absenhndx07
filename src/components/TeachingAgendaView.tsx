@@ -19,6 +19,10 @@ import {
   BookOpen,
   LayoutGrid,
   List,
+  Cloud,
+  RefreshCw,
+  Save,
+  CheckCircle2,
 } from 'lucide-react';
 import { TeachingAgenda, ClassRoom, TeacherProfile } from '../types';
 import { exportAgendasToExcel, exportToWordDocument, exportAgendaToPDF } from '../utils/exportUtils';
@@ -60,6 +64,9 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPreviewPdfOpen, setIsPreviewPdfOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingAll, setIsSavingAll] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [editingAgenda, setEditingAgenda] = useState<Partial<TeachingAgenda> | null>(null);
 
   // Map of classId -> className & subject
@@ -207,12 +214,41 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
       };
 
       await onSaveAgenda(agendaToSave);
+      const timeStr = new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }) + ' WIB';
+      setLastSyncTime(timeStr);
+      setSyncStatusMsg(`Agenda pertemuan ke-${editingAgenda.pertemuanKe || 1} berhasil disimpan ke Cloud Supabase!`);
+      setTimeout(() => setSyncStatusMsg(null), 4000);
       setIsModalOpen(false);
       setEditingAgenda(null);
     } catch (err: any) {
       alert('Gagal menyimpan agenda: ' + (err.message || 'Error'));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSyncAllAgendas = async () => {
+    if (filteredAgendas.length === 0) return;
+    setIsSavingAll(true);
+    try {
+      const promises = filteredAgendas.map((ag) => onSaveAgenda(ag));
+      await Promise.all(promises);
+      const timeStr = new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }) + ' WIB';
+      setLastSyncTime(timeStr);
+      setSyncStatusMsg(`Seluruh ${filteredAgendas.length} agenda berhasil disinkronkan ke Cloud Supabase!`);
+      setTimeout(() => setSyncStatusMsg(null), 4000);
+    } catch (err: any) {
+      alert('Gagal menyimpan agenda ke cloud: ' + (err.message || 'Error'));
+    } finally {
+      setIsSavingAll(false);
     }
   };
 
@@ -339,6 +375,27 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
             Word
           </button>
 
+          {/* Tombol Simpan Agenda ke Cloud Supabase */}
+          <button
+            type="button"
+            onClick={handleSyncAllAgendas}
+            disabled={isSavingAll || filteredAgendas.length === 0}
+            className="min-h-[44px] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer disabled:opacity-50"
+            title="Simpan dan sinkronkan seluruh agenda mengajar ke database cloud Supabase secara real-time"
+          >
+            {isSavingAll ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Menyimpan ke Cloud...</span>
+              </>
+            ) : (
+              <>
+                <Cloud className="w-4 h-4" />
+                <span>Simpan Agenda ke Cloud</span>
+              </>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={handleOpenAdd}
@@ -349,6 +406,21 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Real-time Save Notification Banner */}
+      {syncStatusMsg && (
+        <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-bold rounded-2xl flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{syncStatusMsg}</span>
+          </div>
+          {lastSyncTime && (
+            <span className="text-[11px] text-emerald-700 dark:text-emerald-300 font-mono">
+              {lastSyncTime}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -654,6 +726,36 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
               </tbody>
             </table>
           </div>
+
+          {/* Table Footer with Prominent Save Button */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <Cloud className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>
+                {lastSyncTime
+                  ? `Terakhir disimpan ke Cloud Supabase: ${lastSyncTime}`
+                  : 'Seluruh agenda mengajar tersimpan aman dan terenkripsi di PostgreSQL Supabase.'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleSyncAllAgendas}
+              disabled={isSavingAll || filteredAgendas.length === 0}
+              className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 cursor-pointer disabled:opacity-50"
+            >
+              {isSavingAll ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Menyimpan ke Cloud Supabase...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Simpan Semua Agenda ke Cloud</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       ) : (
         /* CARDS VIEW */
@@ -925,10 +1027,19 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="min-h-[44px] px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="min-h-[44px] px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <Check className="w-4 h-4" />
-                  {isSaving ? 'Menyimpan...' : 'Simpan Agenda'}
+                  {isSaving ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Menyimpan ke Cloud Supabase...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Cloud className="w-4 h-4" />
+                      <span>Simpan Agenda ke Cloud</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
