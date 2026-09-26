@@ -196,18 +196,30 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
                   return (
                     <div
                       key={cls.id}
-                      className={`p-4 rounded-2xl border transition flex items-center justify-between ${
+                      onClick={() => {
+                        onSelectClass(cls.id);
+                        onClose();
+                      }}
+                      className={`group p-4 rounded-2xl border transition-all duration-150 flex items-center justify-between cursor-pointer select-none ${
                         isActive
-                          ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30 shadow-sm'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-indigo-200 bg-white dark:bg-slate-800/80'
+                          ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40 shadow-sm ring-2 ring-indigo-500/20'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-indigo-400 hover:bg-indigo-50/40 dark:hover:bg-slate-800/80 hover:shadow-xs'
                       }`}
+                      title={isActive ? `Kelas aktif saat ini: ${cls.namaKelas}` : `Klik untuk langsung membuka kelas ${cls.namaKelas}`}
                     >
-                      <div className="space-y-1">
+                      <div className="space-y-1 flex-1 pr-3">
                         <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-slate-900 dark:text-white text-base">{cls.namaKelas}</h4>
-                          {isActive && (
-                            <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider">
+                          <h4 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                            {cls.namaKelas}
+                          </h4>
+                          {isActive ? (
+                            <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-xs">
+                              <Check className="w-3 h-3" />
                               Aktif
+                            </span>
+                          ) : (
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                              &rarr; Klik untuk langsung buka
                             </span>
                           )}
                         </div>
@@ -222,27 +234,27 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        {!isActive && (
-                          <button
-                            onClick={() => onSelectClass(cls.id)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 hover:text-indigo-700 rounded-lg text-xs font-semibold transition"
-                          >
-                            Pilih Kelas
-                          </button>
-                        )}
+                      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button
-                          onClick={() => handleStartEdit(cls)}
-                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartEdit(cls);
+                          }}
+                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition cursor-pointer"
                           title="Edit Kelas"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         {classes.length > 1 && (
                           <button
+                            type="button"
                             disabled={isCheckingDeps}
-                            onClick={() => handleDeleteClick(cls)}
-                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteClick(cls);
+                            }}
+                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition cursor-pointer"
                             title="Hapus Kelas"
                           >
                             <Trash2 className="w-4 h-4" />

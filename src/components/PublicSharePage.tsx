@@ -490,7 +490,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         <img
           src={SCHOOL_CONFIG.bgImageUrl}
           alt="Watermark SMK Muhiba"
-          className="w-[85vw] max-w-xl max-h-[80vh] object-contain opacity-10 dark:opacity-20 pointer-events-none filter drop-shadow-2xl select-none"
+          className="w-[85vw] max-w-xl max-h-[80vh] object-contain opacity-[0.04] dark:opacity-[0.07] pointer-events-none filter drop-shadow-xl select-none"
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.bgImageFallback;
           }}
@@ -1818,19 +1818,22 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       </main>
 
       {/* Official Footer */}
-      <footer className="text-center text-xs text-slate-500 dark:text-slate-400 py-8 mt-8 border-t border-slate-200/80 dark:border-slate-800">
-        <div className="max-w-5xl mx-auto px-4 space-y-1">
-          <p className="font-bold text-slate-700 dark:text-slate-300">
-            {SCHOOL_CONFIG.namaSekolah} &bull; Batang, Jawa Tengah
+      <footer className="text-center py-8 mt-10 border-t border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xs">
+        <div className="max-w-5xl mx-auto px-4 space-y-2">
+          <p className="font-black text-sm text-slate-900 dark:text-white uppercase tracking-wider">
+            &copy; 2026 {SCHOOL_CONFIG.namaSekolah} &bull; BATANG, JAWA TENGAH
           </p>
-          <p className="text-[11px] text-slate-400">
-            {SCHOOL_CONFIG.alamat} &bull; Website:{' '}
-            <a href={SCHOOL_CONFIG.websiteUrl} target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+          <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+            {SCHOOL_CONFIG.alamat} &bull; Portal Resmi:{' '}
+            <a href={SCHOOL_CONFIG.websiteUrl} target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">
               {SCHOOL_CONFIG.website}
             </a>
           </p>
-          <p className="text-[10px] text-slate-400 pt-2">
-            &copy; 2026 SMK Muhammadiyah Bawang &bull; Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; developed by @hndx07
+          <p className="text-xs font-extrabold text-indigo-700 dark:text-indigo-400 pt-1">
+            Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; Dikembangkan oleh{' '}
+            <span className="font-mono bg-indigo-50 dark:bg-indigo-950/80 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800 text-slate-900 dark:text-white">
+              @hndx07
+            </span>
           </p>
         </div>
       </footer>

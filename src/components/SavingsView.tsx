@@ -625,9 +625,9 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
         </div>
       )}
 
-      {/* Modal Share Public Savings */}
+      {/* Modal Share Public Savings (Opacity dikurangi agar background terlihat) */}
       {shareModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/30 backdrop-blur-[1.5px] animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4 text-center">
             <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto">
               <Share2 className="w-6 h-6" />

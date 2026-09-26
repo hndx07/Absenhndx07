@@ -99,6 +99,18 @@ type NavTab =
   | 'parent_report'
   | 'school_map';
 
+const NAV_ITEMS = [
+  { id: 'attendance', label: 'Presensi Siswa', icon: CalendarCheck, desc: 'Input kehadiran harian siswa' },
+  { id: 'recap', label: 'Rekap Absensi', icon: FileCheck, desc: 'Rekap bulanan, cetak & ekspor Excel' },
+  { id: 'grades', label: 'Penilaian & KKM', icon: Award, desc: 'Asesmen sumatif & formatif' },
+  { id: 'students', label: 'Data Peserta Didik', icon: Users, desc: 'Kelola siswa & impor Excel' },
+  { id: 'agendas', label: 'Buku Jurnal Guru', icon: BookMarked, desc: 'Catatan agenda kegiatan KBM' },
+  { id: 'savings', label: 'Tabungan & Kas', icon: Wallet, desc: 'Buku kas & tabungan kelas' },
+  { id: 'statistics', label: 'Statistik & Resume', icon: BarChart3, desc: 'Grafik & ringkasan analitik' },
+  { id: 'parent_report', label: 'Laporan WhatsApp Wali', icon: MessageSquare, desc: 'Kirim rekap ke orang tua' },
+  { id: 'school_map', label: 'Peta Kampus', icon: MapPin, desc: 'Profil & lokasi SMK Muhiba' },
+];
+
 function parsePublicShareFromUrl(): {
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
   shareId: string;
@@ -667,17 +679,30 @@ export default function App() {
               </div>
             </div>
 
-            {/* Active Class Switcher */}
+            {/* Center Area: Current Active Module Badge & Class Selector */}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setIsClassModalOpen(true)}
-                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-950 dark:text-indigo-200 text-xs sm:text-sm font-bold transition border border-indigo-200/60 dark:border-indigo-800/60 shadow-xs"
+                type="button"
+                onClick={toggleSideNav}
+                className="hidden lg:flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-800/80 text-indigo-950 dark:text-indigo-200 text-xs font-bold transition hover:bg-indigo-100 dark:hover:bg-indigo-900/60 cursor-pointer shadow-2xs"
+                title="Buka Menu Navigasi Samping"
               >
-                <GraduationCap className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">Modul:</span>
+                <span className="font-extrabold text-indigo-900 dark:text-white">
+                  {NAV_ITEMS.find((n) => n.id === activeTab)?.label || 'Presensi Siswa'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setIsClassModalOpen(true)}
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold transition shadow-xs cursor-pointer"
+                title="Pilih atau kelola kelas (1-klik langsung buka)"
+              >
+                <GraduationCap className="w-4 h-4 text-indigo-200 shrink-0" />
                 <span className="truncate max-w-[130px] sm:max-w-none">
                   Kelas: {activeClass.namaKelas}
                 </span>
-                <ChevronDown className="w-3.5 h-3.5 text-indigo-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-indigo-200" />
               </button>
             </div>
 
@@ -721,121 +746,6 @@ export default function App() {
             </div>
           </div>
         </div>
-
-        {/* Secondary Subnavigation Bar */}
-        <div className="border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80 transition-all duration-200">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6">
-              <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto py-2 scrollbar-none text-xs font-semibold">
-                <button
-                  onClick={() => setActiveTab('attendance')}
-                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                    activeTab === 'attendance'
-                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                  }`}
-                >
-                  <CalendarCheck className="w-4 h-4" />
-                  Presensi Siswa
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('recap')}
-                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                    activeTab === 'recap'
-                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                  }`}
-                >
-                  <FileCheck className="w-4 h-4" />
-                  Rekap Absensi
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('grades')}
-                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                    activeTab === 'grades'
-                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                  }`}
-                >
-                  <Award className="w-4 h-4" />
-                  Penilaian & KKM
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('students')}
-                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                    activeTab === 'students'
-                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                  }`}
-                >
-                  <Users className="w-4 h-4" />
-                  Data Peserta Didik
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('agendas')}
-                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                    activeTab === 'agendas'
-                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                  }`}
-                >
-                  <BookMarked className="w-4 h-4" />
-                  Buku Jurnal Guru
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('savings')}
-                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                    activeTab === 'savings'
-                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                  }`}
-                >
-                  <Wallet className="w-4 h-4" />
-                  Tabungan & Kas
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('statistics')}
-                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                    activeTab === 'statistics'
-                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                  }`}
-                >
-                  <BarChart3 className="w-4 h-4" />
-                  Statistik & Resume
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('parent_report')}
-                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                    activeTab === 'parent_report'
-                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                  }`}
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  Laporan WhatsApp Wali
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('school_map')}
-                  className={`px-3.5 py-2 rounded-xl shrink-0 transition flex items-center gap-1.5 ${
-                    activeTab === 'school_map'
-                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                  }`}
-                >
-                  <MapPin className="w-4 h-4" />
-                  Peta Kampus
-                </button>
-              </nav>
-            </div>
-          </div>
       </header>
 
       {/* Side Navigation Drawer (Navbar Kesamping) */}
@@ -910,17 +820,7 @@ export default function App() {
 
               {/* Navigation Items in Side Drawer */}
               <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-                {[
-                  { id: 'attendance', label: 'Presensi Siswa', icon: CalendarCheck, desc: 'Input kehadiran harian siswa' },
-                  { id: 'recap', label: 'Rekap Absensi', icon: FileCheck, desc: 'Rekap bulanan, cetak & ekspor Excel' },
-                  { id: 'grades', label: 'Penilaian & KKM', icon: Award, desc: 'Asesmen sumatif & formatif' },
-                  { id: 'students', label: 'Data Peserta Didik', icon: Users, desc: 'Kelola siswa & impor Excel' },
-                  { id: 'agendas', label: 'Buku Jurnal Guru', icon: BookMarked, desc: 'Catatan agenda kegiatan KBM' },
-                  { id: 'savings', label: 'Tabungan & Kas', icon: Wallet, desc: 'Buku kas & tabungan kelas' },
-                  { id: 'statistics', label: 'Statistik & Resume', icon: BarChart3, desc: 'Grafik & ringkasan analitik' },
-                  { id: 'parent_report', label: 'Laporan WhatsApp Wali', icon: MessageSquare, desc: 'Kirim rekap ke orang tua' },
-                  { id: 'school_map', label: 'Peta Kampus', icon: MapPin, desc: 'Profil & lokasi SMK Muhiba' },
-                ].map((item) => {
+                {NAV_ITEMS.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
                   return (
@@ -1141,13 +1041,19 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 dark:border-slate-800 mt-12 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-        <div className="max-w-7xl mx-auto px-4 space-y-1">
-          <p className="font-bold text-slate-700 dark:text-slate-200">
-            Aplikasi Presensi & Nilai Siswa &bull; SMK Muhammadiyah Bawang, Batang, Jawa Tengah &bull; developed by @hndx07
+      <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 mt-12 py-8 text-center transition-colors">
+        <div className="max-w-7xl mx-auto px-4 space-y-2">
+          <p className="font-black text-sm sm:text-base text-slate-900 dark:text-white tracking-wide uppercase">
+            &copy; 2026 SMK MUHAMMADIYAH BAWANG &bull; BATANG, JAWA TENGAH
           </p>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">
-            Didukung Backend 100% PostgreSQL & Auth Supabase dengan Row Level Security. Tahun Ajaran 2025/2026.
+          <p className="text-xs sm:text-sm font-bold text-indigo-700 dark:text-indigo-400">
+            Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; Dikembangkan oleh{' '}
+            <span className="font-mono font-black text-slate-900 dark:text-white bg-indigo-100 dark:bg-indigo-900/80 px-2 py-0.5 rounded-md border border-indigo-300 dark:border-indigo-700">
+              @hndx07
+            </span>
+          </p>
+          <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 pt-0.5">
+            Backend Resmi 100% PostgreSQL & Auth Supabase Cloud (Row Level Security Aktif) &bull; Tahun Ajaran 2025/2026
           </p>
         </div>
       </footer>
