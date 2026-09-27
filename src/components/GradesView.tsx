@@ -934,26 +934,26 @@ export const GradesView: React.FC<GradesViewProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
-                <th className="py-3 px-3 text-center w-10 sticky left-0 bg-slate-50 z-10 border-r">No</th>
-                <th className="py-3 px-3 min-w-[180px] sticky left-10 bg-slate-50 z-10 border-r">Nama Siswa</th>
+              <tr className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white font-bold uppercase tracking-wider shadow-xs">
+                <th className="py-3 px-3 text-center w-10 sticky left-0 bg-blue-700 text-white z-10 border-r border-indigo-500/40">No</th>
+                <th className="py-3 px-3 min-w-[180px] sticky left-10 bg-indigo-700 text-white z-10 border-r border-indigo-500/40">Nama Siswa</th>
                 
                 {/* Formatif TP Columns */}
                 {gradeColumns.slice(0, activeColumnsCount).map((col, idx) => (
-                  <th key={col.id} className="py-2 px-1 text-center w-16 border-r font-medium text-[11px]">
-                    <div className="font-bold text-slate-800">TP {idx + 1}</div>
-                    <div className="text-[9px] text-slate-400 truncate max-w-[60px]" title={col.label}>
+                  <th key={col.id} className="py-2 px-1 text-center w-16 border-r border-indigo-500/30 font-medium text-[11px] text-white">
+                    <div className="font-bold text-white">TP {idx + 1}</div>
+                    <div className="text-[9px] text-indigo-200 truncate max-w-[60px]" title={col.label}>
                       {col.label}
                     </div>
                   </th>
                 ))}
 
-                <th className="py-3 px-2 text-center w-16 bg-amber-50/50 text-amber-900 border-r">STS</th>
-                <th className="py-3 px-2 text-center w-16 bg-blue-50/50 text-blue-900 border-r">SAS</th>
-                <th className="py-3 px-2 text-center w-16 bg-emerald-50/70 text-emerald-950 border-r font-bold" title="Hanya nilai yang sudah diinput saja yang dihitung kedalam total sum">Total Sum</th>
-                <th className="py-3 px-2 text-center w-16 bg-indigo-50/60 text-indigo-950 border-r font-bold">Nilai Akhir</th>
-                <th className="py-3 px-2 text-center w-20 bg-indigo-50/60 text-indigo-950 border-r font-bold">Predikat</th>
-                <th className="py-3 px-3 min-w-[260px]">Catatan Capaian Kompetensi (Kurikulum Merdeka)</th>
+                <th className="py-3 px-2 text-center w-16 bg-white/10 text-white border-r border-indigo-500/30">STS</th>
+                <th className="py-3 px-2 text-center w-16 bg-white/10 text-white border-r border-indigo-500/30">SAS</th>
+                <th className="py-3 px-2 text-center w-16 bg-white/15 text-white border-r border-indigo-500/30 font-bold" title="Hanya nilai yang sudah diinput saja yang dihitung kedalam total sum">Total Sum</th>
+                <th className="py-3 px-2 text-center w-16 bg-white/20 text-white border-r border-indigo-500/30 font-bold">Nilai Akhir</th>
+                <th className="py-3 px-2 text-center w-20 bg-white/20 text-white border-r border-indigo-500/30 font-bold">Predikat</th>
+                <th className="py-3 px-3 min-w-[260px] text-white">Catatan Capaian Kompetensi (Kurikulum Merdeka)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-sans">
@@ -965,16 +965,17 @@ export const GradesView: React.FC<GradesViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((student) => {
+                filteredStudents.map((student, sIdx) => {
                   const grade = localGrades[student.id];
                   const { finalScore, predicate, predicateLabel, merdekaDeskripsi, isPassed, sumInputted, countInputted, hasAnyScore } = calculateFinalScore(grade, student.nama);
+                  const rowBg = sIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/80';
 
                   return (
-                    <tr key={student.id} className="hover:bg-slate-50/60 transition group">
-                      <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-500 sticky left-0 bg-white group-hover:bg-slate-50 border-r">
+                    <tr key={student.id} className={`${rowBg} hover:bg-indigo-50/60 transition group`}>
+                      <td className={`py-2.5 px-3 text-center font-mono font-bold text-slate-500 sticky left-0 ${rowBg} group-hover:bg-indigo-50/60 border-r`}>
                         {student.no}
                       </td>
-                      <td className="py-2.5 px-3 font-semibold text-slate-900 sticky left-10 bg-white group-hover:bg-slate-50 border-r">
+                      <td className={`py-2.5 px-3 font-semibold text-slate-900 sticky left-10 ${rowBg} group-hover:bg-indigo-50/60 border-r`}>
                         <div className="truncate max-w-[170px]" title={student.nama}>
                           {student.nama}
                         </div>

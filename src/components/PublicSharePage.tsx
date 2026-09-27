@@ -501,14 +501,14 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         <div className="absolute inset-0 bg-transparent dark:bg-black/50 pointer-events-none" />
       </div>
 
-      {/* Official School Header */}
-      <header className="relative z-20 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 dark:from-black dark:via-zinc-950 dark:to-black text-white shadow-md sticky top-0 border-b border-indigo-900/40 dark:border-zinc-800">
+      {/* Official School Header - Modern Blue-to-Purple Gradient */}
+      <header className="relative z-20 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white shadow-lg sticky top-0 border-b border-indigo-900/40">
         <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 truncate">
             <img
               src={SCHOOL_CONFIG.logoUrl}
               alt="Logo SMK Muhammadiyah Bawang"
-              className="w-10 h-10 object-contain drop-shadow-md rounded-xl p-0.5 bg-white/10 border border-white/20 shrink-0"
+              className="w-10 h-10 object-contain drop-shadow-md rounded-xl p-0.5 bg-white border border-white/30 shrink-0 shadow-xs"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
               }}
@@ -517,7 +517,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
               <h1 className="font-black text-sm sm:text-base leading-tight tracking-tight uppercase truncate">
                 {SCHOOL_CONFIG.namaSekolah}
               </h1>
-              <p className="text-[11px] text-indigo-200/80 truncate">
+              <p className="text-[11px] text-indigo-100 truncate">
                 Portal Informasi & Transparansi Akademik
               </p>
             </div>
@@ -528,7 +528,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
             <button
               type="button"
               onClick={handleCopyLink}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-indigo-200 transition text-xs font-semibold flex items-center gap-1 cursor-pointer"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition text-xs font-semibold flex items-center gap-1 cursor-pointer border border-white/15"
               title="Salin Tautan Publik"
             >
               <Share2 className="w-4 h-4" />
@@ -537,7 +537,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
             <button
               type="button"
               onClick={loadData}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-indigo-200 transition cursor-pointer"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer border border-white/15"
               title="Segarkan Data"
             >
               <RefreshCw className="w-4 h-4" />
@@ -546,14 +546,14 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         </div>
 
         {/* Subheader: Address & Official URL */}
-        <div className="bg-slate-950/60 border-t border-white/5 py-1.5 px-4 text-[11px] text-slate-400">
+        <div className="bg-indigo-950/60 border-t border-white/10 py-1.5 px-4 text-[11px] text-indigo-100">
           <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <div className="flex items-center gap-1.5 truncate">
-              <MapPin className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <MapPin className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
               <span className="truncate">{SCHOOL_CONFIG.alamat}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <Globe className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
               <a
                 href={SCHOOL_CONFIG.websiteUrl}
                 target="_blank"
@@ -854,7 +854,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                                 return (
                                   <tr
                                     key={std.id}
-                                    className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition"
+                                    className={`transition ${idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-blue-50/40 dark:bg-slate-800/60'} hover:bg-indigo-50/80 dark:hover:bg-indigo-950/50`}
                                   >
                                     <td className="py-3.5 px-3 text-center font-mono font-bold text-slate-400 dark:text-slate-500">
                                       {idx + 1}
@@ -1020,7 +1020,10 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                             const pct = Math.round(((h + d) / total) * 100);
 
                             return (
-                              <tr key={std.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
+                              <tr
+                                key={std.id}
+                                className={`transition ${idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-indigo-50/40 dark:bg-slate-800/60'} hover:bg-indigo-50/80 dark:hover:bg-indigo-950/60`}
+                              >
                                 <td className="py-3 px-3 text-center font-mono font-bold text-slate-400 dark:text-slate-500">
                                   {idx + 1}
                                 </td>
@@ -1251,7 +1254,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                           >
                             Total Sum
                           </th>
-                          <th className="py-3 px-4 text-center w-24 bg-slate-900 text-white">Nilai Akhir</th>
+                          <th className="py-3 px-4 text-center w-24 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white font-black shadow-xs">Nilai Akhir</th>
                           <th className="py-3 px-3 text-center w-16">Predikat</th>
                           <th className="py-3 px-4 text-center w-28">Status</th>
                         </>
@@ -1266,7 +1269,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                           <th className="py-3 px-3 text-center w-20">Rata Formatif</th>
                           <th className="py-3 px-3 text-center w-16">STS</th>
                           <th className="py-3 px-3 text-center w-16">SAS</th>
-                          <th className="py-3 px-4 text-center w-24 bg-slate-900 text-white">Nilai Akhir</th>
+                          <th className="py-3 px-4 text-center w-24 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white font-black shadow-xs">Nilai Akhir</th>
                           <th className="py-3 px-3 text-center w-16">Predikat</th>
                           <th className="py-3 px-4 text-center w-28">Status</th>
                           <th className="py-3 px-3 text-center w-24">Rapor</th>
@@ -1344,7 +1347,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                                     <span className="text-slate-300 dark:text-slate-600 font-normal">-</span>
                                   )}
                                 </td>
-                                <td className="py-3 px-4 text-center font-mono font-black text-sm bg-slate-900 dark:bg-slate-950 text-white">
+                                <td className="py-3 px-4 text-center font-mono font-black text-sm bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white shadow-xs">
                                   {hasAnyScore ? finalScore : '-'}
                                 </td>
                                 <td className="py-3 px-3 text-center font-bold">
@@ -1390,7 +1393,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                                 <td className="py-3 px-3 text-center font-mono text-slate-700 dark:text-slate-300">
                                   {sas !== null ? sas : '-'}
                                 </td>
-                                <td className="py-3 px-4 text-center font-mono font-black text-sm bg-slate-900 dark:bg-slate-950 text-white">
+                                <td className="py-3 px-4 text-center font-mono font-black text-sm bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white shadow-xs">
                                   {hasAnyScore ? finalScore : '-'}
                                 </td>
                                 <td className="py-3 px-3 text-center font-bold">
@@ -1522,7 +1525,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                           <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/50 dark:bg-emerald-950/60">
                             -
                           </td>
-                          <td className="py-2.5 px-4 text-center font-mono font-black text-sm bg-slate-900 text-white">
+                          <td className="py-2.5 px-4 text-center font-mono font-black text-sm bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white shadow-xs">
                             {gradeFooterTotals.avgFinal}
                           </td>
                           <td colSpan={2} className="py-2.5 px-3 text-center text-[10px] text-slate-400 font-normal">
@@ -1543,7 +1546,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                           <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
                             {gradeFooterTotals.sasAvg ?? '-'}
                           </td>
-                          <td className="py-2.5 px-4 text-center font-mono font-black text-sm bg-slate-900 text-white">
+                          <td className="py-2.5 px-4 text-center font-mono font-black text-sm bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white shadow-xs">
                             {gradeFooterTotals.avgFinal}
                           </td>
                           <td colSpan={3} className="py-2.5 px-3 text-center text-[10px] text-slate-400 font-normal">
@@ -1640,36 +1643,36 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                     </div>
                   </div>
 
-                  {/* Hasil Akhir & Status KKM */}
-                  <div className="bg-slate-900 dark:bg-slate-950 text-white p-4 rounded-2xl flex items-center justify-between">
+                  {/* Hasil Akhir & Status KKM - Modern Elegant Blue-to-Purple Gradient */}
+                  <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white p-4.5 rounded-2xl flex items-center justify-between shadow-lg border border-indigo-400/30">
                     <div>
-                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
+                      <span className="text-[10px] text-indigo-100 uppercase font-bold tracking-wider block">
                         Nilai Akhir Rapor (Kurikulum Merdeka)
                       </span>
                       <div className="flex items-baseline gap-2 mt-0.5">
-                        <span className="text-3xl font-black font-mono">
+                        <span className="text-3xl font-black font-mono drop-shadow-xs">
                           {selectedStudentGrade.hasAnyScore ? selectedStudentGrade.finalScore : '-'}
                         </span>
-                        <span className="px-2.5 py-1 rounded-lg bg-white/10 text-xs font-mono font-bold">
+                        <span className="px-2.5 py-1 rounded-lg bg-white/20 text-white text-xs font-mono font-bold border border-white/25 shadow-2xs backdrop-blur-xs">
                           Predikat: {selectedStudentGrade.predikat} &bull; {selectedStudentGrade.predikatLabel || (selectedStudentGrade.predikat === 'A' ? 'Sangat Baik' : selectedStudentGrade.predikat === 'B' ? 'Baik' : selectedStudentGrade.predikat === 'C' ? 'Cukup' : 'Perlu Bimbingan')}
                         </span>
                       </div>
                     </div>
 
                     <div className="text-right">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-1">
+                      <span className="text-[10px] text-indigo-100 uppercase font-bold tracking-wider block mb-1">
                         Status Ketuntasan (KKM: {data?.kkm || 75})
                       </span>
                       {!selectedStudentGrade.hasAnyScore ? (
-                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-white/15 text-white border border-white/25">
                           Belum Ada Nilai
                         </span>
                       ) : selectedStudentGrade.isTuntas ? (
-                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-emerald-500 text-white shadow-xs">
+                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-emerald-400 text-emerald-950 shadow-xs border border-emerald-300">
                           Tuntas Capaian
                         </span>
                       ) : (
-                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-rose-500 text-white shadow-xs">
+                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-rose-400 text-rose-950 shadow-xs border border-rose-300">
                           Perlu Bimbingan / Remedial
                         </span>
                       )}

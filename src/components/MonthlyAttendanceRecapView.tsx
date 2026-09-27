@@ -432,38 +432,42 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
-                  <th className="py-3 px-3 text-center w-12">No</th>
-                  <th className="py-3 px-3 w-28">NISN</th>
-                  <th className="py-3 px-3 min-w-[200px]">Nama Siswa</th>
-                  <th className="py-3 px-3 text-center w-12">L/P</th>
-                  <th className="py-3 px-3 min-w-[120px]">Kelas</th>
-                  <th className="py-3 px-3 text-center bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 w-16">
+                <tr className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
+                  <th className="py-3 px-3 text-center w-12 text-white">No</th>
+                  <th className="py-3 px-3 w-28 text-white">NISN</th>
+                  <th className="py-3 px-3 min-w-[200px] text-white">Nama Siswa</th>
+                  <th className="py-3 px-3 text-center w-12 text-white">L/P</th>
+                  <th className="py-3 px-3 min-w-[120px] text-white">Kelas</th>
+                  <th className="py-3 px-3 text-center bg-white/10 text-white w-16">
                     Hadir
                   </th>
-                  <th className="py-3 px-3 text-center bg-blue-50/50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 w-16">
+                  <th className="py-3 px-3 text-center bg-white/10 text-white w-16">
                     Sakit
                   </th>
-                  <th className="py-3 px-3 text-center bg-amber-50/50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 w-16">
+                  <th className="py-3 px-3 text-center bg-white/10 text-white w-16">
                     Izin
                   </th>
-                  <th className="py-3 px-3 text-center bg-rose-50/50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 w-16">
+                  <th className="py-3 px-3 text-center bg-white/10 text-white w-16">
                     Alpa
                   </th>
-                  <th className="py-3 px-3 text-center bg-purple-50/50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 w-16">
+                  <th className="py-3 px-3 text-center bg-white/10 text-white w-16">
                     Dispen
                   </th>
-                  <th className="py-3 px-3 text-center w-24">Persentase</th>
-                  <th className="py-3 px-3 text-center w-32">Keterangan</th>
+                  <th className="py-3 px-3 text-center w-24 text-white">Persentase</th>
+                  <th className="py-3 px-3 text-center w-32 text-white">Keterangan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {studentRecap.map((r) => {
+                {studentRecap.map((r, idx) => {
                   const isWarning = r.persentase < 75;
                   return (
                     <tr
                       key={r.student.id}
-                      className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition"
+                      className={`transition ${
+                        idx % 2 === 0
+                          ? 'bg-white dark:bg-slate-900'
+                          : 'bg-blue-50/40 dark:bg-slate-800/60'
+                      } hover:bg-indigo-50/80 dark:hover:bg-indigo-950/60`}
                     >
                       <td className="py-3 px-3 text-center font-mono font-bold text-slate-500">
                         {r.noUrut}

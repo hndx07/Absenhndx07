@@ -636,8 +636,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-indigo-500 selection:text-white">
-      {/* Top Main Navigation Header */}
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-40 shadow-xs transition-colors">
+      {/* Top Main Navigation Header - Modern Elegant Blue-to-Purple Gradient */}
+      <header className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white border-b border-indigo-900/40 sticky top-0 z-40 shadow-lg backdrop-blur-md transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
             {/* Hamburger (Menu Samping) & Logo Sekolah */}
@@ -645,32 +645,32 @@ export default function App() {
               <button
                 type="button"
                 onClick={toggleSideNav}
-                className="p-2 sm:p-2.5 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-indigo-600 transition border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center shrink-0 cursor-pointer"
+                className="p-2 sm:p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition border border-white/20 shadow-xs flex items-center justify-center shrink-0 cursor-pointer"
                 title="Buka Menu Navigasi Samping"
                 aria-label="Buka Menu Navigasi Samping"
               >
-                <Menu className="w-5 h-5 text-slate-700 dark:text-slate-200" />
+                <Menu className="w-5 h-5 text-white" />
               </button>
 
               <div className="flex items-center gap-2.5">
                 <img
                   src={SCHOOL_CONFIG.logoUrl}
                   alt="Logo SMK Muhammadiyah Bawang"
-                  className="w-10 h-10 object-contain drop-shadow-sm rounded-xl p-0.5 bg-white border border-slate-200 dark:border-slate-700"
+                  className="w-10 h-10 object-contain drop-shadow-sm rounded-xl p-0.5 bg-white border border-white/30 shadow-xs"
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
                   }}
                 />
                 <div className="hidden sm:flex flex-col">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-slate-900 dark:text-white tracking-tight text-sm sm:text-base">
+                    <span className="font-extrabold text-white tracking-tight text-sm sm:text-base drop-shadow-xs">
                       SMK Muhammadiyah Bawang
                     </span>
-                    <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-bold">
-                      2026
+                    <span className="px-2 py-0.5 rounded-md bg-white/20 text-white text-[10px] font-bold border border-white/25">
+                      Kurikulum Merdeka
                     </span>
                   </div>
-                  <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                  <span className="text-xs text-indigo-100 font-medium">
                     Sistem Presensi, Penilaian & Jurnal Guru
                   </span>
                 </div>
@@ -682,7 +682,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsClassModalOpen(true)}
-                className="flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold transition shadow-xs cursor-pointer"
+                className="flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-bold transition shadow-xs border border-white/25 backdrop-blur-xs cursor-pointer"
                 title="Pilih atau kelola kelas"
               >
                 <GraduationCap className="w-4 h-4 text-indigo-200 shrink-0" />
@@ -693,28 +693,18 @@ export default function App() {
               </button>
             </div>
 
-            {/* Penanda Cloud Supabase Aktif, Tombol Backup JSON & Pilihan Dark/Light Mode */}
+            {/* Penanda Cloud Supabase Aktif & Pilihan Dark/Light Mode */}
             <div className="flex items-center gap-2 shrink-0">
               <div
-                className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 text-xs font-bold shadow-2xs"
+                className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/25 border border-emerald-300/40 text-emerald-100 text-xs font-bold shadow-2xs backdrop-blur-xs"
                 title="Database PostgreSQL Supabase Cloud Aktif & Sinkron (RLS)"
               >
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-80"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
                 </span>
                 <span>Cloud Supabase Aktif</span>
               </div>
-
-              <button
-                type="button"
-                onClick={handleDownloadBackup}
-                className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-bold transition cursor-pointer border border-slate-200 dark:border-zinc-700 shadow-2xs"
-                title="Download backup file JSON seluruh data"
-              >
-                <Download className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <span className="hidden sm:inline">Backup JSON</span>
-              </button>
 
               <ThemeToggle />
             </div>
@@ -734,36 +724,36 @@ export default function App() {
           {/* Drawer Sidebar */}
           <div className="fixed inset-y-0 left-0 max-w-full flex">
             <aside className="w-80 max-w-[85vw] bg-white dark:bg-black text-slate-900 dark:text-white shadow-2xl flex flex-col border-r border-slate-200 dark:border-zinc-800 animate-in slide-in-from-left duration-200">
-              {/* Drawer Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-zinc-950">
+              {/* Drawer Header - Modern Blue to Purple Gradient */}
+              <div className="p-4 sm:p-5 border-b border-indigo-900/30 flex items-center justify-between gap-3 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white">
                 <div className="flex items-center gap-3 truncate">
                   <img
                     src={SCHOOL_CONFIG.logoUrl}
                     alt="Logo SMK Muhammadiyah Bawang"
-                    className="w-10 h-10 object-contain drop-shadow-sm rounded-xl p-0.5 bg-white border border-slate-200 dark:border-zinc-700 shrink-0"
+                    className="w-10 h-10 object-contain drop-shadow-sm rounded-xl p-0.5 bg-white border border-white/30 shrink-0"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
                     }}
                   />
                   <div className="truncate">
-                    <h2 className="font-extrabold text-sm sm:text-base tracking-tight truncate text-slate-900 dark:text-white">
-                      SMK Muhiba
-                    </h2>
-                    <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold truncate">
-                      Navigasi Menu Kesamping
+                    <p className="font-extrabold text-sm text-white truncate">
+                      SMK Muhammadiyah Bawang
+                    </p>
+                    <p className="text-[11px] text-indigo-100 truncate">
+                      Sistem Guru & Presensi
                     </p>
                   </div>
                 </div>
-
                 <button
                   type="button"
                   onClick={() => setIsSideNavOpen(false)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer shrink-0"
                   title="Tutup Menu"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
+
 
               {/* Class Info Box inside Drawer */}
               <div className="p-4 bg-indigo-50/70 dark:bg-zinc-900/80 border-b border-indigo-100/50 dark:border-zinc-800">

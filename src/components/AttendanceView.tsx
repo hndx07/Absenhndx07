@@ -684,29 +684,36 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-y border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-2.5 px-3 text-center w-12">No</th>
-                  <th className="py-2.5 px-3 min-w-[180px]">Nama Peserta Didik</th>
-                  <th className="py-2.5 px-3 text-center w-14">L/P</th>
-                  <th className="py-2.5 px-3 text-center min-w-[200px]">Status Kehadiran</th>
-                  <th className="py-2.5 px-3">Keterangan / Alasan</th>
+                <tr className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
+                  <th className="py-3 px-3 text-center w-12 text-white">No</th>
+                  <th className="py-3 px-3 min-w-[180px] text-white">Nama Peserta Didik</th>
+                  <th className="py-3 px-3 text-center w-14 text-white">L/P</th>
+                  <th className="py-3 px-3 text-center min-w-[200px] text-white">Status Kehadiran</th>
+                  <th className="py-3 px-3 text-white">Keterangan / Alasan</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {filteredStudents.map((std) => {
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                {filteredStudents.map((std, idx) => {
                   const record = currentSession.records?.[std.id] || { status: 'H', catatan: '' };
                   const status = record.status;
 
                   return (
-                    <tr key={std.id} className="hover:bg-slate-50/70 transition">
-                      <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-600">
+                    <tr
+                      key={std.id}
+                      className={`transition ${
+                        idx % 2 === 0
+                          ? 'bg-white dark:bg-slate-900'
+                          : 'bg-slate-50/90 dark:bg-slate-800/50'
+                      } hover:bg-indigo-50/70 dark:hover:bg-indigo-950/40`}
+                    >
+                      <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-600 dark:text-slate-400">
                         {std.no}
                       </td>
-                      <td className="py-2.5 px-3 font-bold text-slate-800">
+                      <td className="py-2.5 px-3 font-bold text-slate-800 dark:text-slate-200">
                         {std.nama}
                       </td>
                       <td className="py-2.5 px-3 text-center">
-                        <span className="font-semibold text-slate-500">{std.gender}</span>
+                        <span className="font-semibold text-slate-500 dark:text-slate-400">{std.gender}</span>
                       </td>
                       <td className="py-2.5 px-3">
                         <div className="flex items-center justify-center gap-1.5">
