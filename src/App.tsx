@@ -86,9 +86,9 @@ import { StatisticsView } from './components/StatisticsView';
 import { ParentReportView } from './components/ParentReportView';
 import { SchoolMapView } from './components/SchoolMapView';
 import { MonthlyAttendanceRecapView } from './components/MonthlyAttendanceRecapView';
-import { ThemeToggle } from './components/ThemeToggle';
 
 type NavTab =
+
   | 'attendance'
   | 'recap'
   | 'grades'
@@ -636,8 +636,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-indigo-500 selection:text-white">
-      {/* Top Main Navigation Header - Modern Elegant Blue-to-Purple Gradient */}
-      <header className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white border-b border-indigo-900/40 sticky top-0 z-40 shadow-lg backdrop-blur-md transition-all">
+      {/* Top Main Navigation Header - Muhammadiyah Visual Identity Gradient (#009B62 Green to #292E82 Deep Blue) */}
+      <header className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white border-b border-[#008276]/40 sticky top-0 z-40 shadow-lg backdrop-blur-md transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
             {/* Hamburger (Menu Samping) & Logo Sekolah */}
@@ -670,7 +670,7 @@ export default function App() {
                       Kurikulum Merdeka
                     </span>
                   </div>
-                  <span className="text-xs text-indigo-100 font-medium">
+                  <span className="text-xs text-emerald-100 font-medium">
                     Sistem Presensi, Penilaian & Jurnal Guru
                   </span>
                 </div>
@@ -685,18 +685,18 @@ export default function App() {
                 className="flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-bold transition shadow-xs border border-white/25 backdrop-blur-xs cursor-pointer"
                 title="Pilih atau kelola kelas"
               >
-                <GraduationCap className="w-4 h-4 text-indigo-200 shrink-0" />
+                <GraduationCap className="w-4 h-4 text-emerald-100 shrink-0" />
                 <span className="truncate max-w-[130px] sm:max-w-none">
                   Kelas: {activeClass.namaKelas}
                 </span>
-                <ChevronDown className="w-3.5 h-3.5 text-indigo-200" />
+                <ChevronDown className="w-3.5 h-3.5 text-emerald-100" />
               </button>
             </div>
 
-            {/* Penanda Cloud Supabase Aktif & Pilihan Dark/Light Mode */}
+            {/* Penanda Cloud Supabase Aktif */}
             <div className="flex items-center gap-2 shrink-0">
               <div
-                className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/25 border border-emerald-300/40 text-emerald-100 text-xs font-bold shadow-2xs backdrop-blur-xs"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold shadow-2xs backdrop-blur-xs"
                 title="Database PostgreSQL Supabase Cloud Aktif & Sinkron (RLS)"
               >
                 <span className="relative flex h-2 w-2">
@@ -705,8 +705,6 @@ export default function App() {
                 </span>
                 <span>Cloud Supabase Aktif</span>
               </div>
-
-              <ThemeToggle />
             </div>
           </div>
         </div>
@@ -723,9 +721,9 @@ export default function App() {
 
           {/* Drawer Sidebar */}
           <div className="fixed inset-y-0 left-0 max-w-full flex">
-            <aside className="w-80 max-w-[85vw] bg-white dark:bg-black text-slate-900 dark:text-white shadow-2xl flex flex-col border-r border-slate-200 dark:border-zinc-800 animate-in slide-in-from-left duration-200">
-              {/* Drawer Header - Modern Blue to Purple Gradient */}
-              <div className="p-4 sm:p-5 border-b border-indigo-900/30 flex items-center justify-between gap-3 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white">
+            <aside className="w-80 max-w-[85vw] bg-white text-slate-900 shadow-2xl flex flex-col border-r border-slate-200 animate-in slide-in-from-left duration-200">
+              {/* Drawer Header - Muhammadiyah Visual Identity Gradient */}
+              <div className="p-4 sm:p-5 border-b border-[#008276]/30 flex items-center justify-between gap-3 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white">
                 <div className="flex items-center gap-3 truncate">
                   <img
                     src={SCHOOL_CONFIG.logoUrl}
@@ -739,7 +737,7 @@ export default function App() {
                     <p className="font-extrabold text-sm text-white truncate">
                       SMK Muhammadiyah Bawang
                     </p>
-                    <p className="text-[11px] text-indigo-100 truncate">
+                    <p className="text-[11px] text-emerald-100 truncate">
                       Sistem Guru & Presensi
                     </p>
                   </div>
@@ -755,17 +753,18 @@ export default function App() {
               </div>
 
 
+
               {/* Class Info Box inside Drawer */}
-              <div className="p-4 bg-indigo-50/70 dark:bg-zinc-900/80 border-b border-indigo-100/50 dark:border-zinc-800">
+              <div className="p-4 bg-emerald-50/60 border-b border-emerald-100">
                 <div className="flex items-center justify-between gap-2">
                   <div className="truncate">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600 dark:text-indigo-400 block">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-700 block">
                       Kelas Aktif
                     </span>
-                    <p className="font-extrabold text-sm text-slate-900 dark:text-white truncate">
+                    <p className="font-extrabold text-sm text-slate-900 truncate">
                       {activeClass.namaKelas}
                     </p>
-                    <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">
+                    <p className="text-[11px] text-slate-500 truncate">
                       {activeClass.jurusan}
                     </p>
                   </div>
@@ -775,7 +774,7 @@ export default function App() {
                       setIsSideNavOpen(false);
                       setIsClassModalOpen(true);
                     }}
-                    className="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 transition shrink-0 cursor-pointer"
+                    className="px-2.5 py-1.5 rounded-lg bg-[#009B62] text-white text-[11px] font-bold hover:bg-[#008276] transition shrink-0 cursor-pointer"
                   >
                     Ganti
                   </button>
@@ -797,18 +796,18 @@ export default function App() {
                       }}
                       className={`w-full text-left p-3 rounded-2xl transition flex items-start gap-3 cursor-pointer ${
                         isActive
-                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 font-bold'
-                          : 'hover:bg-slate-100 dark:hover:bg-zinc-900 text-slate-700 dark:text-zinc-200'
+                          ? 'bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white shadow-md font-bold'
+                          : 'hover:bg-slate-100 text-slate-700'
                       }`}
                     >
-                      <div className={`p-2 rounded-xl shrink-0 ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400'}`}>
+                      <div className={`p-2 rounded-xl shrink-0 ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
                         <Icon className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-xs font-bold leading-tight ${isActive ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                        <p className={`text-xs font-bold leading-tight ${isActive ? 'text-white' : 'text-slate-900'}`}>
                           {item.label}
                         </p>
-                        <p className={`text-[10px] mt-0.5 truncate ${isActive ? 'text-indigo-100' : 'text-slate-400 dark:text-zinc-400'}`}>
+                        <p className={`text-[10px] mt-0.5 truncate ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>
                           {item.desc}
                         </p>
                       </div>
@@ -817,23 +816,23 @@ export default function App() {
                 })}
 
                 {/* Penanda Warna Cloud Supabase Aktif & Download Backup JSON */}
-                <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 my-2 space-y-2">
-                  <div className="p-3 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-between">
+                <div className="pt-2 border-t border-slate-100 my-2 space-y-2">
+                  <div className="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <span className="relative flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                       </span>
                       <div>
-                        <p className="text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                        <p className="text-xs font-bold text-emerald-900">
                           Cloud Supabase Aktif
                         </p>
-                        <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80">
+                        <p className="text-[10px] text-emerald-700/80">
                           PostgreSQL & Row Level Security
                         </p>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/70 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/70 text-emerald-800">
                       Aktif
                     </span>
                   </div>
@@ -844,32 +843,32 @@ export default function App() {
                       setIsSideNavOpen(false);
                       handleDownloadBackup();
                     }}
-                    className="w-full p-2.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                    className="w-full p-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
                     title="Download File Backup JSON Seluruh Data"
                   >
-                    <Download className="w-4 h-4" />
+                    <Download className="w-4 h-4 text-emerald-700" />
                     <span>Download Backup Data (JSON)</span>
                   </button>
                 </div>
               </div>
 
               {/* Drawer Footer: Profil Guru & Akun */}
-              <div className="p-3 border-t border-slate-100 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-950 space-y-2">
+              <div className="p-3 border-t border-slate-100 bg-slate-50/80 space-y-2">
                 <button
                   type="button"
                   onClick={() => {
                     setIsSideNavOpen(false);
                     setIsProfileModalOpen(true);
                   }}
-                  className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-white dark:bg-zinc-900 hover:bg-slate-100 dark:hover:bg-zinc-800 text-left transition border border-slate-200/80 dark:border-zinc-800 cursor-pointer shadow-2xs"
+                  className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-white hover:bg-slate-100 text-left transition border border-slate-200/80 cursor-pointer shadow-2xs"
                   title="Buka Pengaturan Profil Guru"
                 >
                   <div className="flex items-center gap-2.5 truncate">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#009B62] to-[#292E82] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
                       {activeTeacher.namaGuru.charAt(0)}
                     </div>
                     <div className="truncate">
-                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                      <p className="text-xs font-bold text-slate-900 truncate">
                         {activeTeacher.namaGuru}
                       </p>
                       <p className="text-[10px] text-slate-400 truncate">
@@ -1026,23 +1025,24 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 mt-12 py-8 text-center transition-colors">
+      {/* Footer inheriting Muhammadiyah Visual Identity */}
+      <footer className="bg-muh-footer border-t border-[#008276]/40 mt-12 py-8 text-center text-white shadow-lg transition-colors">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
-          <p className="font-black text-sm sm:text-base text-slate-900 dark:text-white tracking-wide uppercase">
+          <p className="font-black text-sm sm:text-base text-white tracking-wide uppercase drop-shadow-xs">
             &copy; SMK MUHAMMADIYAH BAWANG &bull; BATANG, JAWA TENGAH
           </p>
-          <p className="text-xs sm:text-sm font-bold text-indigo-700 dark:text-indigo-400">
+          <p className="text-xs sm:text-sm font-bold text-emerald-100">
             Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; Dikembangkan oleh{' '}
-            <span className="font-mono font-black text-slate-900 dark:text-white bg-indigo-100 dark:bg-indigo-900/80 px-2 py-0.5 rounded-md border border-indigo-300 dark:border-indigo-700">
+            <span className="font-mono font-black text-emerald-950 bg-white/95 px-2 py-0.5 rounded-md border border-white/50">
               @hndx07
             </span>
           </p>
-          <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 pt-0.5">
+          <p className="text-xs font-semibold text-emerald-100/90 pt-0.5">
             Backend Resmi 100% PostgreSQL & Auth Supabase Cloud (Row Level Security Aktif)
           </p>
         </div>
       </footer>
+
 
       {/* Modals */}
       <ClassManagementModal

@@ -30,7 +30,6 @@ import {
 import { getSafeSupabaseClient } from '../services/supabase';
 import { getPublicShare } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
-import { ThemeToggle } from './ThemeToggle';
 import { getKurikulumMerdekaAssessment } from '../utils/gradeCalculations';
 
 interface PublicSharePageProps {
@@ -501,8 +500,8 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         <div className="absolute inset-0 bg-transparent dark:bg-black/50 pointer-events-none" />
       </div>
 
-      {/* Official School Header - Modern Blue-to-Purple Gradient */}
-      <header className="relative z-20 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white shadow-lg sticky top-0 border-b border-indigo-900/40">
+      {/* Official School Header - Muhammadiyah Visual Identity Gradient */}
+      <header className="relative z-20 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white shadow-lg sticky top-0 border-b border-[#008276]/40">
         <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 truncate">
             <img
@@ -517,14 +516,13 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
               <h1 className="font-black text-sm sm:text-base leading-tight tracking-tight uppercase truncate">
                 {SCHOOL_CONFIG.namaSekolah}
               </h1>
-              <p className="text-[11px] text-indigo-100 truncate">
+              <p className="text-[11px] text-emerald-100 truncate">
                 Portal Informasi & Transparansi Akademik
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <ThemeToggle />
             <button
               type="button"
               onClick={handleCopyLink}
@@ -546,19 +544,19 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         </div>
 
         {/* Subheader: Address & Official URL */}
-        <div className="bg-indigo-950/60 border-t border-white/10 py-1.5 px-4 text-[11px] text-indigo-100">
+        <div className="bg-[#1c2363]/80 border-t border-white/10 py-1.5 px-4 text-[11px] text-emerald-100">
           <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <div className="flex items-center gap-1.5 truncate">
-              <MapPin className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
+              <MapPin className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
               <span className="truncate">{SCHOOL_CONFIG.alamat}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Globe className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
+              <Globe className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
               <a
                 href={SCHOOL_CONFIG.websiteUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-indigo-300 hover:underline"
+                className="text-emerald-200 hover:text-white hover:underline"
               >
                 {SCHOOL_CONFIG.website}
               </a>
@@ -817,15 +815,15 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                     </div>
 
                     {/* Tabel Peserta Didik Pada Sesi Terakhir */}
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
-                      <div className="p-4 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 flex items-center justify-between">
+                    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+                      <div className="p-4 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <UserCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
+                          <UserCheck className="w-4 h-4 text-emerald-200" />
+                          <h4 className="font-bold text-white text-xs uppercase tracking-wider">
                             Rincian Presensi Siswa: Pertemuan {currentSession.pertemuanKe}
                           </h4>
                         </div>
-                        <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                        <span className="text-xs font-mono font-bold text-emerald-950 bg-white/95 px-2.5 py-1 rounded-xl shadow-xs">
                           Tingkat Kehadiran: {currentSessionStats.rate}%
                         </span>
                       </div>
@@ -833,13 +831,14 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                       <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
                           <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                              <th className="py-3.5 px-3 text-center w-12">No</th>
-                              <th className="py-3.5 px-4 min-w-[200px]">Nama Peserta Didik</th>
-                              <th className="py-3.5 px-4 text-center w-36">Status Kehadiran</th>
-                              <th className="py-3.5 px-4 min-w-[180px]">Catatan / Keterangan</th>
+                            <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
+                              <th className="py-3.5 px-3 text-center w-12 text-white">No</th>
+                              <th className="py-3.5 px-4 min-w-[200px] text-white">Nama Peserta Didik</th>
+                              <th className="py-3.5 px-4 text-center w-36 text-white">Status Kehadiran</th>
+                              <th className="py-3.5 px-4 min-w-[180px] text-white">Catatan / Keterangan</th>
                             </tr>
                           </thead>
+
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {(data?.students || [])
                               .filter((s: any) =>
@@ -975,12 +974,12 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                 </div>
 
                 {/* Tabel Rekap Kumulatif Semua Pertemuan */}
-                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
-                  <div className="p-4 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 flex items-center justify-between">
-                    <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
+                <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+                  <div className="p-4 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white flex items-center justify-between">
+                    <h4 className="font-bold text-white text-xs uppercase tracking-wider">
                       Bilah Rekap Akumulasi Seluruh Pertemuan ({data?.sessions?.length || 0} Pertemuan)
                     </h4>
-                    <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 rounded-xl">
+                    <span className="text-xs font-mono font-bold text-emerald-950 bg-white/95 px-2.5 py-1 rounded-xl shadow-xs">
                       Rekap Total
                     </span>
                   </div>
@@ -988,17 +987,18 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                          <th className="py-3 px-3 text-center w-12">No</th>
-                          <th className="py-3 px-4 min-w-[190px]">Nama Peserta Didik</th>
-                          <th className="py-3 px-3 text-center w-14">Hadir</th>
-                          <th className="py-3 px-3 text-center w-14">Sakit</th>
-                          <th className="py-3 px-3 text-center w-14">Izin</th>
-                          <th className="py-3 px-3 text-center w-14">Alpa</th>
-                          <th className="py-3 px-3 text-center w-14">Dispen</th>
-                          <th className="py-3 px-4 text-center w-28">% Kehadiran</th>
+                        <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
+                          <th className="py-3 px-3 text-center w-12 text-white">No</th>
+                          <th className="py-3 px-4 min-w-[190px] text-white">Nama Peserta Didik</th>
+                          <th className="py-3 px-3 text-center w-14 text-white">Hadir</th>
+                          <th className="py-3 px-3 text-center w-14 text-white">Sakit</th>
+                          <th className="py-3 px-3 text-center w-14 text-white">Izin</th>
+                          <th className="py-3 px-3 text-center w-14 text-white">Alpa</th>
+                          <th className="py-3 px-3 text-center w-14 text-white">Dispen</th>
+                          <th className="py-3 px-4 text-center w-28 text-white">% Kehadiran</th>
                         </tr>
                       </thead>
+
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {(data?.students || [])
                           .filter((s: any) =>
@@ -1216,17 +1216,17 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
             </div>
 
             {/* Tabel Nilai Terisolasi Read-Only */}
-            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
-              <div className="p-4 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+              <div className="p-4 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
-                  <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm uppercase tracking-wider">
+                  <h3 className="font-bold text-white text-xs sm:text-sm uppercase tracking-wider">
                     Daftar Nilai Siswa (KKM: {data?.kkm || 75})
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-[11px] text-emerald-100">
                     Hanya nilai yang sudah diinput saja yang dihitung kedalam Total Sum & Rata-rata.
                   </p>
                 </div>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                <span className="text-[11px] text-emerald-100 font-mono">
                   Menampilkan {filteredComputedGrades.length} dari {computedGrades.length} siswa
                 </span>
               </div>
@@ -1234,49 +1234,50 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                      <th className="py-3 px-3 text-center w-12 sticky left-0 bg-slate-50 dark:bg-slate-850 z-10">No</th>
-                      <th className="py-3 px-4 min-w-[200px] sticky left-12 bg-slate-50 dark:bg-slate-850 z-10">Nama Peserta Didik</th>
+                    <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white text-[11px] font-bold uppercase tracking-wider">
+                      <th className="py-3 px-3 text-center w-12 sticky left-0 bg-[#009B62] text-white z-10">No</th>
+                      <th className="py-3 px-4 min-w-[200px] sticky left-12 bg-[#008276] text-white z-10">Nama Peserta Didik</th>
                       
                       {gradeViewMode === 'detailed' ? (
                         <>
                           {activeGradeColumns.map((col: any) => (
-                            <th key={col.key} className="py-3 px-3 text-center w-16 whitespace-nowrap">
+                            <th key={col.key} className="py-3 px-3 text-center w-16 whitespace-nowrap text-white">
                               {col.label}
                             </th>
                           ))}
-                          <th className="py-3 px-3 text-center w-20">Rata Formatif</th>
-                          <th className="py-3 px-3 text-center w-16">STS</th>
-                          <th className="py-3 px-3 text-center w-16">SAS</th>
+                          <th className="py-3 px-3 text-center w-20 text-white">Rata Formatif</th>
+                          <th className="py-3 px-3 text-center w-16 text-white">STS</th>
+                          <th className="py-3 px-3 text-center w-16 text-white">SAS</th>
                           <th
-                            className="py-3 px-3 text-center w-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 font-bold"
+                            className="py-3 px-3 text-center w-20 bg-white/15 text-white font-bold"
                             title="Hanya nilai yang sudah diinput saja yang dihitung kedalam total sum"
                           >
                             Total Sum
                           </th>
-                          <th className="py-3 px-4 text-center w-24 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white font-black shadow-xs">Nilai Akhir</th>
-                          <th className="py-3 px-3 text-center w-16">Predikat</th>
-                          <th className="py-3 px-4 text-center w-28">Status</th>
+                          <th className="py-3 px-4 text-center w-24 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white font-black shadow-xs">Nilai Akhir</th>
+                          <th className="py-3 px-3 text-center w-16 text-white">Predikat</th>
+                          <th className="py-3 px-4 text-center w-28 text-white">Status</th>
                         </>
                       ) : (
                         <>
                           <th
-                            className="py-3 px-3 text-center w-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-300 font-bold"
+                            className="py-3 px-3 text-center w-20 bg-white/15 text-white font-bold"
                             title="Hanya nilai yang sudah diinput saja yang dihitung kedalam total sum"
                           >
                             Total Sum
                           </th>
-                          <th className="py-3 px-3 text-center w-20">Rata Formatif</th>
-                          <th className="py-3 px-3 text-center w-16">STS</th>
-                          <th className="py-3 px-3 text-center w-16">SAS</th>
-                          <th className="py-3 px-4 text-center w-24 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white font-black shadow-xs">Nilai Akhir</th>
-                          <th className="py-3 px-3 text-center w-16">Predikat</th>
-                          <th className="py-3 px-4 text-center w-28">Status</th>
-                          <th className="py-3 px-3 text-center w-24">Rapor</th>
+                          <th className="py-3 px-3 text-center w-20 text-white">Rata Formatif</th>
+                          <th className="py-3 px-3 text-center w-16 text-white">STS</th>
+                          <th className="py-3 px-3 text-center w-16 text-white">SAS</th>
+                          <th className="py-3 px-4 text-center w-24 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white font-black shadow-xs">Nilai Akhir</th>
+                          <th className="py-3 px-3 text-center w-16 text-white">Predikat</th>
+                          <th className="py-3 px-4 text-center w-28 text-white">Status</th>
+                          <th className="py-3 px-3 text-center w-24 text-white">Rapor</th>
                         </>
                       )}
                     </tr>
                   </thead>
+
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {filteredComputedGrades.length > 0 ? (
                       filteredComputedGrades.map((item: any, idx: number) => {

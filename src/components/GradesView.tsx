@@ -934,25 +934,25 @@ export const GradesView: React.FC<GradesViewProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white font-bold uppercase tracking-wider shadow-xs">
-                <th className="py-3 px-3 text-center w-10 sticky left-0 bg-blue-700 text-white z-10 border-r border-indigo-500/40">No</th>
-                <th className="py-3 px-3 min-w-[180px] sticky left-10 bg-indigo-700 text-white z-10 border-r border-indigo-500/40">Nama Siswa</th>
+              <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white font-bold uppercase tracking-wider shadow-xs">
+                <th className="py-3 px-3 text-center w-10 sticky left-0 bg-[#009B62] text-white z-10 border-r border-[#008276]/40">No</th>
+                <th className="py-3 px-3 min-w-[180px] sticky left-10 bg-[#008276] text-white z-10 border-r border-[#008276]/40">Nama Siswa</th>
                 
                 {/* Formatif TP Columns */}
                 {gradeColumns.slice(0, activeColumnsCount).map((col, idx) => (
-                  <th key={col.id} className="py-2 px-1 text-center w-16 border-r border-indigo-500/30 font-medium text-[11px] text-white">
+                  <th key={col.id} className="py-2 px-1 text-center w-16 border-r border-white/20 font-medium text-[11px] text-white">
                     <div className="font-bold text-white">TP {idx + 1}</div>
-                    <div className="text-[9px] text-indigo-200 truncate max-w-[60px]" title={col.label}>
+                    <div className="text-[9px] text-emerald-100 truncate max-w-[60px]" title={col.label}>
                       {col.label}
                     </div>
                   </th>
                 ))}
 
-                <th className="py-3 px-2 text-center w-16 bg-white/10 text-white border-r border-indigo-500/30">STS</th>
-                <th className="py-3 px-2 text-center w-16 bg-white/10 text-white border-r border-indigo-500/30">SAS</th>
-                <th className="py-3 px-2 text-center w-16 bg-white/15 text-white border-r border-indigo-500/30 font-bold" title="Hanya nilai yang sudah diinput saja yang dihitung kedalam total sum">Total Sum</th>
-                <th className="py-3 px-2 text-center w-16 bg-white/20 text-white border-r border-indigo-500/30 font-bold">Nilai Akhir</th>
-                <th className="py-3 px-2 text-center w-20 bg-white/20 text-white border-r border-indigo-500/30 font-bold">Predikat</th>
+                <th className="py-3 px-2 text-center w-16 bg-white/10 text-white border-r border-white/20">STS</th>
+                <th className="py-3 px-2 text-center w-16 bg-white/10 text-white border-r border-white/20">SAS</th>
+                <th className="py-3 px-2 text-center w-16 bg-white/15 text-white border-r border-white/20 font-bold" title="Hanya nilai yang sudah diinput saja yang dihitung kedalam total sum">Total Sum</th>
+                <th className="py-3 px-2 text-center w-16 bg-white/20 text-white border-r border-white/20 font-bold">Nilai Akhir</th>
+                <th className="py-3 px-2 text-center w-20 bg-white/20 text-white border-r border-white/20 font-bold">Predikat</th>
                 <th className="py-3 px-3 min-w-[260px] text-white">Catatan Capaian Kompetensi (Kurikulum Merdeka)</th>
               </tr>
             </thead>

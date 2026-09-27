@@ -17,7 +17,6 @@ import {
   getSupabaseUrl,
   isValidHttpUrl,
 } from '../services/supabase';
-import { ThemeToggle } from './ThemeToggle';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface LoginViewProps {
@@ -167,20 +166,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <span>Video Smart Classroom</span>
             <ExternalLink className="w-3 h-3 text-slate-300" />
           </a>
-
-          <ThemeToggle />
         </div>
       </div>
 
       {/* Center Auth Card with Opacity 0.5 and Background Image 44857.png */}
       <div className="relative z-10 max-w-md w-full mx-auto my-auto py-6">
-        <div className="relative overflow-hidden rounded-3xl p-7 sm:p-8 shadow-2xl border border-white/60 dark:border-white/20 space-y-6 backdrop-blur-md bg-white/50 dark:bg-black/50">
+        <div className="relative overflow-hidden rounded-3xl p-7 sm:p-8 shadow-2xl border border-white/60 space-y-6 backdrop-blur-md bg-white/70">
           {/* Background Image (44857.png) inside the login form */}
           <div className="absolute inset-0 pointer-events-none z-0 flex items-center justify-center overflow-hidden">
             <img
               src={SCHOOL_CONFIG.bgImageUrl}
               alt="Latar Belakang Form Login SMK Muhiba"
-              className="w-3/4 max-h-[70%] object-contain opacity-25 dark:opacity-30 select-none filter drop-shadow-md"
+              className="w-3/4 max-h-[70%] object-contain opacity-25 select-none filter drop-shadow-md"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.bgImageFallback;
               }}
@@ -191,7 +188,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           <div className="relative z-10 space-y-6">
             {/* Header with School Logo */}
             <div className="text-center space-y-2">
-              <div className="w-16 h-16 rounded-2xl bg-white/80 dark:bg-zinc-900/80 border border-indigo-100 dark:border-zinc-700 flex items-center justify-center mx-auto shadow-xs p-2">
+              <div className="w-16 h-16 rounded-2xl bg-white/90 border border-slate-200 flex items-center justify-center mx-auto shadow-xs p-2">
                 <img
                   src={SCHOOL_CONFIG.logoUrl}
                   alt="Logo SMK"
@@ -202,10 +199,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 />
               </div>
               <div>
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">
                   Masuk Akun Guru
                 </h2>
-                <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1">
+                <p className="text-xs text-slate-600 font-medium mt-1">
                   SMK Muhammadiyah Bawang &bull; Presensi & Penilaian
                 </p>
               </div>
@@ -213,7 +210,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
             {/* Alert Error Messages */}
             {errorMessage && (
-              <div className="p-3.5 rounded-2xl bg-rose-50/90 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs flex items-start gap-2.5 animate-in fade-in">
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in">
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <p className="font-medium leading-relaxed">{errorMessage}</p>
@@ -285,7 +282,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-2xl font-bold text-xs transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 disabled:opacity-60"
+              className="w-full py-3 px-4 bg-[#009B62] hover:bg-[#008276] active:bg-[#292E82] text-white rounded-2xl font-bold text-xs transition shadow-lg shadow-[#009B62]/25 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
             >
               {isSubmitting ? (
                 <span>Memproses Masuk...</span>
@@ -298,8 +295,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             </button>
           </form>
 
-          <div className="pt-2 border-t border-slate-200/60 dark:border-zinc-800 text-center space-y-2">
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center justify-center gap-1 font-medium">
+          <div className="pt-2 border-t border-slate-200/60 text-center space-y-2">
+            <p className="text-[11px] text-slate-600 flex items-center justify-center gap-1 font-medium">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
               Keamanan dilindungi Row Level Security (RLS) PostgreSQL Supabase
             </p>
@@ -308,10 +305,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       </div>
     </div>
 
-      {/* Footer */}
-      <footer className="relative z-10 text-center text-xs text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] font-medium py-3">
-        &copy; SMK Muhammadiyah Bawang, Batang &bull; Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; developed by @hndx07
+      {/* Footer inheriting Muhammadiyah Visual Identity */}
+      <footer className="relative z-10 text-center text-xs text-white font-medium py-3.5 bg-muh-footer border-t border-white/20 shadow-lg">
+        &copy; SMK Muhammadiyah Bawang &bull; BATANG, JAWA TENGAH &bull; Dikembangkan oleh @hndx07
       </footer>
     </div>
   );
 };
+

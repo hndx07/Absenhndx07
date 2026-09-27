@@ -407,15 +407,15 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
       </div>
 
       {/* Recap Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="p-4 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-indigo-600" />
-            <h3 className="font-bold text-slate-800 dark:text-white text-sm">
+            <CalendarDays className="w-4 h-4 text-emerald-100" />
+            <h3 className="font-bold text-white text-sm">
               Daftar Rekap Kehadiran Peserta Didik ({studentRecap.length} Siswa)
             </h3>
           </div>
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-emerald-100 font-mono">
             Sumber Data: Cloud PostgreSQL Supabase
           </span>
         </div>
@@ -432,7 +432,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
+                <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
                   <th className="py-3 px-3 text-center w-12 text-white">No</th>
                   <th className="py-3 px-3 w-28 text-white">NISN</th>
                   <th className="py-3 px-3 min-w-[200px] text-white">Nama Siswa</th>
@@ -457,7 +457,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
                   <th className="py-3 px-3 text-center w-32 text-white">Keterangan</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-100">
                 {studentRecap.map((r, idx) => {
                   const isWarning = r.persentase < 75;
                   return (
@@ -465,9 +465,9 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
                       key={r.student.id}
                       className={`transition ${
                         idx % 2 === 0
-                          ? 'bg-white dark:bg-slate-900'
-                          : 'bg-blue-50/40 dark:bg-slate-800/60'
-                      } hover:bg-indigo-50/80 dark:hover:bg-indigo-950/60`}
+                          ? 'bg-white'
+                          : 'bg-emerald-50/20'
+                      } hover:bg-emerald-50/50`}
                     >
                       <td className="py-3 px-3 text-center font-mono font-bold text-slate-500">
                         {r.noUrut}
@@ -475,7 +475,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
                       <td className="py-3 px-3 font-mono text-[11px] text-slate-500">
                         {r.student.nisn || '-'}
                       </td>
-                      <td className="py-3 px-3 font-bold text-slate-800 dark:text-white">
+                      <td className="py-3 px-3 font-bold text-slate-800">
                         {r.student.nama}
                       </td>
                       <td className="py-3 px-3 text-center text-slate-500">

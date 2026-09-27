@@ -549,18 +549,18 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       {/* Active Session Info & Metrics Card */}
       {currentSession && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-2 bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-5 rounded-3xl shadow-sm flex flex-col justify-between">
+          <div className="md:col-span-2 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white p-5 rounded-3xl shadow-md flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="px-2.5 py-0.5 bg-indigo-500/30 border border-indigo-400/40 rounded-full text-[11px] font-bold text-indigo-200">
+                <span className="px-2.5 py-0.5 bg-white/20 border border-white/30 rounded-full text-[11px] font-bold text-emerald-100">
                   Pertemuan Ke-{currentSession.pertemuanKe}
                 </span>
-                <span className="text-xs text-slate-300 font-mono flex items-center gap-1">
+                <span className="text-xs text-emerald-100 font-mono flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
                   {currentSession.tanggal}
                 </span>
               </div>
-              <h3 className="font-bold text-base mt-2 leading-snug">
+              <h3 className="font-bold text-base mt-2 leading-snug text-white">
                 {currentSession.topikMateri || 'Tanpa topik materi'}
               </h3>
             </div>
@@ -684,7 +684,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
+                <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
                   <th className="py-3 px-3 text-center w-12 text-white">No</th>
                   <th className="py-3 px-3 min-w-[180px] text-white">Nama Peserta Didik</th>
                   <th className="py-3 px-3 text-center w-14 text-white">L/P</th>
@@ -692,7 +692,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   <th className="py-3 px-3 text-white">Keterangan / Alasan</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+              <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredStudents.map((std, idx) => {
                   const record = currentSession.records?.[std.id] || { status: 'H', catatan: '' };
                   const status = record.status;
@@ -702,18 +702,18 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                       key={std.id}
                       className={`transition ${
                         idx % 2 === 0
-                          ? 'bg-white dark:bg-slate-900'
-                          : 'bg-slate-50/90 dark:bg-slate-800/50'
-                      } hover:bg-indigo-50/70 dark:hover:bg-indigo-950/40`}
+                          ? 'bg-white'
+                          : 'bg-emerald-50/20'
+                      } hover:bg-emerald-50/50`}
                     >
-                      <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-600 dark:text-slate-400">
+                      <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-600">
                         {std.no}
                       </td>
-                      <td className="py-2.5 px-3 font-bold text-slate-800 dark:text-slate-200">
+                      <td className="py-2.5 px-3 font-bold text-slate-800">
                         {std.nama}
                       </td>
                       <td className="py-2.5 px-3 text-center">
-                        <span className="font-semibold text-slate-500 dark:text-slate-400">{std.gender}</span>
+                        <span className="font-semibold text-slate-500">{std.gender}</span>
                       </td>
                       <td className="py-2.5 px-3">
                         <div className="flex items-center justify-center gap-1.5">
