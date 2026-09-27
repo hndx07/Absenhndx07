@@ -11,6 +11,7 @@ import {
   TeacherProfile,
 } from '../types';
 import { triggerSafeDownload, ExportDownloadPayload } from '../components/ExportDownloadModal';
+import { getKurikulumMerdekaAssessment } from './gradeCalculations';
 
 // Helper to format safe filenames
 function sanitizeFileName(str: string, fallback = 'Dokumen'): string {
@@ -448,13 +449,12 @@ export function exportGradesToExcel(
 
     const finalScore = totalW > 0 ? Math.round(totalWeighted / totalW) : 0;
 
-    let predikat = '-';
-    if (hasAny) {
-      if (finalScore >= 90) predikat = 'A';
-      else if (finalScore >= 80) predikat = 'B';
-      else if (finalScore >= kkm) predikat = 'C';
-      else predikat = 'D';
-    }
+    const merdekaAssessment = getKurikulumMerdekaAssessment(
+      hasAny ? finalScore : null,
+      kkm,
+      subject,
+      std.nama
+    );
 
     const status = !hasAny ? '-' : finalScore >= kkm ? 'Tuntas' : 'Belum Tuntas';
 
@@ -469,9 +469,9 @@ export function exportGradesToExcel(
       sts !== null ? sts : '',
       sas !== null ? sas : '',
       hasAny ? finalScore : '',
-      predikat,
+      merdekaAssessment.predikat,
       status,
-      g?.catatan || '',
+      g?.catatan || (hasAny ? merdekaAssessment.deskripsi : ''),
     ];
   });
 
@@ -608,13 +608,12 @@ export function exportGradesToPDF(
     }
     const finalScore = totalW > 0 ? Math.round(totalWeighted / totalW) : 0;
 
-    let predikat = '-';
-    if (hasAny) {
-      if (finalScore >= 90) predikat = 'A';
-      else if (finalScore >= 80) predikat = 'B';
-      else if (finalScore >= kkm) predikat = 'C';
-      else predikat = 'D';
-    }
+    const merdekaAssessment = getKurikulumMerdekaAssessment(
+      hasAny ? finalScore : null,
+      kkm,
+      subject,
+      std.nama
+    );
 
     const status = !hasAny ? '-' : finalScore >= kkm ? 'Tuntas' : 'B.Tuntas';
 
@@ -629,7 +628,7 @@ export function exportGradesToPDF(
       sts !== null ? sts : '-',
       sas !== null ? sas : '-',
       hasAny ? finalScore : '-',
-      predikat,
+      merdekaAssessment.predikat,
       status,
     ];
   });

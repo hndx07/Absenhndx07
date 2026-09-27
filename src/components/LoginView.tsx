@@ -310,7 +310,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
       {/* Footer */}
       <footer className="relative z-10 text-center text-xs text-white/90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] font-medium py-3">
-        &copy; 2026 SMK Muhammadiyah Bawang, Batang &bull; Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; developed by @hndx07
+        &copy; SMK Muhammadiyah Bawang, Batang &bull; Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; developed by @hndx07
       </footer>
     </div>
   );

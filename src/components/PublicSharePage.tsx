@@ -31,6 +31,7 @@ import { getSafeSupabaseClient } from '../services/supabase';
 import { getPublicShare } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { ThemeToggle } from './ThemeToggle';
+import { getKurikulumMerdekaAssessment } from '../utils/gradeCalculations';
 
 interface PublicSharePageProps {
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
@@ -292,15 +293,12 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
 
       const finalScore = totalW > 0 ? Math.round(totalWeighted / totalW) : 0;
 
-      let predikat = '-';
-      if (hasAnyScore) {
-        if (finalScore >= 90) predikat = 'A';
-        else if (finalScore >= 80) predikat = 'B';
-        else if (finalScore >= kkm) predikat = 'C';
-        else predikat = 'D';
-      }
-
-      const isTuntas = hasAnyScore && finalScore >= kkm;
+      const merdekaAssessment = getKurikulumMerdekaAssessment(
+        hasAnyScore ? finalScore : null,
+        kkm,
+        data?.mataPelajaran || data?.namaKelas,
+        std.nama
+      );
 
       return {
         student: std,
@@ -313,8 +311,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         countInputted,
         hasAnyScore,
         finalScore,
-        predikat,
-        isTuntas,
+        predikat: merdekaAssessment.predikat,
+        predikatLabel: merdekaAssessment.predikatLabel,
+        merdekaDeskripsi: merdekaAssessment.deskripsi,
+        merdekaDeskripsiSingkat: merdekaAssessment.deskripsiSingkat,
+        isTuntas: merdekaAssessment.isTuntas,
       };
     });
   }, [classStudentsList, rawGradesList, data?.kkm]);
@@ -1643,14 +1644,14 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                   <div className="bg-slate-900 dark:bg-slate-950 text-white p-4 rounded-2xl flex items-center justify-between">
                     <div>
                       <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                        Nilai Akhir Rapor
+                        Nilai Akhir Rapor (Kurikulum Merdeka)
                       </span>
                       <div className="flex items-baseline gap-2 mt-0.5">
                         <span className="text-3xl font-black font-mono">
                           {selectedStudentGrade.hasAnyScore ? selectedStudentGrade.finalScore : '-'}
                         </span>
-                        <span className="px-2 py-0.5 rounded-md bg-white/10 text-xs font-mono font-bold">
-                          Predikat: {selectedStudentGrade.predikat}
+                        <span className="px-2.5 py-1 rounded-lg bg-white/10 text-xs font-mono font-bold">
+                          Predikat: {selectedStudentGrade.predikat} &bull; {selectedStudentGrade.predikatLabel || (selectedStudentGrade.predikat === 'A' ? 'Sangat Baik' : selectedStudentGrade.predikat === 'B' ? 'Baik' : selectedStudentGrade.predikat === 'C' ? 'Cukup' : 'Perlu Bimbingan')}
                         </span>
                       </div>
                     </div>
@@ -1673,6 +1674,16 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                         </span>
                       )}
                     </div>
+                  </div>
+
+                  {/* Deskripsi Otomatis Capaian Kompetensi Kurikulum Merdeka */}
+                  <div className="bg-indigo-50/70 dark:bg-zinc-900 p-4 rounded-2xl border border-indigo-100 dark:border-zinc-800 space-y-1.5">
+                    <span className="text-[10px] font-bold text-indigo-900 dark:text-indigo-400 uppercase tracking-wider block">
+                      Deskripsi Capaian Kompetensi
+                    </span>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                      {selectedStudentGrade.gradeRecord?.catatan || selectedStudentGrade.merdekaDeskripsi || 'Belum ada catatan capaian kompetensi.'}
+                    </p>
                   </div>
 
                   {/* Actions */}
@@ -1822,7 +1833,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       <footer className="text-center py-8 mt-10 border-t border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xs">
         <div className="max-w-5xl mx-auto px-4 space-y-2">
           <p className="font-black text-sm text-slate-900 dark:text-white uppercase tracking-wider">
-            &copy; 2026 {SCHOOL_CONFIG.namaSekolah} &bull; BATANG, JAWA TENGAH
+            &copy; {SCHOOL_CONFIG.namaSekolah} &bull; BATANG, JAWA TENGAH
           </p>
           <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
             {SCHOOL_CONFIG.alamat} &bull; Portal Resmi:{' '}

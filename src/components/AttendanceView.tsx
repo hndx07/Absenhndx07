@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Calendar,
   Plus,
@@ -89,13 +89,53 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
-  // Selected session for editing records
-  const currentSession = classSessions.find((s) => s.id === activeSessionId) || classSessions[0];
+  // Optimistic local sessions state for ZERO-DELAY instant click responsiveness
+  const [localSessions, setLocalSessions] = useState<Record<string, AttendanceSession>>({});
+  const saveDebounceTimerRef = useRef<any>(null);
+
+  // Sync prop classSessions into localSessions when classSessions change
+  useEffect(() => {
+    setLocalSessions((prev) => {
+      const next = { ...prev };
+      classSessions.forEach((s) => {
+        if (!next[s.id]) {
+          next[s.id] = s;
+        } else {
+          // Merge while preserving local edits
+          next[s.id] = { ...s, ...next[s.id] };
+        }
+      });
+      return next;
+    });
+  }, [classSessions]);
+
+  // Selected session for editing records (reads from optimistic local state first)
+  const currentSession: AttendanceSession | undefined =
+    localSessions[activeSessionId] ||
+    classSessions.find((s) => s.id === activeSessionId) ||
+    classSessions[0];
+
+  // Background debounced cloud sync (prevents network wait and race conditions)
+  const scheduleSessionCloudSave = (sessionToSave: AttendanceSession) => {
+    setHasUnsavedChanges(true);
+    if (saveDebounceTimerRef.current) {
+      clearTimeout(saveDebounceTimerRef.current);
+    }
+    saveDebounceTimerRef.current = setTimeout(async () => {
+      try {
+        await onSaveSession(sessionToSave);
+        setHasUnsavedChanges(false);
+      } catch (err) {
+        console.error('Failed to sync attendance session:', err);
+      }
+    }, 450);
+  };
 
   // Explicit Save to Cloud function
   const handleSaveToCloud = async (overrideSession?: AttendanceSession) => {
     const targetSession = overrideSession || currentSession;
     if (!targetSession) return;
+    if (saveDebounceTimerRef.current) clearTimeout(saveDebounceTimerRef.current);
     setIsSavingToCloud(true);
     setSaveSuccessMsg(null);
     try {
@@ -116,11 +156,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     }
   };
 
-  // Helper to change status for a student in current session
+  // Helper to change status for a student in current session - ZERO DELAY INSTANT CLICK
   const handleUpdateRecord = (studentId: string, status: AttendanceStatus, catatan?: string) => {
     if (!currentSession) return;
     const existingRecords = currentSession.records || {};
-    const updated = {
+    const updated: AttendanceSession = {
       ...currentSession,
       records: {
         ...existingRecords,
@@ -130,11 +170,15 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         },
       },
     };
-    setHasUnsavedChanges(true);
-    onSaveSession(updated);
+
+    // 1. Instant optimistic local update - UI updates in 0 milliseconds
+    setLocalSessions((prev) => ({ ...prev, [updated.id]: updated }));
+
+    // 2. Debounced background save to Cloud - no network blocking or race conditions
+    scheduleSessionCloudSave(updated);
   };
 
-  // Set All Present shortcut
+  // Set All Present shortcut - ZERO DELAY
   const handleSetAllPresent = () => {
     if (!currentSession) return;
     const records: Record<string, { status: AttendanceStatus; catatan: string }> = {};
@@ -144,12 +188,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         catatan: currentSession.records?.[std.id]?.catatan || '',
       };
     });
-    const updated = {
+    const updated: AttendanceSession = {
       ...currentSession,
       records,
     };
-    setHasUnsavedChanges(true);
-    onSaveSession(updated);
+    setLocalSessions((prev) => ({ ...prev, [updated.id]: updated }));
+    scheduleSessionCloudSave(updated);
   };
 
   const handleCreateSession = (e: React.FormEvent) => {

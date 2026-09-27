@@ -20,6 +20,7 @@ import {
   X,
   Eye,
   EyeOff,
+  Download,
 } from 'lucide-react';
 import { SCHOOL_CONFIG } from './config/schoolConfig';
 
@@ -74,7 +75,6 @@ import { exportDataToJsonBackup } from './utils/storage';
 // Components
 import { LoginView } from './components/LoginView';
 import { ClassManagementModal } from './components/ClassManagementModal';
-import { CloudSupabaseModal } from './components/CloudSupabaseModal';
 import { TeacherProfileModal } from './components/TeacherProfileModal';
 import { PublicSharePage } from './components/PublicSharePage';
 import { AttendanceView } from './components/AttendanceView';
@@ -212,7 +212,6 @@ export default function App() {
     UiStatePersistence.set('activeTab', tab);
   };
 
-  const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSideNavOpen, setIsSideNavOpen] = useState(false);
@@ -694,8 +693,29 @@ export default function App() {
               </button>
             </div>
 
-            {/* Pilihan Dark/Light Mode (Hanya Simbol Tanpa Tulisan) */}
+            {/* Penanda Cloud Supabase Aktif, Tombol Backup JSON & Pilihan Dark/Light Mode */}
             <div className="flex items-center gap-2 shrink-0">
+              <div
+                className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 text-xs font-bold shadow-2xs"
+                title="Database PostgreSQL Supabase Cloud Aktif & Sinkron (RLS)"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>Cloud Supabase Aktif</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleDownloadBackup}
+                className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-bold transition cursor-pointer border border-slate-200 dark:border-zinc-700 shadow-2xs"
+                title="Download backup file JSON seluruh data"
+              >
+                <Download className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span className="hidden sm:inline">Backup JSON</span>
+              </button>
+
               <ThemeToggle />
             </div>
           </div>
@@ -806,32 +826,39 @@ export default function App() {
                   );
                 })}
 
-                {/* Navigasi Cloud Supabase di Navbar */}
-                <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 my-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSideNavOpen(false);
-                      setIsCloudModalOpen(true);
-                    }}
-                    className="w-full text-left p-3 rounded-2xl transition flex items-center justify-between gap-3 bg-emerald-50/70 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70 text-emerald-900 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/60 cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
-                        <Cloud className="w-4 h-4" />
-                      </div>
+                {/* Penanda Warna Cloud Supabase Aktif & Download Backup JSON */}
+                <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 my-2 space-y-2">
+                  <div className="p-3 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                      </span>
                       <div>
-                        <p className="text-xs font-bold leading-tight">
-                          Cloud Database Supabase
+                        <p className="text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                          Cloud Supabase Aktif
                         </p>
-                        <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80 mt-0.5">
-                          Status PostgreSQL, Auth & Migrasi
+                        <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80">
+                          PostgreSQL & Row Level Security
                         </p>
                       </div>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/70 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200">
-                      Status
+                      Aktif
                     </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSideNavOpen(false);
+                      handleDownloadBackup();
+                    }}
+                    className="w-full p-2.5 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                    title="Download File Backup JSON Seluruh Data"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Backup Data (JSON)</span>
                   </button>
                 </div>
               </div>
@@ -1013,7 +1040,7 @@ export default function App() {
       <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 mt-12 py-8 text-center transition-colors">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p className="font-black text-sm sm:text-base text-slate-900 dark:text-white tracking-wide uppercase">
-            &copy; 2026 SMK MUHAMMADIYAH BAWANG &bull; BATANG, JAWA TENGAH
+            &copy; SMK MUHAMMADIYAH BAWANG &bull; BATANG, JAWA TENGAH
           </p>
           <p className="text-xs sm:text-sm font-bold text-indigo-700 dark:text-indigo-400">
             Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; Dikembangkan oleh{' '}
@@ -1022,7 +1049,7 @@ export default function App() {
             </span>
           </p>
           <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 pt-0.5">
-            Backend Resmi 100% PostgreSQL & Auth Supabase Cloud (Row Level Security Aktif) &bull; Tahun Ajaran 2025/2026
+            Backend Resmi 100% PostgreSQL & Auth Supabase Cloud (Row Level Security Aktif)
           </p>
         </div>
       </footer>
@@ -1038,11 +1065,7 @@ export default function App() {
         onDeleteClass={handleDeleteClass}
       />
 
-      <CloudSupabaseModal
-        isOpen={isCloudModalOpen}
-        onClose={() => setIsCloudModalOpen(false)}
-        onSyncComplete={() => loadUserData(activeClassId)}
-      />
+
 
       <TeacherProfileModal
         isOpen={isProfileModalOpen}
