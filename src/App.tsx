@@ -1,0 +1,1074 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  CalendarCheck,
+  Award,
+  Users,
+  BookMarked,
+  Wallet,
+  BarChart3,
+  MessageSquare,
+  MapPin,
+  Cloud,
+  RefreshCw,
+  Settings,
+  ChevronDown,
+  GraduationCap,
+  AlertCircle,
+  LogOut,
+  FileCheck,
+  Menu,
+  X,
+  Eye,
+  EyeOff,
+  Download,
+} from 'lucide-react';
+import { SCHOOL_CONFIG } from './config/schoolConfig';
+
+// Supabase Services
+import {
+  getAuthSession,
+  getSafeSupabaseClient,
+  signOutSupabase,
+  checkSupabaseConnection,
+} from './services/supabase';
+import {
+  getTeacherProfile,
+  createOrUpdateTeacherProfile,
+  getClasses,
+  createClass,
+  updateClass,
+  deleteClass,
+  getStudents,
+  createStudent,
+  updateStudent,
+  deleteStudent,
+  batchInsertStudents,
+  getAttendanceSessions,
+  saveAttendanceSession,
+  deleteAttendanceSession,
+  getStudentGrades,
+  saveStudentGrade,
+  getGradeColumns,
+  saveGradeColumns,
+  getTeachingAgendas,
+  saveTeachingAgenda,
+  deleteTeachingAgenda,
+  getSavingTransactions,
+  saveSavingTransaction,
+  deleteSavingTransaction,
+} from './services/data';
+
+// Types
+import {
+  TeacherProfile,
+  ClassRoom,
+  Student,
+  AttendanceSession,
+  StudentGrade,
+  GradeColumn,
+  TeachingAgenda,
+  SavingTransaction,
+} from './types';
+import { UiStatePersistence, SafeCache } from './utils/storageCache';
+import { exportDataToJsonBackup } from './utils/storage';
+
+// Components
+import { LoginView } from './components/LoginView';
+import { ClassManagementModal } from './components/ClassManagementModal';
+import { TeacherProfileModal } from './components/TeacherProfileModal';
+import { PublicSharePage } from './components/PublicSharePage';
+import { AttendanceView } from './components/AttendanceView';
+import { GradesView } from './components/GradesView';
+import { StudentManagementView } from './components/StudentManagementView';
+import { TeachingAgendaView } from './components/TeachingAgendaView';
+import { SavingsView } from './components/SavingsView';
+import { StatisticsView } from './components/StatisticsView';
+import { ParentReportView } from './components/ParentReportView';
+import { SchoolMapView } from './components/SchoolMapView';
+import { MonthlyAttendanceRecapView } from './components/MonthlyAttendanceRecapView';
+
+type NavTab =
+
+  | 'attendance'
+  | 'recap'
+  | 'grades'
+  | 'students'
+  | 'agendas'
+  | 'savings'
+  | 'statistics'
+  | 'parent_report'
+  | 'school_map';
+
+const NAV_ITEMS = [
+  { id: 'attendance', label: 'Presensi Siswa', icon: CalendarCheck, desc: 'Input kehadiran harian siswa' },
+  { id: 'recap', label: 'Rekap Absensi', icon: FileCheck, desc: 'Rekap bulanan, cetak & ekspor Excel' },
+  { id: 'grades', label: 'Penilaian & KKM', icon: Award, desc: 'Asesmen sumatif & formatif' },
+  { id: 'students', label: 'Data Peserta Didik', icon: Users, desc: 'Kelola siswa & impor Excel' },
+  { id: 'agendas', label: 'Buku Jurnal Guru', icon: BookMarked, desc: 'Catatan agenda kegiatan KBM' },
+  { id: 'savings', label: 'Tabungan & Kas', icon: Wallet, desc: 'Buku kas & tabungan kelas' },
+  { id: 'statistics', label: 'Statistik & Resume', icon: BarChart3, desc: 'Grafik & ringkasan analitik' },
+  { id: 'parent_report', label: 'Laporan WhatsApp Wali', icon: MessageSquare, desc: 'Kirim rekap ke orang tua' },
+  { id: 'school_map', label: 'Peta Kampus', icon: MapPin, desc: 'Profil & lokasi SMK Muhiba' },
+];
+
+function parsePublicShareFromUrl(): {
+  type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
+  shareId: string;
+} | null {
+  if (typeof window === 'undefined') return null;
+
+  const checkParams = (params: URLSearchParams) => {
+    if (params.get('nilai_share')) {
+      return { type: 'nilai' as const, shareId: params.get('nilai_share')! };
+    }
+    if (params.get('absen_share')) {
+      return { type: 'absen' as const, shareId: params.get('absen_share')! };
+    }
+    if (params.get('tabungan_share')) {
+      return { type: 'tabungan' as const, shareId: params.get('tabungan_share')! };
+    }
+    if (params.get('agenda_share')) {
+      return { type: 'agenda' as const, shareId: params.get('agenda_share')! };
+    }
+    // Generic fallback for links like ?share=... or ?share_id=...
+    const genericShare = params.get('share') || params.get('share_id');
+    if (genericShare) {
+      let detectedType: 'absen' | 'nilai' | 'tabungan' | 'agenda' = 'nilai';
+      if (genericShare.startsWith('att_') || genericShare.includes('absen')) detectedType = 'absen';
+      else if (genericShare.startsWith('sav_') || genericShare.includes('tabungan')) detectedType = 'tabungan';
+      else if (genericShare.startsWith('age_') || genericShare.includes('agenda')) detectedType = 'agenda';
+      return { type: detectedType, shareId: genericShare };
+    }
+    return null;
+  };
+
+  // 1. Search in window.location.search
+  const fromSearch = checkParams(new URLSearchParams(window.location.search));
+  if (fromSearch) return fromSearch;
+
+  // 2. Search in window.location.hash if present
+  if (window.location.hash && window.location.hash.includes('?')) {
+    const hashQuery = window.location.hash.slice(window.location.hash.indexOf('?') + 1);
+    const fromHash = checkParams(new URLSearchParams(hashQuery));
+    if (fromHash) return fromHash;
+  }
+
+  return null;
+}
+
+export default function App() {
+  // 1. Check for Public Share parameters in URL (accessible without auth)
+  const [publicShare, setPublicShare] = useState<{
+    type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
+    shareId: string;
+  } | null>(() => parsePublicShareFromUrl());
+
+  // Listen for navigation or URL query updates
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const parsed = parsePublicShareFromUrl();
+      if (parsed) {
+        setPublicShare(parsed);
+      }
+    };
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
+
+  // 2. Auth Session State (Source of Truth)
+  const [session, setSession] = useState<any>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+
+  // 3. Database State from Supabase
+  const [teacher, setTeacher] = useState<TeacherProfile | null>(null);
+  const [classes, setClasses] = useState<ClassRoom[]>([]);
+  const [activeClassId, setActiveClassIdState] = useState<string>(() =>
+    UiStatePersistence.get('activeClassId', '')
+  );
+  const setActiveClassId = (clsId: string) => {
+    setActiveClassIdState(clsId);
+    UiStatePersistence.set('activeClassId', clsId);
+  };
+
+  const [students, setStudents] = useState<Student[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceSession[]>([]);
+  const [grades, setGrades] = useState<StudentGrade[]>([]);
+  const [gradeColumns, setGradeColumns] = useState<GradeColumn[]>([]);
+  const [agendas, setAgendas] = useState<TeachingAgenda[]>([]);
+  const [savings, setSavings] = useState<SavingTransaction[]>([]);
+
+  // 4. UI States with safe persistence
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [activeTab, setActiveTabState] = useState<NavTab>(() =>
+    UiStatePersistence.get<NavTab>('activeTab', 'attendance')
+  );
+  const setActiveTab = (tab: NavTab) => {
+    setActiveTabState(tab);
+    UiStatePersistence.set('activeTab', tab);
+  };
+
+  const [isClassModalOpen, setIsClassModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isSideNavOpen, setIsSideNavOpen] = useState(false);
+
+  const toggleSideNav = () => {
+    setIsSideNavOpen((prev) => !prev);
+  };
+
+  // Load all user data from Supabase
+  const loadUserData = useCallback(async (targetClassId?: string) => {
+    setIsLoadingData(true);
+    setDataError(null);
+
+    try {
+      // 1. Fetch / initialize teacher profile
+      let profile = await getTeacherProfile();
+      if (!profile) {
+        profile = await createOrUpdateTeacherProfile({
+          namaGuru: 'Guru SMK Muhammadiyah Bawang',
+          namaSekolah: 'SMK Muhammadiyah Bawang',
+          mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
+          tahunAjaran: '2025/2026',
+          semester: 'Genap',
+        });
+      }
+      setTeacher(profile);
+
+      // 2. Fetch classes (live from Supabase)
+      const loadedClasses = await getClasses();
+      setClasses(loadedClasses);
+      SafeCache.set('all_classes', loadedClasses);
+
+      // Determine active class
+      let currentClassId = targetClassId || activeClassId || profile.activeClassId || '';
+      if (!currentClassId && loadedClasses.length > 0) {
+        currentClassId = loadedClasses[0].id;
+      }
+      if (currentClassId) {
+        setActiveClassId(currentClassId);
+      }
+
+      // 3. Fetch all teaching agendas (Decoupled from active class: User requirement 1, 2, 3)
+      const loadedAgendas = await getTeachingAgendas();
+      setAgendas(loadedAgendas);
+      SafeCache.set('all_agendas', loadedAgendas);
+
+      // 4. Fetch class-specific records
+      if (currentClassId) {
+        const [
+          loadedStudents,
+          loadedAttendance,
+          loadedGrades,
+          loadedGradeCols,
+          loadedSavings,
+        ] = await Promise.all([
+          getStudents(currentClassId),
+          getAttendanceSessions(currentClassId),
+          getStudentGrades(currentClassId),
+          getGradeColumns(currentClassId),
+          getSavingTransactions(currentClassId),
+        ]);
+
+        setStudents(loadedStudents);
+        setAttendance(loadedAttendance);
+        setGrades(loadedGrades);
+        setGradeColumns(loadedGradeCols);
+        setSavings(loadedSavings);
+
+        SafeCache.set(`class_data_${currentClassId}`, {
+          students: loadedStudents,
+          attendance: loadedAttendance,
+          grades: loadedGrades,
+          gradeColumns: loadedGradeCols,
+          savings: loadedSavings,
+        });
+      } else {
+        setStudents([]);
+        setAttendance([]);
+        setGrades([]);
+        setGradeColumns([]);
+        setSavings([]);
+      }
+    } catch (err: any) {
+      console.error('Error loading data from Supabase:', err);
+      setDataError(
+        err?.message ||
+          'Tidak dapat terhubung ke server PostgreSQL Supabase. Periksa koneksi internet Anda.'
+      );
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, [activeClassId]);
+
+  // Check auth session on startup & subscribe to auth changes
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initAuth() {
+      try {
+        const currentSession = await getAuthSession();
+        if (isMounted) {
+          setSession(currentSession);
+          setIsAuthChecking(false);
+          if (currentSession) {
+            loadUserData();
+          }
+        }
+      } catch (err) {
+        console.error('Session check error:', err);
+        if (isMounted) {
+          setIsAuthChecking(false);
+        }
+      }
+    }
+
+    initAuth();
+
+    // Supabase Auth State Change Listener
+    const supabase = getSafeSupabaseClient();
+    if (supabase) {
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+        if (!isMounted) return;
+
+        setSession(newSession);
+        setIsAuthChecking(false);
+
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+          if (newSession) {
+            loadUserData();
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setTeacher(null);
+          setClasses([]);
+          setStudents([]);
+          setAttendance([]);
+          setGrades([]);
+          setAgendas([]);
+          setSavings([]);
+        }
+      });
+
+      return () => {
+        isMounted = false;
+        subscription.unsubscribe();
+      };
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadUserData]);
+
+  // Handle active class change with cache-first and background sync
+  const handleSelectClass = async (clsId: string) => {
+    setActiveClassId(clsId);
+    if (teacher) {
+      const updated = { ...teacher, activeClassId: clsId };
+      setTeacher(updated);
+      createOrUpdateTeacherProfile({ activeClassId: clsId }).catch(console.error);
+    }
+
+    // Check safe cache first for instant switch without UI blocking
+    const cached = SafeCache.get<any>(`class_data_${clsId}`);
+    if (cached) {
+      setStudents(cached.students || []);
+      setAttendance(cached.attendance || []);
+      setGrades(cached.grades || []);
+      setGradeColumns(cached.gradeColumns || []);
+      setSavings(cached.savings || []);
+    } else {
+      setIsLoadingData(true);
+    }
+
+    try {
+      const [
+        loadedStudents,
+        loadedAttendance,
+        loadedGrades,
+        loadedGradeCols,
+        loadedSavings,
+      ] = await Promise.all([
+        getStudents(clsId),
+        getAttendanceSessions(clsId),
+        getStudentGrades(clsId),
+        getGradeColumns(clsId),
+        getSavingTransactions(clsId),
+      ]);
+
+      setStudents(loadedStudents);
+      setAttendance(loadedAttendance);
+      setGrades(loadedGrades);
+      setGradeColumns(loadedGradeCols);
+      setSavings(loadedSavings);
+
+      SafeCache.set(`class_data_${clsId}`, {
+        students: loadedStudents,
+        attendance: loadedAttendance,
+        grades: loadedGrades,
+        gradeColumns: loadedGradeCols,
+        savings: loadedSavings,
+      });
+    } catch (e: any) {
+      console.error('Error switching class data:', e);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  // 1. Classes Handlers
+  const handleSaveClass = async (cls: ClassRoom) => {
+    const exists = classes.some((c) => c.id === cls.id);
+    if (exists) {
+      const updated = await updateClass(cls);
+      setClasses((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    } else {
+      const created = await createClass(cls);
+      setClasses((prev) => [...prev, created]);
+      if (!activeClassId) {
+        handleSelectClass(created.id);
+      }
+    }
+    SafeCache.invalidate('all_classes');
+  };
+
+  const handleDeleteClass = async (clsId: string) => {
+    await deleteClass(clsId);
+    const updated = classes.filter((c) => c.id !== clsId);
+    setClasses(updated);
+    SafeCache.invalidate(`class_data_${clsId}`);
+    SafeCache.invalidate('all_classes');
+
+    if (activeClassId === clsId) {
+      if (updated.length > 0) {
+        handleSelectClass(updated[0].id);
+      } else {
+        setActiveClassId('');
+        setStudents([]);
+        setAttendance([]);
+        setGrades([]);
+      }
+    }
+  };
+
+  // 2. Students Handlers
+  const handleSaveStudent = async (std: Student) => {
+    const exists = students.some((s) => s.id === std.id);
+    if (exists) {
+      const updated = await updateStudent(std);
+      setStudents((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    } else {
+      const created = await createStudent(std);
+      setStudents((prev) => [...prev, created]);
+    }
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+  };
+
+  const handleDeleteStudent = async (stdId: string) => {
+    await deleteStudent(stdId);
+    setStudents((prev) => prev.filter((s) => s.id !== stdId));
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+  };
+
+  const handleBatchAddStudents = async (newStds: Student[]) => {
+    if (!newStds || newStds.length === 0) return;
+
+    // 1. Immediately update application state so students are instantly visible in the UI
+    setStudents((prev) => {
+      const existingIds = new Set(prev.map((s) => s.id));
+      const filtered = newStds.filter((s) => !existingIds.has(s.id));
+      return [...prev, ...filtered];
+    });
+
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+
+    // 2. Persist to Supabase if configured and online
+    try {
+      await batchInsertStudents(newStds);
+      if (activeClassId) {
+        const fresh = await getStudents(activeClassId);
+        if (fresh && fresh.length > 0) {
+          setStudents(fresh);
+        }
+      }
+    } catch (err) {
+      console.warn('Supabase batch insert notification (data preserved locally):', err);
+    }
+  };
+
+  // 3. Attendance Handlers
+  const handleSaveAttendance = async (sessionData: AttendanceSession) => {
+    const saved = await saveAttendanceSession(sessionData);
+    setAttendance((prev) => [saved, ...prev.filter((s) => s.id !== saved.id)]);
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+  };
+
+  const handleDeleteAttendance = async (sessionId: string) => {
+    await deleteAttendanceSession(sessionId);
+    setAttendance((prev) => prev.filter((s) => s.id !== sessionId));
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+  };
+
+  // 4. Grades Handlers
+  const handleSaveGrade = async (gradeData: StudentGrade) => {
+    const saved = await saveStudentGrade(gradeData);
+    setGrades((prev) => [saved, ...prev.filter((g) => g.id !== saved.id)]);
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+  };
+
+  const handleSaveGradeCols = async (cols: GradeColumn[]) => {
+    if (!activeClassId) return;
+    await saveGradeColumns(cols, activeClassId);
+    setGradeColumns(cols);
+    SafeCache.invalidate(`class_data_${activeClassId}`);
+  };
+
+  // 5. Teaching Agenda Handlers (Decoupled from active class)
+  const handleSaveAgenda = async (agendaData: TeachingAgenda) => {
+    const saved = await saveTeachingAgenda(agendaData);
+    setAgendas((prev) => [saved, ...prev.filter((a) => a.id !== saved.id)]);
+    SafeCache.invalidate('all_agendas');
+  };
+
+  const handleDeleteAgenda = async (agendaId: string) => {
+    await deleteTeachingAgenda(agendaId);
+    setAgendas((prev) => prev.filter((a) => a.id !== agendaId));
+    SafeCache.invalidate('all_agendas');
+  };
+
+  // 6. Savings Handlers
+  const handleSaveSaving = async (txData: SavingTransaction) => {
+    const saved = await saveSavingTransaction(txData);
+    setSavings((prev) => [saved, ...prev.filter((s) => s.id !== saved.id)]);
+  };
+
+  const handleDeleteSaving = async (txId: string) => {
+    await deleteSavingTransaction(txId);
+    setSavings((prev) => prev.filter((s) => s.id !== txId));
+  };
+
+  // Download JSON backup
+  const handleDownloadBackup = () => {
+    const jsonStr = exportDataToJsonBackup({
+      teacher,
+      classes,
+      students,
+      attendance,
+      grades,
+      gradeColumns,
+      agendas,
+      savings,
+    });
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Backup_SMK_Muh_Bawang_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Public Share Zero-Login Route
+  if (publicShare) {
+    return (
+      <PublicSharePage
+        type={publicShare.type}
+        shareId={publicShare.shareId}
+      />
+    );
+  }
+
+  // Loading Session on startup
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
+        <div className="flex flex-col items-center gap-4 animate-in fade-in">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center">
+            <RefreshCw className="w-6 h-6 text-indigo-300 animate-spin" />
+          </div>
+          <p className="text-sm font-semibold tracking-wide text-slate-300">
+            Memeriksa sesi Supabase Auth...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not Logged In -> Login Screen (Supabase Auth Only)
+  if (!session) {
+    return (
+      <LoginView
+        onLoginSuccess={() => loadUserData()}
+      />
+    );
+  }
+
+  // Active Class Entity
+  const activeClass: ClassRoom = classes.find((c) => c.id === activeClassId) || {
+    id: activeClassId || 'empty_cls',
+    namaKelas: classes.length > 0 ? classes[0].namaKelas : 'Belum Ada Kelas',
+    mataPelajaran: classes.length > 0 ? classes[0].mataPelajaran : 'Silakan Buat Kelas',
+    kkm: 75,
+    jurusan: 'TKJ',
+    createdAt: new Date().toISOString(),
+  };
+
+  const activeTeacher: TeacherProfile = teacher || {
+    id: session.user.id,
+    namaGuru: session.user.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
+    nip: '',
+    nbm: '',
+    namaSekolah: 'SMK Muhammadiyah Bawang',
+    mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
+    tahunAjaran: '2025/2026',
+    semester: 'Genap',
+    email: session.user.email,
+    isLoggedIn: true,
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-indigo-500 selection:text-white">
+      {/* Top Main Navigation Header - Muhammadiyah Visual Identity Gradient (#009B62 Green to #292E82 Deep Blue) */}
+      <header className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white border-b border-[#008276]/40 sticky top-0 z-40 shadow-lg backdrop-blur-md transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
+            {/* Hamburger (Menu Samping) & Logo Sekolah */}
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={toggleSideNav}
+                className="p-2 sm:p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition border border-white/20 shadow-xs flex items-center justify-center shrink-0 cursor-pointer"
+                title="Buka Menu Navigasi Samping"
+                aria-label="Buka Menu Navigasi Samping"
+              >
+                <Menu className="w-5 h-5 text-white" />
+              </button>
+
+              <div className="flex items-center gap-2.5">
+                <img
+                  src={SCHOOL_CONFIG.logoUrl}
+                  alt="Logo SMK Muhammadiyah Bawang"
+                  className="w-10 h-10 object-contain drop-shadow-sm rounded-xl p-0.5 bg-white border border-white/30 shadow-xs"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
+                  }}
+                />
+                <div className="hidden sm:flex flex-col">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-white tracking-tight text-sm sm:text-base drop-shadow-xs">
+                      SMK Muhammadiyah Bawang
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-white/20 text-white text-[10px] font-bold border border-white/25">
+                      Kurikulum Merdeka
+                    </span>
+                  </div>
+                  <span className="text-xs text-emerald-100 font-medium">
+                    Sistem Presensi, Penilaian & Jurnal Guru
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Pilihan Kelas */}
+            <div className="flex items-center justify-center flex-1 max-w-md mx-2">
+              <button
+                type="button"
+                onClick={() => setIsClassModalOpen(true)}
+                className="flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-bold transition shadow-xs border border-white/25 backdrop-blur-xs cursor-pointer"
+                title="Pilih atau kelola kelas"
+              >
+                <GraduationCap className="w-4 h-4 text-emerald-100 shrink-0" />
+                <span className="truncate max-w-[130px] sm:max-w-none">
+                  Kelas: {activeClass.namaKelas}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-emerald-100" />
+              </button>
+            </div>
+
+            {/* Penanda Cloud Supabase Aktif */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold shadow-2xs backdrop-blur-xs"
+                title="Database PostgreSQL Supabase Cloud Aktif & Sinkron (RLS)"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-80"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                </span>
+                <span>Cloud Supabase Aktif</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Side Navigation Drawer (Navbar Kesamping) */}
+      {isSideNavOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200 cursor-pointer"
+            onClick={() => setIsSideNavOpen(false)}
+          />
+
+          {/* Drawer Sidebar */}
+          <div className="fixed inset-y-0 left-0 max-w-full flex">
+            <aside className="w-80 max-w-[85vw] bg-white text-slate-900 shadow-2xl flex flex-col border-r border-slate-200 animate-in slide-in-from-left duration-200">
+              {/* Drawer Header - Muhammadiyah Visual Identity Gradient */}
+              <div className="p-4 sm:p-5 border-b border-[#008276]/30 flex items-center justify-between gap-3 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white">
+                <div className="flex items-center gap-3 truncate">
+                  <img
+                    src={SCHOOL_CONFIG.logoUrl}
+                    alt="Logo SMK Muhammadiyah Bawang"
+                    className="w-10 h-10 object-contain drop-shadow-sm rounded-xl p-0.5 bg-white border border-white/30 shrink-0"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
+                    }}
+                  />
+                  <div className="truncate">
+                    <p className="font-extrabold text-sm text-white truncate">
+                      SMK Muhammadiyah Bawang
+                    </p>
+                    <p className="text-[11px] text-emerald-100 truncate">
+                      Sistem Guru & Presensi
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSideNavOpen(false)}
+                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer shrink-0"
+                  title="Tutup Menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+
+
+              {/* Class Info Box inside Drawer */}
+              <div className="p-4 bg-emerald-50/60 border-b border-emerald-100">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="truncate">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-700 block">
+                      Kelas Aktif
+                    </span>
+                    <p className="font-extrabold text-sm text-slate-900 truncate">
+                      {activeClass.namaKelas}
+                    </p>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {activeClass.jurusan}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSideNavOpen(false);
+                      setIsClassModalOpen(true);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-[#009B62] text-white text-[11px] font-bold hover:bg-[#008276] transition shrink-0 cursor-pointer"
+                  >
+                    Ganti
+                  </button>
+                </div>
+              </div>
+
+              {/* Navigation Items in Side Drawer */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+                {NAV_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab(item.id as NavTab);
+                        setIsSideNavOpen(false);
+                      }}
+                      className={`w-full text-left p-3 rounded-2xl transition flex items-start gap-3 cursor-pointer ${
+                        isActive
+                          ? 'bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white shadow-md font-bold'
+                          : 'hover:bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-xl shrink-0 ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-bold leading-tight ${isActive ? 'text-white' : 'text-slate-900'}`}>
+                          {item.label}
+                        </p>
+                        <p className={`text-[10px] mt-0.5 truncate ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>
+                          {item.desc}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {/* Penanda Warna Cloud Supabase Aktif & Download Backup JSON */}
+                <div className="pt-2 border-t border-slate-100 my-2 space-y-2">
+                  <div className="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                      </span>
+                      <div>
+                        <p className="text-xs font-bold text-emerald-900">
+                          Cloud Supabase Aktif
+                        </p>
+                        <p className="text-[10px] text-emerald-700/80">
+                          PostgreSQL & Row Level Security
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/70 text-emerald-800">
+                      Aktif
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSideNavOpen(false);
+                      handleDownloadBackup();
+                    }}
+                    className="w-full p-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                    title="Download File Backup JSON Seluruh Data"
+                  >
+                    <Download className="w-4 h-4 text-emerald-700" />
+                    <span>Download Backup Data (JSON)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Drawer Footer: Profil Guru & Akun */}
+              <div className="p-3 border-t border-slate-100 bg-slate-50/80 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSideNavOpen(false);
+                    setIsProfileModalOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-white hover:bg-slate-100 text-left transition border border-slate-200/80 cursor-pointer shadow-2xs"
+                  title="Buka Pengaturan Profil Guru"
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#009B62] to-[#292E82] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                      {activeTeacher.namaGuru.charAt(0)}
+                    </div>
+                    <div className="truncate">
+                      <p className="text-xs font-bold text-slate-900 truncate">
+                        {activeTeacher.namaGuru}
+                      </p>
+                      <p className="text-[10px] text-slate-400 truncate">
+                        {activeTeacher.email}
+                      </p>
+                    </div>
+                  </div>
+                  <Settings className="w-4 h-4 text-slate-400 shrink-0" />
+                </button>
+              </div>
+            </aside>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+        {/* Error state if Supabase connection fails */}
+        {dataError && (
+          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+              <div>
+                <p className="font-bold">Gagal memuat data dari Supabase</p>
+                <p className="text-slate-600">{dataError}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => loadUserData(activeClassId)}
+              className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition flex items-center gap-1.5 shrink-0"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Coba Lagi
+            </button>
+          </div>
+        )}
+
+        {/* Loading Spinner for data fetching */}
+        {isLoadingData && (
+          <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
+            <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
+            <span className="text-xs font-semibold">Mengambil data dari PostgreSQL Supabase...</span>
+          </div>
+        )}
+
+        {!isLoadingData && (
+          <>
+            {classes.length === 0 && (
+              <div className="mb-6 p-6 rounded-3xl bg-indigo-50 border border-indigo-200 text-indigo-950 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-base">Selamat Datang di Sistem Absensi & Nilai!</h3>
+                  <p className="text-xs text-indigo-700 mt-1">
+                    Anda belum memiliki kelas yang terdaftar di akun ini. Silakan buat kelas pertama Anda untuk mulai mengelola presensi dan nilai siswa.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsClassModalOpen(true)}
+                  className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition shrink-0 shadow-md"
+                >
+                  + Tambah Kelas Pertama
+                </button>
+              </div>
+            )}
+
+            {activeTab === 'attendance' && (
+              <AttendanceView
+                currentClass={activeClass}
+                students={students}
+                sessions={attendance}
+                teacher={activeTeacher}
+                onSaveSession={handleSaveAttendance}
+                onDeleteSession={handleDeleteAttendance}
+              />
+            )}
+
+            {activeTab === 'recap' && (
+              <MonthlyAttendanceRecapView
+                currentClass={activeClass}
+                classes={classes}
+                students={students}
+                sessions={attendance}
+                teacher={activeTeacher}
+              />
+            )}
+
+            {activeTab === 'grades' && (
+              <GradesView
+                currentClass={activeClass}
+                students={students}
+                grades={grades}
+                gradeColumns={gradeColumns}
+                teacher={activeTeacher}
+                onSaveGrade={handleSaveGrade}
+                onSaveGradeColumns={handleSaveGradeCols}
+              />
+            )}
+
+            {activeTab === 'students' && (
+              <StudentManagementView
+                currentClass={activeClass}
+                students={students}
+                teacher={activeTeacher}
+                classes={classes}
+                onSaveStudent={handleSaveStudent}
+                onDeleteStudent={handleDeleteStudent}
+                onBatchAddStudents={handleBatchAddStudents}
+              />
+            )}
+
+            {activeTab === 'agendas' && (
+              <TeachingAgendaView
+                classes={classes}
+                agendas={agendas}
+                teacher={activeTeacher}
+                currentClass={activeClass}
+                onSaveAgenda={handleSaveAgenda}
+                onDeleteAgenda={handleDeleteAgenda}
+              />
+            )}
+
+            {activeTab === 'savings' && (
+              <SavingsView
+                currentClass={activeClass}
+                students={students}
+                savings={savings}
+                teacher={activeTeacher}
+                onSaveTransaction={handleSaveSaving}
+                onDeleteTransaction={handleDeleteSaving}
+              />
+            )}
+
+            {activeTab === 'statistics' && (
+              <StatisticsView
+                currentClass={activeClass}
+                students={students}
+                sessions={attendance}
+                grades={grades}
+                teacher={activeTeacher}
+              />
+            )}
+
+            {activeTab === 'parent_report' && (
+              <ParentReportView
+                currentClass={activeClass}
+                students={students}
+                sessions={attendance}
+                grades={grades}
+                teacher={activeTeacher}
+              />
+            )}
+
+            {activeTab === 'school_map' && <SchoolMapView />}
+          </>
+        )}
+      </main>
+
+      {/* Footer inheriting Muhammadiyah Visual Identity */}
+      <footer className="bg-muh-footer border-t border-[#008276]/40 mt-12 py-8 text-center text-white shadow-lg transition-colors">
+        <div className="max-w-7xl mx-auto px-4 space-y-2">
+          <p className="font-black text-sm sm:text-base text-white tracking-wide uppercase drop-shadow-xs">
+            &copy; SMK MUHAMMADIYAH BAWANG &bull; BATANG, JAWA TENGAH
+          </p>
+          <p className="text-xs sm:text-sm font-bold text-emerald-100">
+            Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; Dikembangkan oleh{' '}
+            <span className="font-mono font-black text-emerald-950 bg-white/95 px-2 py-0.5 rounded-md border border-white/50">
+              @hndx07
+            </span>
+          </p>
+          <p className="text-xs font-semibold text-emerald-100/90 pt-0.5">
+            Backend Resmi 100% PostgreSQL & Auth Supabase Cloud (Row Level Security Aktif)
+          </p>
+        </div>
+      </footer>
+
+
+      {/* Modals */}
+      <ClassManagementModal
+        isOpen={isClassModalOpen}
+        onClose={() => setIsClassModalOpen(false)}
+        classes={classes}
+        activeClassId={activeClass.id}
+        onSelectClass={handleSelectClass}
+        onSaveClass={handleSaveClass}
+        onDeleteClass={handleDeleteClass}
+      />
+
+
+
+      <TeacherProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        teacher={activeTeacher}
+        onUpdateTeacher={(upd) => setTeacher(upd)}
+        onLogout={() => {
+          signOutSupabase();
+          setSession(null);
+        }}
+        onDataMigrated={() => loadUserData(activeClassId)}
+        onDownloadBackup={handleDownloadBackup}
+      />
+    </div>
+  );
+}

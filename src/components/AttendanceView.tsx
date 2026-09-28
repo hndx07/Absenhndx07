@@ -1,0 +1,1085 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Calendar,
+  Plus,
+  CheckCircle2,
+  Share2,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Clock,
+  Sparkles,
+  Search,
+  Copy,
+  Check,
+  ExternalLink,
+  ChevronRight,
+  ChevronDown,
+  TrendingUp,
+  Save,
+  Cloud,
+  RefreshCw,
+  CheckCheck,
+  Edit2,
+  Trash2,
+  X,
+} from 'lucide-react';
+import QRCode from 'qrcode';
+import {
+  AttendanceSession,
+  AttendanceStatus,
+  ClassRoom,
+  Student,
+  TeacherProfile,
+  PublicShareRecord,
+} from '../types';
+import { exportAttendanceToExcel, exportAttendanceToPDF } from '../utils/exportUtils';
+import { createOrUpdatePublicShare } from '../services/data';
+import { SCHOOL_CONFIG } from '../config/schoolConfig';
+
+interface AttendanceViewProps {
+  currentClass: ClassRoom;
+  students: Student[];
+  sessions: AttendanceSession[];
+  teacher: TeacherProfile;
+  onSaveSession: (session: AttendanceSession) => void;
+  onDeleteSession: (sessionId: string) => void;
+}
+
+export const AttendanceView: React.FC<AttendanceViewProps> = ({
+  currentClass,
+  students,
+  sessions,
+  teacher,
+  onSaveSession,
+  onDeleteSession,
+}) => {
+  const classStudents = students
+    .filter((s) => s.classId === currentClass.id)
+    .sort((a, b) => a.no - b.no);
+
+  const classSessions = sessions
+    .filter((s) => s.classId === currentClass.id)
+    .sort((a, b) => b.pertemuanKe - a.pertemuanKe);
+
+  const [activeSessionId, setActiveSessionId] = useState<string>(
+    classSessions[0]?.id || ''
+  );
+  const [isMeetingsPanelOpen, setIsMeetingsPanelOpen] = useState(false);
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [newSessionData, setNewSessionData] = useState({
+    tanggal: new Date().toISOString().split('T')[0],
+    pertemuanKe: (classSessions.length > 0 ? Math.max(...classSessions.map((s) => s.pertemuanKe)) : 0) + 1,
+    topikMateri: '',
+  });
+
+  // Edit Existing Session States
+  const [editingSessionData, setEditingSessionData] = useState<AttendanceSession | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const [filterQuery, setFilterQuery] = useState('');
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareQrUrl, setShareQrUrl] = useState('');
+  const [shareLink, setShareLink] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Cloud Real-time Save States
+  const [isSavingToCloud, setIsSavingToCloud] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+
+  // Optimistic local sessions state for ZERO-DELAY instant click responsiveness
+  const [localSessions, setLocalSessions] = useState<Record<string, AttendanceSession>>({});
+  const saveDebounceTimerRef = useRef<any>(null);
+
+  // Sync prop classSessions into localSessions when classSessions change
+  useEffect(() => {
+    setLocalSessions((prev) => {
+      const next = { ...prev };
+      classSessions.forEach((s) => {
+        if (!next[s.id]) {
+          next[s.id] = s;
+        } else {
+          // Merge while preserving local edits
+          next[s.id] = { ...s, ...next[s.id] };
+        }
+      });
+      return next;
+    });
+  }, [classSessions]);
+
+  // Selected session for editing records (reads from optimistic local state first)
+  const currentSession: AttendanceSession | undefined =
+    localSessions[activeSessionId] ||
+    classSessions.find((s) => s.id === activeSessionId) ||
+    classSessions[0];
+
+  // Background debounced cloud sync (prevents network wait and race conditions)
+  const scheduleSessionCloudSave = (sessionToSave: AttendanceSession) => {
+    setHasUnsavedChanges(true);
+    if (saveDebounceTimerRef.current) {
+      clearTimeout(saveDebounceTimerRef.current);
+    }
+    saveDebounceTimerRef.current = setTimeout(async () => {
+      try {
+        await onSaveSession(sessionToSave);
+        setHasUnsavedChanges(false);
+      } catch (err) {
+        console.error('Failed to sync attendance session:', err);
+      }
+    }, 450);
+  };
+
+  // Explicit Save to Cloud function
+  const handleSaveToCloud = async (overrideSession?: AttendanceSession) => {
+    const targetSession = overrideSession || currentSession;
+    if (!targetSession) return;
+    if (saveDebounceTimerRef.current) clearTimeout(saveDebounceTimerRef.current);
+    setIsSavingToCloud(true);
+    setSaveSuccessMsg(null);
+    try {
+      await onSaveSession(targetSession);
+      const timeStr = new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }) + ' WIB';
+      setLastSavedTime(timeStr);
+      setHasUnsavedChanges(false);
+      setSaveSuccessMsg(`Presensi Pertemuan Ke-${targetSession.pertemuanKe} Berhasil Disimpan Real-Time ke Cloud Supabase!`);
+      setTimeout(() => setSaveSuccessMsg(null), 4000);
+    } catch (err: any) {
+      alert(`Gagal menyimpan ke cloud: ${err.message || 'Koneksi terputus'}`);
+    } finally {
+      setIsSavingToCloud(false);
+    }
+  };
+
+  // Helper to change status for a student in current session - ZERO DELAY INSTANT CLICK
+  const handleUpdateRecord = (studentId: string, status: AttendanceStatus, catatan?: string) => {
+    if (!currentSession) return;
+    const existingRecords = currentSession.records || {};
+    const updated: AttendanceSession = {
+      ...currentSession,
+      records: {
+        ...existingRecords,
+        [studentId]: {
+          status,
+          catatan: catatan !== undefined ? catatan : (existingRecords[studentId]?.catatan || ''),
+        },
+      },
+    };
+
+    // 1. Instant optimistic local update - UI updates in 0 milliseconds
+    setLocalSessions((prev) => ({ ...prev, [updated.id]: updated }));
+
+    // 2. Debounced background save to Cloud - no network blocking or race conditions
+    scheduleSessionCloudSave(updated);
+  };
+
+  // Set All Present shortcut - ZERO DELAY
+  const handleSetAllPresent = () => {
+    if (!currentSession) return;
+    const records: Record<string, { status: AttendanceStatus; catatan: string }> = {};
+    classStudents.forEach((std) => {
+      records[std.id] = {
+        status: 'H',
+        catatan: currentSession.records?.[std.id]?.catatan || '',
+      };
+    });
+    const updated: AttendanceSession = {
+      ...currentSession,
+      records,
+    };
+    setLocalSessions((prev) => ({ ...prev, [updated.id]: updated }));
+    scheduleSessionCloudSave(updated);
+  };
+
+  const handleCreateSession = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newId = `att_${Date.now()}`;
+    const initialRecords: Record<string, { status: AttendanceStatus; catatan: string }> = {};
+    classStudents.forEach((s) => {
+      initialRecords[s.id] = { status: 'H', catatan: '' };
+    });
+
+    const created: AttendanceSession = {
+      id: newId,
+      classId: currentClass.id,
+      tanggal: newSessionData.tanggal,
+      pertemuanKe: Number(newSessionData.pertemuanKe),
+      topikMateri: newSessionData.topikMateri || 'Pertemuan Pembelajaran Rutin',
+      records: initialRecords,
+    };
+
+    onSaveSession(created);
+    setActiveSessionId(newId);
+    setIsNewModalOpen(false);
+  };
+
+  const handleStartEditSession = (sess: AttendanceSession) => {
+    setEditingSessionData({ ...sess });
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEditedSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSessionData) return;
+    setIsSavingToCloud(true);
+    try {
+      await onSaveSession(editingSessionData);
+      const timeStr = new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }) + ' WIB';
+      setLastSavedTime(timeStr);
+      setSaveSuccessMsg(`Data Pertemuan Ke-${editingSessionData.pertemuanKe} berhasil diperbarui di Cloud!`);
+      setTimeout(() => setSaveSuccessMsg(null), 4000);
+      setIsEditModalOpen(false);
+      setEditingSessionData(null);
+    } catch (err: any) {
+      alert(`Gagal menyimpan perubahan sesi: ${err.message || 'Error'}`);
+    } finally {
+      setIsSavingToCloud(false);
+    }
+  };
+
+  const handleDeleteSessionConfirm = (sess: AttendanceSession) => {
+    if (confirm(`Yakin ingin menghapus sesi Pertemuan Ke-${sess.pertemuanKe} (${sess.tanggal})? Seluruh rekaman presensi siswa pada sesi ini akan dihapus permanen.`)) {
+      onDeleteSession(sess.id);
+      if (activeSessionId === sess.id) {
+        const remaining = classSessions.filter((s) => s.id !== sess.id);
+        if (remaining.length > 0) {
+          setActiveSessionId(remaining[0].id);
+        }
+      }
+    }
+  };
+
+  // Stats for current session
+  let countH = 0, countS = 0, countI = 0, countA = 0, countD = 0;
+  if (currentSession) {
+    classStudents.forEach((std) => {
+      const st = currentSession.records?.[std.id]?.status;
+      if (st === 'H') countH++;
+      else if (st === 'S') countS++;
+      else if (st === 'I') countI++;
+      else if (st === 'A') countA++;
+      else if (st === 'D') countD++;
+    });
+  }
+  const totalInSession = classStudents.length || 1;
+  const attendanceRate = Math.round(((countH + countD) / totalInSession) * 100);
+
+  // Generate public share link
+  const handleOpenShare = async () => {
+    const shareId = `att_share_${currentClass.id}`;
+    const baseUrl = window.location.origin + window.location.pathname;
+    const fullLink = `${baseUrl}?absen_share=${shareId}`;
+    setShareLink(fullLink);
+
+    // Save record in local storage and supabase
+    const shareRecord: PublicShareRecord = {
+      id: shareId,
+      type: 'absen',
+      classId: currentClass.id,
+      title: `Presensi Siswa Kelas ${currentClass.namaKelas} - SMK Muhammadiyah Bawang`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      data: {
+        className: currentClass.namaKelas,
+        subject: currentClass.mataPelajaran,
+        teacher: teacher.namaGuru,
+        school: teacher.namaSekolah,
+        students: classStudents,
+        sessions: classSessions,
+      },
+    };
+
+    try {
+      await createOrUpdatePublicShare(shareRecord);
+    } catch (err) {
+      console.warn('Could not sync share to cloud', err);
+    }
+
+    try {
+      const qrData = await QRCode.toDataURL(fullLink, { width: 240, margin: 2 });
+      setShareQrUrl(qrData);
+    } catch (e) {
+      console.error(e);
+    }
+    setShareModalOpen(true);
+  };
+
+  const copyShareLink = () => {
+    navigator.clipboard.writeText(shareLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const filteredStudents = classStudents.filter((s) =>
+    s.nama.toLowerCase().includes(filterQuery.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Top Banner with Stats & Session Switcher */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 font-bold text-xs rounded-full">
+                {currentClass.namaKelas}
+              </span>
+              <span className="text-xs text-slate-400">&bull;</span>
+              <span className="text-xs font-semibold text-slate-600">{currentClass.mataPelajaran}</span>
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+              Buku Presensi & Kehadiran Siswa
+            </h2>
+            <p className="text-xs text-slate-500">
+              SMK Muhammadiyah Bawang &bull; Tahun Ajaran {teacher.tahunAjaran} ({teacher.semester})
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Tombol Simpan Presensi ke Cloud di Header Toolbar */}
+            <button
+              type="button"
+              onClick={() => handleSaveToCloud()}
+              disabled={isSavingToCloud || !currentSession}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-md cursor-pointer ${
+                hasUnsavedChanges
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 ring-2 ring-emerald-400 animate-pulse'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+              } disabled:opacity-50`}
+              title="Simpan data presensi siswa ke cloud Supabase secara real-time"
+            >
+              {isSavingToCloud ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Menyimpan ke Cloud...</span>
+                </>
+              ) : (
+                <>
+                  <Cloud className="w-4 h-4" />
+                  <span>Simpan Presensi ke Cloud</span>
+                  {hasUnsavedChanges && (
+                    <span className="w-2 h-2 rounded-full bg-amber-300 animate-ping" />
+                  )}
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => setIsNewModalOpen(true)}
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
+            >
+              <Plus className="w-4 h-4" />
+              Buat Pertemuan Baru
+            </button>
+
+            <button
+              onClick={handleOpenShare}
+              className="px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+              title="Bagikan Tautan Publik untuk Orang Tua"
+            >
+              <Share2 className="w-4 h-4" />
+              Link Publik Wali Murid
+            </button>
+
+            <div className="flex items-center rounded-2xl border border-slate-200 p-1 bg-slate-50">
+              <button
+                onClick={() => exportAttendanceToExcel(currentClass, classStudents, classSessions, teacher)}
+                className="px-3 py-1.5 hover:bg-white text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1"
+                title="Unduh file Excel"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                Excel
+              </button>
+              <button
+                onClick={() => exportAttendanceToPDF(currentClass, classStudents, classSessions, teacher)}
+                className="px-3 py-1.5 hover:bg-white text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1"
+                title="Cetak format PDF resmi"
+              >
+                <FileText className="w-3.5 h-3.5 text-rose-600" />
+                PDF
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Real-time Save Notification Banner */}
+        {saveSuccessMsg && (
+          <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-bold rounded-2xl flex items-center justify-between animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{saveSuccessMsg}</span>
+            </div>
+            {lastSavedTime && (
+              <span className="text-[11px] text-emerald-700 dark:text-emerald-300 font-mono">
+                {lastSavedTime}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Collapsible Sessions Selector Panel (Default: Tersembunyi) */}
+        {classSessions.length > 0 ? (
+          <div className="pt-2 border-t border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsMeetingsPanelOpen(!isMeetingsPanelOpen)}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-xs font-bold transition flex items-center justify-between gap-3 shadow-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-indigo-600" />
+                  <span>
+                    Pertemuan {currentSession ? `Ke-${currentSession.pertemuanKe} (${currentSession.tanggal})` : 'Pilih Pertemuan'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">
+                    {classSessions.length} Pertemuan
+                  </span>
+                </div>
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${
+                    isMeetingsPanelOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              <span className="text-[11px] text-slate-400 hidden sm:inline">
+                Klik tombol di atas untuk membuka daftar seluruh pertemuan
+              </span>
+            </div>
+
+            {/* Hidden / Expanded Dropdown Panel */}
+            {isMeetingsPanelOpen && (
+              <div className="mt-3 p-4 bg-slate-50/80 rounded-2xl border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Pilih Sesi Pertemuan:
+                  </p>
+                  <button
+                    onClick={() => setIsMeetingsPanelOpen(false)}
+                    className="text-xs text-slate-400 hover:text-slate-600 font-medium"
+                  >
+                    Tutup Panel ▲
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 max-h-64 overflow-y-auto pr-1">
+                  {classSessions.map((session) => {
+                    const isSelected = currentSession?.id === session.id;
+                    return (
+                      <div
+                        key={session.id}
+                        onClick={() => {
+                          setActiveSessionId(session.id);
+                          setIsMeetingsPanelOpen(false); // Auto close after selecting
+                        }}
+                        className={`p-2.5 rounded-2xl text-xs font-semibold transition text-left border flex items-center justify-between gap-2 cursor-pointer select-none ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-500/30'
+                            : 'bg-white hover:bg-indigo-50/70 text-slate-700 hover:text-indigo-950 border-slate-200 hover:border-indigo-300'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold leading-tight block truncate">
+                            Pertemuan {session.pertemuanKe}
+                          </span>
+                          <span className={`text-[10px] block font-mono truncate ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
+                            {session.tanggal}
+                          </span>
+                          {session.topikMateri && (
+                            <span className={`text-[10px] block truncate mt-0.5 ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                              {session.topikMateri}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartEditSession(session);
+                            }}
+                            className={`p-1.5 rounded-lg transition cursor-pointer ${
+                              isSelected
+                                ? 'hover:bg-white/20 text-indigo-100 hover:text-white'
+                                : 'hover:bg-slate-100 text-slate-400 hover:text-indigo-600'
+                            }`}
+                            title={`Edit Pertemuan Ke-${session.pertemuanKe}`}
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSessionConfirm(session);
+                            }}
+                            className={`p-1.5 rounded-lg transition cursor-pointer ${
+                              isSelected
+                                ? 'hover:bg-rose-500/40 text-rose-200 hover:text-white'
+                                : 'hover:bg-rose-50 text-slate-400 hover:text-rose-600'
+                            }`}
+                            title={`Hapus Pertemuan Ke-${session.pertemuanKe}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-800">
+            Belum ada sesi pertemuan. Klik tombol <strong>"Buat Pertemuan Baru"</strong> di atas untuk memulai pencatatan presensi.
+          </div>
+        )}
+      </div>
+
+      {/* Active Session Info & Metrics Card */}
+      {currentSession && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="md:col-span-2 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white p-5 rounded-3xl shadow-md flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="px-2.5 py-0.5 bg-white/20 border border-white/30 rounded-full text-[11px] font-bold text-emerald-100">
+                  Pertemuan Ke-{currentSession.pertemuanKe}
+                </span>
+                <span className="text-xs text-emerald-100 font-mono flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {currentSession.tanggal}
+                </span>
+              </div>
+              <h3 className="font-bold text-base mt-2 leading-snug text-white">
+                {currentSession.topikMateri || 'Tanpa topik materi'}
+              </h3>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 mt-4 border-t border-white/10 gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleSetAllPresent}
+                  className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Set Semua Hadir
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSaveToCloud()}
+                  disabled={isSavingToCloud}
+                  className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                  title="Simpan data sesi ini ke database cloud Supabase secara real-time"
+                >
+                  {isSavingToCloud ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  <span>Simpan ke Cloud</span>
+                </button>
+              </div>
+
+              {/* Tombol Edit dan Hapus untuk Absen yang Sudah Dibuat */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleStartEditSession(currentSession)}
+                  className="px-3.5 py-1.5 bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 hover:text-white border border-amber-300/40 text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  title="Edit tanggal, nomor pertemuan, atau topik materi absen ini"
+                >
+                  <Edit2 className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Edit Sesi</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSessionConfirm(currentSession)}
+                  className="px-3.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-white border border-rose-400/40 text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  title="Hapus sesi pertemuan presensi ini"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hapus Sesi</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col justify-center">
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+              Persentase Hadir
+            </span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-3xl font-black text-indigo-600 font-mono">
+                {attendanceRate}%
+              </span>
+              <span className="text-xs text-slate-500 font-medium">
+                ({countH + countD}/{classStudents.length} Siswa)
+              </span>
+            </div>
+            <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
+              <div
+                className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                style={{ width: `${attendanceRate}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-sm grid grid-cols-5 gap-1.5 text-center">
+            <div className="bg-emerald-50 p-2 rounded-xl border border-emerald-100">
+              <span className="block text-emerald-800 font-bold text-base font-mono">{countH}</span>
+              <span className="text-[10px] font-bold text-emerald-600">Hadir</span>
+            </div>
+            <div className="bg-blue-50 p-2 rounded-xl border border-blue-100">
+              <span className="block text-blue-800 font-bold text-base font-mono">{countS}</span>
+              <span className="text-[10px] font-bold text-blue-600">Sakit</span>
+            </div>
+            <div className="bg-amber-50 p-2 rounded-xl border border-amber-100">
+              <span className="block text-amber-800 font-bold text-base font-mono">{countI}</span>
+              <span className="text-[10px] font-bold text-amber-600">Izin</span>
+            </div>
+            <div className="bg-rose-50 p-2 rounded-xl border border-rose-100">
+              <span className="block text-rose-800 font-bold text-base font-mono">{countA}</span>
+              <span className="text-[10px] font-bold text-rose-600">Alfa</span>
+            </div>
+            <div className="bg-purple-50 p-2 rounded-xl border border-purple-100">
+              <span className="block text-purple-800 font-bold text-base font-mono">{countD}</span>
+              <span className="text-[10px] font-bold text-purple-600">Dispen</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attendance Grid per Student */}
+      {currentSession && (
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden space-y-3 p-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2">
+            <h3 className="font-bold text-slate-800 text-sm">
+              Daftar Kehadiran Siswa
+            </h3>
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Cari siswa..."
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
+                  <th className="py-3 px-3 text-center w-12 text-white">No</th>
+                  <th className="py-3 px-3 min-w-[180px] text-white">Nama Peserta Didik</th>
+                  <th className="py-3 px-3 text-center w-14 text-white">L/P</th>
+                  <th className="py-3 px-3 text-center min-w-[200px] text-white">Status Kehadiran</th>
+                  <th className="py-3 px-3 text-white">Keterangan / Alasan</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {filteredStudents.map((std, idx) => {
+                  const record = currentSession.records?.[std.id] || { status: 'H', catatan: '' };
+                  const status = record.status;
+
+                  return (
+                    <tr
+                      key={std.id}
+                      className={`transition ${
+                        idx % 2 === 0
+                          ? 'bg-white'
+                          : 'bg-emerald-50/20'
+                      } hover:bg-emerald-50/50`}
+                    >
+                      <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-600">
+                        {std.no}
+                      </td>
+                      <td className="py-2.5 px-3 font-bold text-slate-800">
+                        {std.nama}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className="font-semibold text-slate-500">{std.gender}</span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {(['H', 'S', 'I', 'A', 'D'] as AttendanceStatus[]).map((st) => {
+                            const isSelected = status === st;
+                            let style = 'bg-slate-100 text-slate-600 hover:bg-slate-200';
+                            if (isSelected) {
+                              if (st === 'H') style = 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20';
+                              else if (st === 'S') style = 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20';
+                              else if (st === 'I') style = 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-500/20';
+                              else if (st === 'A') style = 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-500/20';
+                              else if (st === 'D') style = 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-500/20';
+                            }
+
+                            return (
+                              <button
+                                key={st}
+                                type="button"
+                                onClick={() => handleUpdateRecord(std.id, st)}
+                                className={`w-8 h-8 rounded-xl font-bold font-mono transition text-xs flex items-center justify-center ${style}`}
+                                title={
+                                  st === 'H'
+                                    ? 'Hadir'
+                                    : st === 'S'
+                                    ? 'Sakit'
+                                    : st === 'I'
+                                    ? 'Izin'
+                                    : st === 'A'
+                                    ? 'Alpa'
+                                    : 'Dispensasi'
+                                }
+                              >
+                                {st}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <input
+                          type="text"
+                          placeholder="Catatan izin/keterangan..."
+                          value={record.catatan || ''}
+                          onChange={(e) => handleUpdateRecord(std.id, status, e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Table Footer with Prominent Save Button */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <Cloud className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  {lastSavedTime
+                    ? `Terakhir disimpan ke Cloud Supabase: ${lastSavedTime}`
+                    : 'Perubahan presensi dapat langsung disimpan ke database Cloud secara real-time.'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSaveToCloud()}
+                disabled={isSavingToCloud}
+                className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 cursor-pointer disabled:opacity-50"
+              >
+                {isSavingToCloud ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Menyimpan ke Cloud Supabase...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Simpan Presensi ke Cloud</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Unsaved Changes Notification */}
+      {hasUnsavedChanges && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-4 animate-in slide-in-from-bottom duration-200">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+            <span className="text-xs font-semibold">Ada perubahan isian presensi yang siap disimpan ke cloud.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleSaveToCloud()}
+            disabled={isSavingToCloud}
+            className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md cursor-pointer transition"
+          >
+            {isSavingToCloud ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            Simpan Sekarang
+          </button>
+        </div>
+      )}
+
+      {/* Modal Create Session */}
+      {isNewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4">
+            <h3 className="font-bold text-slate-900 text-base">
+              Buat Sesi Pertemuan Baru
+            </h3>
+            <form onSubmit={handleCreateSession} className="space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Pertemuan Ke-
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={newSessionData.pertemuanKe}
+                    onChange={(e) =>
+                      setNewSessionData({ ...newSessionData, pertemuanKe: Number(e.target.value) })
+                    }
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Tanggal
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={newSessionData.tanggal}
+                    onChange={(e) =>
+                      setNewSessionData({ ...newSessionData, tanggal: e.target.value })
+                    }
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                  Materi Pokok / Capaian Pembelajaran (TP)
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Contoh: Konfigurasi Virtual LAN (VLAN) dan Trunking pada Switch Cisco"
+                  value={newSessionData.topikMateri}
+                  onChange={(e) =>
+                    setNewSessionData({ ...newSessionData, topikMateri: e.target.value })
+                  }
+                  className="w-full p-3 rounded-xl border border-slate-300 text-sm"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setIsNewModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Cloud className="w-4 h-4" />
+                  Simpan Pertemuan Baru ke Cloud
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Sesi Pertemuan Absen yang Sudah Dibuat */}
+      {isEditModalOpen && editingSessionData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/35 backdrop-blur-[2px] animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center">
+                  <Edit2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    Edit Sesi Pertemuan Absen
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Ubah tanggal, nomor pertemuan, atau materi ajar
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingSessionData(null);
+                }}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedSession} className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                  Tanggal Pertemuan
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={editingSessionData.tanggal}
+                  onChange={(e) =>
+                    setEditingSessionData({ ...editingSessionData, tanggal: e.target.value })
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                  Pertemuan Ke-
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={editingSessionData.pertemuanKe}
+                  onChange={(e) =>
+                    setEditingSessionData({
+                      ...editingSessionData,
+                      pertemuanKe: Number(e.target.value),
+                    })
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                  Materi Pokok / Capaian Pembelajaran
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Contoh: Pengujian Jaringan Lokal dan Troubleshoot IP Address"
+                  value={editingSessionData.topikMateri || ''}
+                  onChange={(e) =>
+                    setEditingSessionData({ ...editingSessionData, topikMateri: e.target.value })
+                  }
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDeleteSessionConfirm(editingSessionData);
+                    setIsEditModalOpen(false);
+                    setEditingSessionData(null);
+                  }}
+                  className="px-3 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hapus Sesi</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditModalOpen(false);
+                      setEditingSessionData(null);
+                    }}
+                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingToCloud}
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSavingToCloud ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Cloud className="w-4 h-4" />
+                    )}
+                    <span>Simpan Perubahan</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Share Public Link (Opacity dikurangi agar background terlihat) */}
+      {shareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/30 backdrop-blur-[1.5px] animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto">
+              <Share2 className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="font-bold text-slate-900 text-lg">
+                Tautan Publik Kehadiran Siswa
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Wali murid dan siswa dapat memantau kehadiran secara real-time tanpa perlu akun login.
+              </p>
+            </div>
+
+            {shareQrUrl && (
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 inline-block mx-auto">
+                <img src={shareQrUrl} alt="QR Code Share" className="w-48 h-48 mx-auto" />
+                <p className="text-[10px] text-slate-400 mt-1">Scan QR Code dengan kamera ponsel</p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200 text-left">
+              <input
+                type="text"
+                readOnly
+                value={shareLink}
+                className="w-full bg-transparent text-xs font-mono text-slate-700 px-2 focus:outline-none"
+              />
+              <button
+                onClick={copyShareLink}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shrink-0 transition flex items-center gap-1"
+              >
+                {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedLink ? 'Tersalin' : 'Salin'}
+              </button>
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <a
+                href={shareLink}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1"
+              >
+                Buka Halaman Publik <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+              <button
+                onClick={() => setShareModalOpen(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-xl"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
