@@ -63,7 +63,6 @@ export async function createOrUpdateTeacherProfile(
   const user = await getAuthUser();
   if (!user) throw new Error('User belum terautentikasi');
 
-  // Ambil profil yang tersimpan di cloud agar partial update tidak menimpa data yang sudah ada
   const { data: existing } = await supabase
     .from('teacher_profiles')
     .select('*')
@@ -136,14 +135,14 @@ export async function getClasses(): Promise<ClassRoom[]> {
     throw error;
   }
 
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    namaKelas: row.nama_kelas,
-    mataPelajaran: row.mata_pelajaran,
-    kkm: Number(row.kkm) || 75,
-    jurusan: row.jurusan || '',
-    keterangan: row.keterangan || '',
-    createdAt: row.created_at,
+  return (data || []).map((c: any) => ({
+    id: c.id,
+    namaKelas: c.nama_kelas,
+    mataPelajaran: c.mata_pelajaran,
+    kkm: Number(c.kkm),
+    jurusan: c.jurusan,
+    keterangan: c.keterangan,
+    createdAt: c.created_at,
   }));
 }
 
@@ -158,9 +157,10 @@ export async function createClass(cls: ClassRoom): Promise<ClassRoom> {
       id: cls.id,
       user_id: user.id,
       nama_kelas: cls.namaKelas,
+      mataPelajaran: cls.mataPelajaran,
       mata_pelajaran: cls.mataPelajaran,
       kkm: cls.kkm,
-      jurusan: cls.jurusan || '',
+      jurusan: cls.jurusan,
       keterangan: cls.keterangan || '',
     })
     .select()
@@ -184,14 +184,13 @@ export async function createClass(cls: ClassRoom): Promise<ClassRoom> {
 
 export async function updateClass(cls: ClassRoom): Promise<ClassRoom> {
   const supabase = getSupabaseClient();
-
   const { data, error } = await supabase
     .from('classes')
     .update({
       nama_kelas: cls.namaKelas,
       mata_pelajaran: cls.mataPelajaran,
       kkm: cls.kkm,
-      jurusan: cls.jurusan || '',
+      jurusan: cls.jurusan,
       keterangan: cls.keterangan || '',
       updated_at: new Date().toISOString(),
     })
@@ -275,27 +274,31 @@ export async function getStudents(classId?: string): Promise<Student[]> {
     throw error;
   }
 
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    classId: row.class_id,
-    no: Number(row.no),
-    nisn: row.nisn || '',
-    nama: row.nama,
-    gender: row.gender as 'L' | 'P',
-    catatanUmum: row.catatan_umum || '',
-    noHpOrangTua: row.no_hp_orang_tua || '',
+  return (data || []).map((s: any) => ({
+    id: s.id,
+    classId: s.class_id,
+    no: Number(s.no),
+    nisn: s.nisn || '',
+    nama: s.nama,
+    gender: s.gender as 'L' | 'P',
+    catatanUmum: s.catatan_umum,
+    noHpOrangTua: s.no_hp_orang_tua,
   }));
 }
 
 export async function createStudent(std: Student): Promise<Student> {
   const supabase = getSupabaseClient();
+  const user = await getAuthUser();
+  if (!user) throw new Error('User belum login');
+
   const { data, error } = await supabase
     .from('students')
     .insert({
       id: std.id,
       class_id: std.classId,
+      user_id: user.id,
       no: std.no,
-      nisn: std.nisn,
+      nisn: std.nisn || '',
       nama: std.nama,
       gender: std.gender,
       catatan_umum: std.catatanUmum || '',
@@ -327,7 +330,7 @@ export async function updateStudent(std: Student): Promise<Student> {
     .from('students')
     .update({
       no: std.no,
-      nisn: std.nisn,
+      nisn: std.nisn || '',
       nama: std.nama,
       gender: std.gender,
       catatan_umum: std.catatanUmum || '',
@@ -403,10 +406,7 @@ export async function batchInsertStudents(students: Student[]): Promise<void> {
 
 export async function getAttendanceSessions(classId?: string): Promise<AttendanceSession[]> {
   const supabase = getSupabaseClient();
-  let query = supabase
-    .from('attendance_sessions')
-    .select('*')
-    .order('tanggal', { ascending: false });
+  let query = supabase.from('attendance_sessions').select('*').order('tanggal', { ascending: false });
 
   if (classId) {
     query = query.eq('class_id', classId);
@@ -414,7 +414,7 @@ export async function getAttendanceSessions(classId?: string): Promise<Attendanc
 
   const { data, error } = await query;
   if (error) {
-    console.error('Error fetching attendance:', error);
+    console.error('Error fetching attendance sessions:', error);
     throw error;
   }
 
@@ -553,24 +553,24 @@ export async function saveStudentGrade(grade: StudentGrade): Promise<StudentGrad
     id: data.id,
     studentId: data.student_id,
     classId: data.class_id,
-    formatif1: data.formatif1 !== null ? Number(data.formatif1) : null,
-    formatif2: data.formatif2 !== null ? Number(data.formatif2) : null,
-    formatif3: data.formatif3 !== null ? Number(data.formatif3) : null,
-    formatif4: data.formatif4 !== null ? Number(data.formatif4) : null,
-    formatif5: data.formatif5 !== null ? Number(data.formatif5) : null,
-    formatif6: data.formatif6 !== null ? Number(data.formatif6) : null,
-    formatif7: data.formatif7 !== null ? Number(data.formatif7) : null,
-    formatif8: data.formatif8 !== null ? Number(data.formatif8) : null,
-    formatif9: data.formatif9 !== null ? Number(data.formatif9) : null,
-    formatif10: data.formatif10 !== null ? Number(data.formatif10) : null,
-    sumatifTengah: data.sumatif_tengah !== null ? Number(data.sumatif_tengah) : null,
-    sumatifAkhir: data.sumatif_akhir !== null ? Number(data.sumatif_akhir) : null,
-    catatan: data.catatan || '',
+    formatif1: data.formatif1,
+    formatif2: data.formatif2,
+    formatif3: data.formatif3,
+    formatif4: data.formatif4,
+    formatif5: data.formatif5,
+    formatif6: data.formatif6,
+    formatif7: data.formatif7,
+    formatif8: data.formatif8,
+    formatif9: data.formatif9,
+    formatif10: data.formatif10,
+    sumatifTengah: data.sumatif_tengah,
+    sumatifAkhir: data.sumatif_akhir,
+    catatan: data.catatan,
   };
 }
 
 export async function batchUpsertStudentGrades(gradesList: StudentGrade[]): Promise<void> {
-  if (!gradesList || gradesList.length === 0) return;
+  if (gradesList.length === 0) return;
   const supabase = getSupabaseClient();
   const user = await getAuthUser();
   if (!user) throw new Error('User belum login');
@@ -612,6 +612,16 @@ export { getLocalGradeColumns, setLocalGradeColumns, DEFAULT_GRADE_COLUMNS };
 
 export async function getGradeColumns(classId?: string): Promise<GradeColumn[]> {
   try {
+    const raw = localStorage.getItem('muhiba_grade_columns');
+    if (raw) {
+      const all = JSON.parse(raw);
+      if (classId && all[classId] && Array.isArray(all[classId]) && all[classId].length > 0) {
+        return all[classId];
+      }
+    }
+  } catch {}
+
+  try {
     const supabase = getSafeSupabaseClient();
     if (supabase) {
       let query = supabase.from('grade_columns').select('*').order('created_at', { ascending: true });
@@ -636,7 +646,6 @@ export async function getGradeColumns(classId?: string): Promise<GradeColumn[]> 
     console.warn('Falling back to local grade columns:', err);
   }
 
-  // Fallback to localStorage helper with classId
   return getLocalGradeColumns(classId);
 }
 
@@ -644,7 +653,13 @@ export async function saveGradeColumns(
   columns: GradeColumn[],
   classId: string
 ): Promise<void> {
-  // Always update local cache immediately
+  try {
+    const raw = localStorage.getItem('muhiba_grade_columns');
+    const all = raw ? JSON.parse(raw) : {};
+    all[classId] = columns;
+    localStorage.setItem('muhiba_grade_columns', JSON.stringify(all));
+  } catch {}
+
   setLocalGradeColumns(columns, classId);
 
   try {
@@ -679,10 +694,7 @@ export async function saveGradeColumns(
 
 export async function getTeachingAgendas(classId?: string): Promise<TeachingAgenda[]> {
   const supabase = getSupabaseClient();
-  let query = supabase
-    .from('teaching_agendas')
-    .select('*')
-    .order('tanggal', { ascending: false });
+  let query = supabase.from('teaching_agendas').select('*').order('tanggal', { ascending: false });
 
   if (classId) {
     query = query.eq('class_id', classId);
@@ -698,16 +710,14 @@ export async function getTeachingAgendas(classId?: string): Promise<TeachingAgen
     id: row.id,
     classId: row.class_id,
     tanggal: row.tanggal,
-    hari: row.hari || '',
-    jamKe: row.jam_ke || '',
-    rentangJam: row.rentang_jam || '',
+    hari: row.hari,
+    jamKe: row.jam_ke,
+    rentangJam: row.rentang_jam,
     materiAjar: row.materi_ajar,
     kegiatan: row.kegiatan || '',
     catatan: row.catatan || '',
-    hadirCount: Number(row.hadir_count) || 0,
-    tidakHadirCount: Number(row.tidak_hadir_count) || 0,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
+    hadirCount: Number(row.hadir_count || 0),
+    tidakHadirCount: Number(row.tidak_hadir_count || 0),
   }));
 }
 
@@ -751,10 +761,10 @@ export async function saveTeachingAgenda(agenda: TeachingAgenda): Promise<Teachi
     jamKe: data.jam_ke,
     rentangJam: data.rentang_jam,
     materiAjar: data.materi_ajar,
-    kegiatan: data.kegiatan,
-    catatan: data.catatan,
-    hadirCount: Number(data.hadir_count),
-    tidakHadirCount: Number(data.tidak_hadir_count),
+    kegiatan: data.kegiatan || '',
+    catatan: data.catatan || '',
+    hadirCount: Number(data.hadir_count || 0),
+    tidakHadirCount: Number(data.tidak_hadir_count || 0),
   };
 }
 
@@ -773,10 +783,7 @@ export async function deleteTeachingAgenda(agendaId: string): Promise<void> {
 
 export async function getSavingTransactions(classId?: string): Promise<SavingTransaction[]> {
   const supabase = getSupabaseClient();
-  let query = supabase
-    .from('saving_transactions')
-    .select('*')
-    .order('tanggal', { ascending: false });
+  let query = supabase.from('saving_transactions').select('*').order('tanggal', { ascending: false });
 
   if (classId) {
     query = query.eq('class_id', classId);
@@ -839,8 +846,8 @@ export async function saveSavingTransaction(tx: SavingTransaction): Promise<Savi
     tanggal: data.tanggal,
     tipe: data.tipe as 'masuk' | 'keluar',
     jumlah: Number(data.jumlah),
-    keterangan: data.keterangan,
-    pencatat: data.pencatat,
+    keterangan: data.keterangan || '',
+    pencatat: data.pencatat || '',
   };
 }
 
@@ -848,64 +855,45 @@ export async function deleteSavingTransaction(txId: string): Promise<void> {
   const supabase = getSupabaseClient();
   const { error } = await supabase.from('saving_transactions').delete().eq('id', txId);
   if (error) {
-    console.error('Error deleting transaction:', error);
+    console.error('Error deleting saving transaction:', error);
     throw error;
   }
 }
 
 // ============================================================================
-// 9. PUBLIC SHARES SERVICE
+// 9. PUBLIC SHARE SERVICE
 // ============================================================================
 
 export async function createOrUpdatePublicShare(record: PublicShareRecord): Promise<void> {
-  const resultPayload = {
-    ...(record.data || {}),
-    shareType: record.type,
-    shareTitle: record.title,
-    classId: record.classId,
-    created_at: record.createdAt,
-    updated_at: record.updatedAt,
-  };
-
-  // Immediate local cache for zero-latency preview
-  SafeCache.set(`pub_share_${record.id}`, resultPayload, 24 * 60 * 60 * 1000);
+  SafeCache.set(`pub_share_${record.id}`, record.payload, 24 * 60 * 60 * 1000);
   try {
-    localStorage.setItem(`pub_share_${record.id}`, JSON.stringify(resultPayload));
-  } catch (err) {
-    console.warn('localStorage cache failed for public share', err);
-  }
+    localStorage.setItem(`pub_share_${record.id}`, JSON.stringify(record.payload));
+  } catch {}
 
   const supabase = getSafeSupabaseClient();
-  if (!supabase) return;
-
   const user = await getAuthUser();
-
-  const payload = {
-    id: record.id,
-    user_id: user?.id || null,
-    class_id: record.classId,
-    type: record.type,
-    title: record.title,
-    payload: record.data,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { error } = await supabase
-    .from('public_shares')
-    .upsert(payload, { onConflict: 'id' });
-
-  if (error) {
-    console.error('Error creating public share in Supabase:', error);
-    // Do not throw if local cache already has it, to avoid blocking UI flow
+  if (supabase && user) {
+    try {
+      const payloadRow = {
+        id: record.id,
+        user_id: user.id,
+        class_id: record.classId,
+        type: record.type,
+        title: record.title,
+        payload: record.payload,
+        updated_at: new Date().toISOString(),
+      };
+      await supabase.from('public_shares').upsert(payloadRow, { onConflict: 'id' });
+    } catch (err) {
+      console.warn('Could not sync public share to cloud:', err);
+    }
   }
 }
 
 export async function getPublicShare(shareId: string): Promise<any | null> {
-  // 1. Check in-memory & session cache
   const cached = SafeCache.get<any>(`pub_share_${shareId}`);
   if (cached) return cached;
 
-  // 2. Check localStorage
   let localStored: any = null;
   try {
     const raw = localStorage.getItem(`pub_share_${shareId}`);
@@ -916,7 +904,6 @@ export async function getPublicShare(shareId: string): Promise<any | null> {
     console.warn('Could not read public share from localStorage', err);
   }
 
-  // 3. Query Supabase (allowed for anon by RLS)
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
@@ -935,7 +922,6 @@ export async function getPublicShare(shareId: string): Promise<any | null> {
           created_at: data.created_at,
           updated_at: data.updated_at,
         };
-        // Update caches
         SafeCache.set(`pub_share_${shareId}`, payloadData, 24 * 60 * 60 * 1000);
         try {
           localStorage.setItem(`pub_share_${shareId}`, JSON.stringify(payloadData));
@@ -964,4 +950,3 @@ export const fetchGrades = getStudentGrades;
 export const saveGrade = saveStudentGrade;
 export const fetchTeachingAgendas = getTeachingAgendas;
 export const fetchSavingTransactions = getSavingTransactions;
-
