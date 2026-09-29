@@ -131,12 +131,16 @@ export async function signUpWithEmailPassword(
 export async function getAuthSession() {
   const client = getSafeSupabaseClient();
   if (!client) return null;
-  const { data, error } = await client.auth.getSession();
-  if (error) {
-    console.error('Failed to retrieve Supabase session:', error);
+  try {
+    const { data, error } = await client.auth.getSession();
+    if (error) {
+      console.error('Failed to retrieve Supabase session:', error);
+      return null;
+    }
+    return data?.session ?? null;
+  } catch {
     return null;
   }
-  return data.session;
 }
 
 export async function getAuthUser() {
@@ -236,7 +240,6 @@ export async function checkSupabaseConnection(): Promise<SupabaseHealthStatus> {
     try {
       const { error } = await client.from(table).select('id').limit(1);
       if (error) {
-        // PGRST205 / 42P01 / "Could not find the table ... in the schema cache"
         const isMissing =
           error.code === '42P01' ||
           error.code === 'PGRST205' ||
@@ -248,8 +251,6 @@ export async function checkSupabaseConnection(): Promise<SupabaseHealthStatus> {
           missingTables.push(table);
           hasSchemaCacheError = true;
         } else {
-          // If RLS blocked (e.g. 42501 permission denied because not logged in), the table DOES exist in schema cache!
-          // Only actual missing table error adds to missingTables.
           if (error.code !== '42501' && !error.message.includes('JWT')) {
             connectionError = error.message;
           }
