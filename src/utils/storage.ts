@@ -1,5 +1,5 @@
-import { safeGetLocalStorage, safeSetLocalStorage } from './storageCache';
 import {
+  TeacherProfile,
   ClassRoom,
   Student,
   AttendanceSession,
@@ -7,119 +7,307 @@ import {
   GradeColumn,
   TeachingAgenda,
   SavingTransaction,
-  TeacherProfile,
 } from '../types';
-import { SCHOOL_CONFIG } from '../config/schoolConfig';
+import {
+  createClass,
+  batchInsertStudents,
+  saveAttendanceSession,
+  saveStudentGrade,
+  saveTeachingAgenda,
+  saveSavingTransaction,
+} from '../services/data';
+import { checkSupabaseConnection } from '../services/supabase';
 
-export const DEFAULT_TEACHER: TeacherProfile = {
-  id: 'guru_default',
-  namaGuru: 'Hendra Prabu S.Kom',
-  nip: '19870512 201201 1 004',
-  nbm: '1122334',
-  namaSekolah: SCHOOL_CONFIG.namaSekolah,
-  mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
-  tahunAjaran: SCHOOL_CONFIG.tahunAjaran,
-  semester: SCHOOL_CONFIG.semester,
-  email: 'guru@smkmuhbawang.sch.id',
-  activeClassId: 'cls_tkj_1',
+const LEGACY_KEYS = {
+  CLASSES: 'smk_classes',
+  STUDENTS: 'smk_students',
+  ATTENDANCE: 'smk_attendance',
+  GRADES: 'smk_grades',
+  GRADE_COLUMNS: 'smk_grade_columns',
+  AGENDAS: 'smk_agendas',
+  SAVINGS: 'smk_savings',
 };
 
-export const DEFAULT_CLASSES: ClassRoom[] = [
-  {
-    id: 'cls_tkj_1',
-    namaKelas: 'XII TKJ 1',
-    mataPelajaran: 'Administrasi Infrastruktur Jaringan',
-    kkm: 75,
-    jurusan: 'Teknik Jaringan Komputer dan Telekomunikasi',
-    keterangan: 'Tahun Ajaran 2025/2026',
-    createdAt: '2025-07-15',
-  },
-  {
-    id: 'cls_tkj_2',
-    namaKelas: 'XII TKJ 2',
-    mataPelajaran: 'Teknologi Layanan Jaringan',
-    kkm: 75,
-    jurusan: 'Teknik Jaringan Komputer dan Telekomunikasi',
-    keterangan: 'Tahun Ajaran 2025/2026',
-    createdAt: '2025-07-15',
-  },
-  {
-    id: 'cls_akl_1',
-    namaKelas: 'XI AKL 1',
-    mataPelajaran: 'Komputer Akuntansi (MYOB)',
-    kkm: 75,
-    jurusan: 'Akuntansi dan Keuangan Lembaga',
-    keterangan: 'Tahun Ajaran 2025/2026',
-    createdAt: '2025-07-15',
-  },
-];
+export const DEFAULT_GRADE_COLUMNS: GradeColumn[] = Array.from({ length: 10 }, (_, i) => ({
+  id: `col_f_${i + 1}`,
+  key: `formatif${i + 1}`,
+  label: `TP ${i + 1}`,
+  keterangan: `Tujuan Pembelajaran ${i + 1}`,
+}));
 
-export const DEFAULT_STUDENTS: Student[] = [
-  { id: 'std_1', classId: 'cls_tkj_1', no: 1, nisn: '0071234561', nama: 'Ahmad Fauzan', gender: 'L', noHpOrangTua: '081234567890', catatanUmum: 'Siswa aktif dan komunikatif' },
-  { id: 'std_2', classId: 'cls_tkj_1', no: 2, nisn: '0071234562', nama: 'Annisa Rahmawati', gender: 'P', noHpOrangTua: '081234567891', catatanUmum: 'Sangat rapi dalam mencatat tugas' },
-  { id: 'std_3', classId: 'cls_tkj_1', no: 3, nisn: '0071234563', nama: 'Bagus Pratama', gender: 'L', noHpOrangTua: '081234567892', catatanUmum: 'Mahir dalam konfigurasi Mikrotik' },
-  { id: 'std_4', classId: 'cls_tkj_1', no: 4, nisn: '0071234564', nama: 'Dewi Lestari', gender: 'P', noHpOrangTua: '081234567893', catatanUmum: 'Tertib dan disiplin' },
-  { id: 'std_5', classId: 'cls_tkj_1', no: 5, nisn: '0071234565', nama: 'Dimas Anggara', gender: 'L', noHpOrangTua: '081234567894', catatanUmum: 'Perlu sedikit dorongan pada teori' },
-  { id: 'std_6', classId: 'cls_tkj_1', no: 6, nisn: '0071234566', nama: 'Fajar Nugroho', gender: 'L', noHpOrangTua: '081234567895', catatanUmum: 'Antusias pada kegiatan praktik' },
-  { id: 'std_7', classId: 'cls_tkj_1', no: 7, nisn: '0071234567', nama: 'Intan Permata', gender: 'P', noHpOrangTua: '081234567896', catatanUmum: 'Selalu hadir tepat waktu' },
-  { id: 'std_8', classId: 'cls_tkj_1', no: 8, nisn: '0071234568', nama: 'Muhammad Rizky', gender: 'L', noHpOrangTua: '081234567897', catatanUmum: 'Ketua kelas yang bertanggung jawab' },
-  { id: 'std_9', classId: 'cls_tkj_1', no: 9, nisn: '0071234569', nama: 'Nabila Zahra', gender: 'P', noHpOrangTua: '081234567898', catatanUmum: 'Kreatif dalam menyelesaikan tugas' },
-  { id: 'std_10', classId: 'cls_tkj_1', no: 10, nisn: '0071234570', nama: 'Rizki Hidayat', gender: 'L', noHpOrangTua: '081234567899', catatanUmum: 'Senang membantu rekan kelompok' },
-];
-
-export const DEFAULT_GRADE_COLUMNS: GradeColumn[] = [
-  { id: 'col_tp1', key: 'formatif1', label: 'Konfigurasi Routing Dinamis BGP & OSPF', bobot: 1 },
-  { id: 'col_tp2', key: 'formatif2', label: 'VLAN, Trunking & InterVLAN Routing', bobot: 1 },
-  { id: 'col_tp3', key: 'formatif3', label: 'Firewall Filter & Network Address Translation', bobot: 1 },
-  { id: 'col_tp4', key: 'formatif4', label: 'Manajemen Bandwidth Simple Queue & PCQ', bobot: 1 },
-  { id: 'col_tp5', key: 'formatif5', label: 'Keamanan Jaringan & VPN Tunneling', bobot: 1 },
-];
-
-export function getLocalTeacher(): TeacherProfile {
-  return safeGetLocalStorage('muhiba_teacher_profile', DEFAULT_TEACHER);
-}
-export function setLocalTeacher(profile: TeacherProfile): void {
-  safeSetLocalStorage('muhiba_teacher_profile', profile);
+export function getLocalGradeColumns(classId?: string): GradeColumn[] {
+  if (typeof window === 'undefined') return DEFAULT_GRADE_COLUMNS;
+  try {
+    const key = classId ? `smk_grade_columns_${classId}` : LEGACY_KEYS.GRADE_COLUMNS;
+    const val = localStorage.getItem(key);
+    if (val) {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+    // Fallback to legacy un-scoped key if class-specific is not found
+    if (classId) {
+      const fallbackVal = localStorage.getItem(LEGACY_KEYS.GRADE_COLUMNS);
+      if (fallbackVal) {
+        const parsedFallback = JSON.parse(fallbackVal);
+        if (Array.isArray(parsedFallback) && parsedFallback.length > 0) return parsedFallback;
+      }
+    }
+  } catch (e) {
+    console.error('Error reading local grade columns:', e);
+  }
+  return DEFAULT_GRADE_COLUMNS;
 }
 
-export function getLocalClasses(): ClassRoom[] {
-  return safeGetLocalStorage('muhiba_classes', DEFAULT_CLASSES);
-}
-export function setLocalClasses(classes: ClassRoom[]): void {
-  safeSetLocalStorage('muhiba_classes', classes);
-}
-
-export function getLocalStudents(): Student[] {
-  return safeGetLocalStorage('muhiba_students', DEFAULT_STUDENTS);
-}
-export function setLocalStudents(students: Student[]): void {
-  safeSetLocalStorage('muhiba_students', students);
+export function setLocalGradeColumns(cols: GradeColumn[], classId?: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const key = classId ? `smk_grade_columns_${classId}` : LEGACY_KEYS.GRADE_COLUMNS;
+    localStorage.setItem(key, JSON.stringify(cols));
+  } catch (e) {
+    console.error('Error saving local grade columns:', e);
+  }
 }
 
-export function getLocalSessions(): AttendanceSession[] {
-  return safeGetLocalStorage('muhiba_sessions', []);
-}
-export function setLocalSessions(sessions: AttendanceSession[]): void {
-  safeSetLocalStorage('muhiba_sessions', sessions);
-}
-
-export function getLocalGrades(): StudentGrade[] {
-  return safeGetLocalStorage('muhiba_grades', []);
-}
-export function setLocalGrades(grades: StudentGrade[]): void {
-  safeSetLocalStorage('muhiba_grades', grades);
-}
-
-export function getLocalAgendas(): TeachingAgenda[] {
-  return safeGetLocalStorage('muhiba_agendas', []);
-}
-export function setLocalAgendas(agendas: TeachingAgenda[]): void {
-  safeSetLocalStorage('muhiba_agendas', agendas);
+// Check if any legacy local data exists in the user's browser
+export function checkHasLegacyLocalData(): boolean {
+  try {
+    for (const key of Object.values(LEGACY_KEYS)) {
+      const val = localStorage.getItem(key);
+      if (val) {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return true;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error checking legacy local data:', e);
+  }
+  return false;
 }
 
-export function getLocalSavings(): SavingTransaction[] {
-  return safeGetLocalStorage('muhiba_savings', []);
+export function getLegacyDataSummary(): {
+  classes: number;
+  students: number;
+  attendance: number;
+  grades: number;
+  agendas: number;
+  savings: number;
+} {
+  const summary = {
+    classes: 0,
+    students: 0,
+    attendance: 0,
+    grades: 0,
+    agendas: 0,
+    savings: 0,
+  };
+
+  try {
+    const cls = localStorage.getItem(LEGACY_KEYS.CLASSES);
+    if (cls) summary.classes = JSON.parse(cls).length || 0;
+
+    const std = localStorage.getItem(LEGACY_KEYS.STUDENTS);
+    if (std) summary.students = JSON.parse(std).length || 0;
+
+    const att = localStorage.getItem(LEGACY_KEYS.ATTENDANCE);
+    if (att) summary.attendance = JSON.parse(att).length || 0;
+
+    const grd = localStorage.getItem(LEGACY_KEYS.GRADES);
+    if (grd) summary.grades = JSON.parse(grd).length || 0;
+
+    const agd = localStorage.getItem(LEGACY_KEYS.AGENDAS);
+    if (agd) summary.agendas = JSON.parse(agd).length || 0;
+
+    const svg = localStorage.getItem(LEGACY_KEYS.SAVINGS);
+    if (svg) summary.savings = JSON.parse(svg).length || 0;
+  } catch (e) {
+    console.warn('Error summarizing legacy data:', e);
+  }
+
+  return summary;
 }
-export function setLocalSavings(savings: SavingTransaction[]): void {
-  safeSetLocalStorage('muhiba_savings', savings);
+
+// One-time migration: Import data from LocalStorage to Supabase
+// Protected: NEVER removes localStorage unless database schema is ready and insertion is 100% verified
+export async function migrateLegacyLocalStorageToSupabase(): Promise<{
+  success: boolean;
+  importedCount: number;
+  failedCount: number;
+  message: string;
+}> {
+  // SAFETY GATE: Verify Supabase database schema readiness first
+  const health = await checkSupabaseConnection();
+  if (!health.databaseSchemaReady) {
+    return {
+      success: false,
+      importedCount: 0,
+      failedCount: 0,
+      message: `MIGRATION STATUS = BLOCKED: Schema database Supabase belum siap (${health.missingTables.length > 0 ? `Tabel belum ada: ${health.missingTables.join(', ')}` : health.message}). Data lokal Anda dijamin AMAN dan TIDAK dihapus. Silakan jalankan file supabase/migrations/001_initial_schema.sql di SQL Editor Supabase terlebih dahulu.`,
+    };
+  }
+
+  let importedCount = 0;
+  let failedCount = 0;
+
+  try {
+    // 1. Classes
+    let classesFailed = 0;
+    const rawClasses = localStorage.getItem(LEGACY_KEYS.CLASSES);
+    if (rawClasses) {
+      const parsed: ClassRoom[] = JSON.parse(rawClasses);
+      for (const cls of parsed) {
+        try {
+          await createClass(cls);
+          importedCount++;
+        } catch (e) {
+          console.error('Failed to migrate class:', cls.namaKelas, e);
+          failedCount++;
+          classesFailed++;
+        }
+      }
+      // ONLY remove if completely successful
+      if (classesFailed === 0 && parsed.length > 0) {
+        localStorage.removeItem(LEGACY_KEYS.CLASSES);
+      }
+    }
+
+    // 2. Students
+    let studentsFailed = 0;
+    const rawStudents = localStorage.getItem(LEGACY_KEYS.STUDENTS);
+    if (rawStudents) {
+      const parsed: Student[] = JSON.parse(rawStudents);
+      try {
+        await batchInsertStudents(parsed);
+        importedCount += parsed.length;
+        localStorage.removeItem(LEGACY_KEYS.STUDENTS);
+      } catch (e) {
+        console.error('Failed to migrate students:', e);
+        failedCount += parsed.length;
+        studentsFailed += parsed.length;
+      }
+    }
+
+    // 3. Attendance
+    let attendanceFailed = 0;
+    const rawAtt = localStorage.getItem(LEGACY_KEYS.ATTENDANCE);
+    if (rawAtt) {
+      const parsed: AttendanceSession[] = JSON.parse(rawAtt);
+      for (const sess of parsed) {
+        try {
+          await saveAttendanceSession(sess);
+          importedCount++;
+        } catch (e) {
+          console.error('Failed to migrate attendance:', sess.tanggal, e);
+          failedCount++;
+          attendanceFailed++;
+        }
+      }
+      if (attendanceFailed === 0 && parsed.length > 0) {
+        localStorage.removeItem(LEGACY_KEYS.ATTENDANCE);
+      }
+    }
+
+    // 4. Grades
+    let gradesFailed = 0;
+    const rawGrades = localStorage.getItem(LEGACY_KEYS.GRADES);
+    if (rawGrades) {
+      const parsed: StudentGrade[] = JSON.parse(rawGrades);
+      for (const gr of parsed) {
+        try {
+          await saveStudentGrade(gr);
+          importedCount++;
+        } catch (e) {
+          console.error('Failed to migrate grade:', gr.id, e);
+          failedCount++;
+          gradesFailed++;
+        }
+      }
+      if (gradesFailed === 0 && parsed.length > 0) {
+        localStorage.removeItem(LEGACY_KEYS.GRADES);
+      }
+    }
+
+    // 5. Agendas
+    let agendasFailed = 0;
+    const rawAgd = localStorage.getItem(LEGACY_KEYS.AGENDAS);
+    if (rawAgd) {
+      const parsed: TeachingAgenda[] = JSON.parse(rawAgd);
+      for (const ag of parsed) {
+        try {
+          await saveTeachingAgenda(ag);
+          importedCount++;
+        } catch (e) {
+          console.error('Failed to migrate agenda:', ag.tanggal, e);
+          failedCount++;
+          agendasFailed++;
+        }
+      }
+      if (agendasFailed === 0 && parsed.length > 0) {
+        localStorage.removeItem(LEGACY_KEYS.AGENDAS);
+      }
+    }
+
+    // 6. Savings
+    let savingsFailed = 0;
+    const rawSavings = localStorage.getItem(LEGACY_KEYS.SAVINGS);
+    if (rawSavings) {
+      const parsed: SavingTransaction[] = JSON.parse(rawSavings);
+      for (const tx of parsed) {
+        try {
+          await saveSavingTransaction(tx);
+          importedCount++;
+        } catch (e) {
+          console.error('Failed to migrate saving transaction:', tx.id, e);
+          failedCount++;
+          savingsFailed++;
+        }
+      }
+      if (savingsFailed === 0 && parsed.length > 0) {
+        localStorage.removeItem(LEGACY_KEYS.SAVINGS);
+      }
+    }
+
+    // Only set migration timestamp if no overall failures
+    if (failedCount === 0 && importedCount > 0) {
+      localStorage.setItem('smk_migrated_to_supabase', new Date().toISOString());
+    }
+
+    return {
+      success: failedCount === 0,
+      importedCount,
+      failedCount,
+      message:
+        failedCount === 0
+          ? `Migrasi berhasil! ${importedCount} data berhasil dipindahkan ke PostgreSQL Supabase.`
+          : `Migrasi selesai sebagian: ${importedCount} data berhasil, ${failedCount} data gagal. Data yang belum berhasil tetap AMAN di browser.`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      importedCount,
+      failedCount,
+      message: `Terjadi kendala saat migrasi: ${err?.message || 'Error tidak diketahui'}. Data lokal tetap aman di browser.`,
+    };
+  }
+}
+
+// Backup current memory data to JSON file
+export function exportDataToJsonBackup(data: {
+  teacher: TeacherProfile | null;
+  classes: ClassRoom[];
+  students: Student[];
+  attendance: AttendanceSession[];
+  grades: StudentGrade[];
+  gradeColumns: GradeColumn[];
+  agendas: TeachingAgenda[];
+  savings: SavingTransaction[];
+}): string {
+  const payload = {
+    appName: 'Absenhndx07 - SMK Muhammadiyah Bawang',
+    backupVersion: '2.0-supabase',
+    exportedAt: new Date().toISOString(),
+    ...data,
+  };
+  return JSON.stringify(payload, null, 2);
 }

@@ -401,7 +401,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
 
   const handleSetAllPresentInAgenda = () => {
     if (!editingAgenda) return;
-    const total = targetClassStudents.length || editingAgenda.hadirCount || 32;
+    const total = targetClassStudents.length || editingAgenda.hadirCount || 0;
     setEditingAgenda((prev) => (prev ? { ...prev, hadirCount: total, tidakHadirCount: 0 } : null));
   };
 
@@ -425,7 +425,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
 
     const todayStr = today.toISOString().split('T')[0];
     const stds = classStudentsMap[initialClassId] || (currentClass?.id === initialClassId ? students : []);
-    const initialTotal = stds.length > 0 ? stds.length : 32;
+    const initialTotal = stds.length;
 
     const existingSessions = classSessionsMap[initialClassId] || (currentClass?.id === initialClassId ? sessions : []);
     const matchTodaySession = existingSessions.find((s) => s.tanggal === todayStr);
@@ -1171,7 +1171,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                     const curDate = editingAgenda.tanggal || '';
                     const matchSess = sessList.find((s) => s.tanggal === curDate);
 
-                    let hadir = stds.length || 32;
+                    let hadir = stds.length;
                     let tidakHadir = 0;
                     let absentNote = '';
 
@@ -1235,7 +1235,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                       const sessList = classSessionsMap[curClsId] || (currentClass?.id === curClsId ? sessions : []);
                       const matchSess = sessList.find((s) => s.tanggal === newDate);
 
-                      let hadir = stds.length || editingAgenda.hadirCount || 32;
+                      let hadir = stds.length || editingAgenda.hadirCount || 0;
                       let tidakHadir = 0;
                       let absentNote = '';
 
@@ -1523,7 +1523,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                     onClick={handleSetAllPresentInAgenda}
                     className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer"
                   >
-                    Semua Hadir ({targetClassStudents.length || 32})
+                    Semua Hadir ({targetClassStudents.length})
                   </button>
                 </div>
 

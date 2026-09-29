@@ -1039,7 +1039,7 @@ export default function App() {
               href={SCHOOL_CONFIG.websiteUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-white underline decoration-emerald-300 font-bold hover:text-emerald-200 transition"
+              className="text-white underline decoration-white/80 font-bold hover:text-white hover:decoration-white transition"
             >
               {SCHOOL_CONFIG.website}
             </a>
