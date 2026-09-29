@@ -122,7 +122,7 @@ export function getLegacyDataSummary(): {
     const svg = localStorage.getItem(LEGACY_KEYS.SAVINGS);
     if (svg) summary.savings = JSON.parse(svg).length || 0;
   } catch (e) {
-    console.warn('Error summarizing legacy data:', e);
+    console.error('Error reading legacy data summary:', e);
   }
 
   return summary;
@@ -166,7 +166,6 @@ export async function migrateLegacyLocalStorageToSupabase(): Promise<{
           classesFailed++;
         }
       }
-      // ONLY remove if completely successful
       if (classesFailed === 0 && parsed.length > 0) {
         localStorage.removeItem(LEGACY_KEYS.CLASSES);
       }
@@ -182,13 +181,13 @@ export async function migrateLegacyLocalStorageToSupabase(): Promise<{
         importedCount += parsed.length;
         localStorage.removeItem(LEGACY_KEYS.STUDENTS);
       } catch (e) {
-        console.error('Failed to migrate students:', e);
+        console.error('Failed to migrate students bulk:', e);
         failedCount += parsed.length;
-        studentsFailed += parsed.length;
+        studentsFailed++;
       }
     }
 
-    // 3. Attendance
+    // 3. Attendance Sessions
     let attendanceFailed = 0;
     const rawAtt = localStorage.getItem(LEGACY_KEYS.ATTENDANCE);
     if (rawAtt) {
@@ -198,7 +197,7 @@ export async function migrateLegacyLocalStorageToSupabase(): Promise<{
           await saveAttendanceSession(sess);
           importedCount++;
         } catch (e) {
-          console.error('Failed to migrate attendance:', sess.tanggal, e);
+          console.error('Failed to migrate attendance session:', sess.pertemuanKe, e);
           failedCount++;
           attendanceFailed++;
         }
@@ -210,15 +209,15 @@ export async function migrateLegacyLocalStorageToSupabase(): Promise<{
 
     // 4. Grades
     let gradesFailed = 0;
-    const rawGrades = localStorage.getItem(LEGACY_KEYS.GRADES);
-    if (rawGrades) {
-      const parsed: StudentGrade[] = JSON.parse(rawGrades);
-      for (const gr of parsed) {
+    const rawGrd = localStorage.getItem(LEGACY_KEYS.GRADES);
+    if (rawGrd) {
+      const parsed: StudentGrade[] = JSON.parse(rawGrd);
+      for (const grd of parsed) {
         try {
-          await saveStudentGrade(gr);
+          await saveStudentGrade(grd);
           importedCount++;
         } catch (e) {
-          console.error('Failed to migrate grade:', gr.id, e);
+          console.error('Failed to migrate student grade:', grd.studentId, e);
           failedCount++;
           gradesFailed++;
         }
