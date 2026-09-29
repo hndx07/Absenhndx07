@@ -26,6 +26,9 @@ import {
   Filter,
   X,
   ChevronRight,
+  ArrowUpAZ,
+  ArrowDownZA,
+  ArrowUpDown,
 } from 'lucide-react';
 import { getSafeSupabaseClient } from '../services/supabase';
 import { getPublicShare } from '../services/data';
@@ -79,6 +82,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   const [gradeViewMode, setGradeViewMode] = useState<'summary' | 'detailed'>('summary');
   const [gradeFilterStatus, setGradeFilterStatus] = useState<'all' | 'tuntas' | 'belum_tuntas'>('all');
   const [selectedStudentGrade, setSelectedStudentGrade] = useState<any | null>(null);
+  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('no');
 
   const effectiveType: 'absen' | 'nilai' | 'tabungan' | 'agenda' =
     data?.shareType || initialType;
@@ -418,18 +422,48 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     };
   }, [computedGrades, activeGradeColumns]);
 
-  const filteredComputedGrades = useMemo(() => {
-    return computedGrades.filter((item: any) => {
-      const matchSearch =
-        (item.student.nama || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.student.nisn || '').includes(searchTerm);
-      if (!matchSearch) return false;
+  // Sorted and filtered students list for Absen & Tabungan
+  const sortedStudents = useMemo(() => {
+    const list = Array.isArray(data?.students) ? [...data.students] : [];
+    return list
+      .filter(
+        (s: any) =>
+          (s.nama || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (s.nisn || '').includes(searchTerm)
+      )
+      .sort((a: any, b: any) => {
+        if (sortOrder === 'name-asc') {
+          return (a.nama || '').localeCompare(b.nama || '', 'id', { sensitivity: 'base' });
+        }
+        if (sortOrder === 'name-desc') {
+          return (b.nama || '').localeCompare(a.nama || '', 'id', { sensitivity: 'base' });
+        }
+        return (a.no || 0) - (b.no || 0);
+      });
+  }, [data?.students, searchTerm, sortOrder]);
 
-      if (gradeFilterStatus === 'tuntas') return item.isTuntas;
-      if (gradeFilterStatus === 'belum_tuntas') return item.hasAnyScore && !item.isTuntas;
-      return true;
-    });
-  }, [computedGrades, searchTerm, gradeFilterStatus]);
+  const filteredComputedGrades = useMemo(() => {
+    return computedGrades
+      .filter((item: any) => {
+        const matchSearch =
+          (item.student?.nama || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (item.student?.nisn || '').includes(searchTerm);
+        if (!matchSearch) return false;
+
+        if (gradeFilterStatus === 'tuntas') return item.isTuntas;
+        if (gradeFilterStatus === 'belum_tuntas') return item.hasAnyScore && !item.isTuntas;
+        return true;
+      })
+      .sort((a: any, b: any) => {
+        if (sortOrder === 'name-asc') {
+          return (a.student?.nama || '').localeCompare(b.student?.nama || '', 'id', { sensitivity: 'base' });
+        }
+        if (sortOrder === 'name-desc') {
+          return (b.student?.nama || '').localeCompare(a.student?.nama || '', 'id', { sensitivity: 'base' });
+        }
+        return (a.student?.no || 0) - (b.student?.no || 0);
+      });
+  }, [computedGrades, searchTerm, gradeFilterStatus, sortOrder]);
 
   if (loading && !data) {
     return (
@@ -647,17 +681,61 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           </div>
         </div>
 
-        {/* Search Bar */}
+        {/* Search & Sort Bar */}
         {(effectiveType === 'absen' || effectiveType === 'nilai' || effectiveType === 'tabungan') && (
-          <div className="relative w-full max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Cari nama siswa atau NISN..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full min-h-[44px] pl-10 pr-4 py-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
-            />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Cari nama siswa atau NISN..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full min-h-[44px] pl-10 pr-4 py-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
+              />
+            </div>
+
+            {/* Quick Sort Buttons */}
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setSortOrder('no')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                  sortOrder === 'no'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+                title="Urutkan nomor urut"
+              >
+                <span>No Urut</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortOrder('name-asc')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                  sortOrder === 'name-asc'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+                title="Urutkan abjad A ke Z"
+              >
+                <ArrowUpAZ className="w-3.5 h-3.5" />
+                <span>Abjad A-Z</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortOrder('name-desc')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                  sortOrder === 'name-desc'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+                title="Urutkan abjad Z ke A"
+              >
+                <ArrowDownZA className="w-3.5 h-3.5" />
+                <span>Abjad Z-A</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -832,20 +910,43 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                         <table className="w-full text-left border-collapse text-xs">
                           <thead>
                             <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
-                              <th className="py-3.5 px-3 text-center w-12 text-white">No</th>
-                              <th className="py-3.5 px-4 min-w-[200px] text-white">Nama Peserta Didik</th>
+                              <th
+                                onClick={() => setSortOrder('no')}
+                                className="py-3.5 px-3 text-center w-12 text-white cursor-pointer hover:bg-white/10 transition select-none"
+                                title="Klik untuk sortir nomor urut"
+                              >
+                                <div className="flex items-center justify-center gap-1">
+                                  <span>No</span>
+                                  {sortOrder === 'no' && <ArrowUpDown className="w-3 h-3 text-white" />}
+                                </div>
+                              </th>
+                              <th
+                                onClick={() => setSortOrder((prev) => (prev === 'name-asc' ? 'name-desc' : 'name-asc'))}
+                                className="py-3.5 px-4 min-w-[200px] text-white cursor-pointer hover:bg-white/10 transition select-none"
+                                title="Klik untuk sortir nama alfabetis (A-Z / Z-A)"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span>Nama Peserta Didik</span>
+                                  {sortOrder === 'name-asc' ? (
+                                    <span className="flex items-center text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-mono">
+                                      <ArrowUpAZ className="w-3 h-3 mr-0.5" /> A-Z
+                                    </span>
+                                  ) : sortOrder === 'name-desc' ? (
+                                    <span className="flex items-center text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-mono">
+                                      <ArrowDownZA className="w-3 h-3 mr-0.5" /> Z-A
+                                    </span>
+                                  ) : (
+                                    <ArrowUpDown className="w-3 h-3 text-emerald-200" />
+                                  )}
+                                </div>
+                              </th>
                               <th className="py-3.5 px-4 text-center w-36 text-white">Status Kehadiran</th>
                               <th className="py-3.5 px-4 min-w-[180px] text-white">Catatan / Keterangan</th>
                             </tr>
                           </thead>
 
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {(data?.students || [])
-                              .filter((s: any) =>
-                                (s.nama || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                (s.nisn || '').includes(searchTerm)
-                              )
-                              .map((std: any, idx: number) => {
+                            {sortedStudents.map((std: any, idx: number) => {
                                 const rec = currentSession.records?.[std.id];
                                 const status = rec?.status || 'H';
                                 const catatan = rec?.catatan;
@@ -988,8 +1089,36 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
-                          <th className="py-3 px-3 text-center w-12 text-white">No</th>
-                          <th className="py-3 px-4 min-w-[190px] text-white">Nama Peserta Didik</th>
+                          <th
+                            onClick={() => setSortOrder('no')}
+                            className="py-3 px-3 text-center w-12 text-white cursor-pointer hover:bg-white/10 transition select-none"
+                            title="Klik untuk sortir nomor urut"
+                          >
+                            <div className="flex items-center justify-center gap-1">
+                              <span>No</span>
+                              {sortOrder === 'no' && <ArrowUpDown className="w-3 h-3 text-white" />}
+                            </div>
+                          </th>
+                          <th
+                            onClick={() => setSortOrder((prev) => (prev === 'name-asc' ? 'name-desc' : 'name-asc'))}
+                            className="py-3 px-4 min-w-[190px] text-white cursor-pointer hover:bg-white/10 transition select-none"
+                            title="Klik untuk sortir nama alfabetis (A-Z / Z-A)"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span>Nama Peserta Didik</span>
+                              {sortOrder === 'name-asc' ? (
+                                <span className="flex items-center text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-mono">
+                                  <ArrowUpAZ className="w-3 h-3 mr-0.5" /> A-Z
+                                </span>
+                              ) : sortOrder === 'name-desc' ? (
+                                <span className="flex items-center text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-mono">
+                                  <ArrowDownZA className="w-3 h-3 mr-0.5" /> Z-A
+                                </span>
+                              ) : (
+                                <ArrowUpDown className="w-3 h-3 text-emerald-200" />
+                              )}
+                            </div>
+                          </th>
                           <th className="py-3 px-3 text-center w-14 text-white">Hadir</th>
                           <th className="py-3 px-3 text-center w-14 text-white">Sakit</th>
                           <th className="py-3 px-3 text-center w-14 text-white">Izin</th>
@@ -1000,12 +1129,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                       </thead>
 
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {(data?.students || [])
-                          .filter((s: any) =>
-                            (s.nama || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            (s.nisn || '').includes(searchTerm)
-                          )
-                          .map((std: any, idx: number) => {
+                        {sortedStudents.map((std: any, idx: number) => {
                             let h = 0, s = 0, i = 0, a = 0, d = 0;
                             (data.sessions || []).forEach((sess: any) => {
                               const rec = sess.records?.[std.id];
@@ -1235,8 +1359,36 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white text-[11px] font-bold uppercase tracking-wider">
-                      <th className="py-3 px-3 text-center w-12 sticky left-0 bg-[#009B62] text-white z-10">No</th>
-                      <th className="py-3 px-4 min-w-[200px] sticky left-12 bg-[#008276] text-white z-10">Nama Peserta Didik</th>
+                      <th
+                        onClick={() => setSortOrder('no')}
+                        className="py-3 px-3 text-center w-12 sticky left-0 bg-[#009B62] text-white z-10 cursor-pointer hover:opacity-90 transition select-none"
+                        title="Klik untuk sortir nomor urut"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>No</span>
+                          {sortOrder === 'no' && <ArrowUpDown className="w-3 h-3 text-white" />}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => setSortOrder((prev) => (prev === 'name-asc' ? 'name-desc' : 'name-asc'))}
+                        className="py-3 px-4 min-w-[200px] sticky left-12 bg-[#008276] text-white z-10 cursor-pointer hover:opacity-90 transition select-none"
+                        title="Klik untuk sortir nama alfabetis (A-Z / Z-A)"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Nama Peserta Didik</span>
+                          {sortOrder === 'name-asc' ? (
+                            <span className="flex items-center text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-mono">
+                              <ArrowUpAZ className="w-3 h-3 mr-0.5" /> A-Z
+                            </span>
+                          ) : sortOrder === 'name-desc' ? (
+                            <span className="flex items-center text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-mono">
+                              <ArrowDownZA className="w-3 h-3 mr-0.5" /> Z-A
+                            </span>
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-emerald-200" />
+                          )}
+                        </div>
+                      </th>
                       
                       {gradeViewMode === 'detailed' ? (
                         <>
@@ -1743,15 +1895,41 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                      <th className="py-3 px-3 text-center w-12">No</th>
-                      <th className="py-3 px-4 min-w-[200px]">Nama Siswa</th>
+                      <th
+                        onClick={() => setSortOrder('no')}
+                        className="py-3 px-3 text-center w-12 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition select-none"
+                        title="Klik untuk sortir nomor urut"
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                          <span>No</span>
+                          {sortOrder === 'no' && <ArrowUpDown className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />}
+                        </div>
+                      </th>
+                      <th
+                        onClick={() => setSortOrder((prev) => (prev === 'name-asc' ? 'name-desc' : 'name-asc'))}
+                        className="py-3 px-4 min-w-[200px] cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition select-none"
+                        title="Klik untuk sortir nama alfabetis (A-Z / Z-A)"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Nama Siswa</span>
+                          {sortOrder === 'name-asc' ? (
+                            <span className="flex items-center text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.5 rounded font-mono">
+                              <ArrowUpAZ className="w-3 h-3 mr-0.5" /> A-Z
+                            </span>
+                          ) : sortOrder === 'name-desc' ? (
+                            <span className="flex items-center text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.5 rounded font-mono">
+                              <ArrowDownZA className="w-3 h-3 mr-0.5" /> Z-A
+                            </span>
+                          ) : (
+                            <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                          )}
+                        </div>
+                      </th>
                       <th className="py-3 px-4 text-right min-w-[150px]">Saldo Tabungan</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {(data?.students || [])
-                      .filter((s: any) => (s.nama || '').toLowerCase().includes(searchTerm.toLowerCase()))
-                      .map((std: any, idx: number) => (
+                    {sortedStudents.map((std: any, idx: number) => (
                         <tr key={std.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
                           <td className="py-3 px-3 text-center font-mono font-bold text-slate-400 dark:text-slate-500">
                             {idx + 1}

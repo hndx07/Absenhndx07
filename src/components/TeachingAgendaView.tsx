@@ -423,8 +423,38 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
     setIsPeriodsExpanded(true);
     const formatted = formatPeriodsToJamKe(defaultPeriods);
 
+    const todayStr = today.toISOString().split('T')[0];
     const stds = classStudentsMap[initialClassId] || (currentClass?.id === initialClassId ? students : []);
     const initialTotal = stds.length > 0 ? stds.length : 32;
+
+    const existingSessions = classSessionsMap[initialClassId] || (currentClass?.id === initialClassId ? sessions : []);
+    const matchTodaySession = existingSessions.find((s) => s.tanggal === todayStr);
+
+    let initialHadir = initialTotal;
+    let initialTidakHadir = 0;
+    let initialCatatan = 'Pembelajaran berlangsung kondusif dan tertib.';
+
+    if (matchTodaySession && stds.length > 0) {
+      let h = 0;
+      let th = 0;
+      const absentList: string[] = [];
+      stds.forEach((s) => {
+        const rec = matchTodaySession.records?.[s.id];
+        const st = rec?.status || 'H';
+        if (st === 'H' || st === 'D') {
+          h++;
+        } else {
+          th++;
+          const label = st === 'S' ? 'Sakit' : st === 'I' ? 'Izin' : 'Alpa';
+          absentList.push(`${s.nama} (${label})`);
+        }
+      });
+      initialHadir = h;
+      initialTidakHadir = th;
+      if (absentList.length > 0) {
+        initialCatatan = `Tidak hadir: ${absentList.join(', ')}`;
+      }
+    }
 
     setEditingAgenda({
       id: `ag_${Date.now()}`,
@@ -432,15 +462,15 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
       classNameSnapshot: initialClass?.namaKelas || '',
       mataPelajaran: initialClass?.mataPelajaran || teacher.mataPelajaranUtama || '',
       guruName: teacher.namaGuru,
-      tanggal: today.toISOString().split('T')[0],
+      tanggal: todayStr,
       hari: currentDay,
       jamKe: formatted.jamKe,
       rentangJam: formatted.rentangJam,
-      materiAjar: '',
+      materiAjar: matchTodaySession?.topikMateri || '',
       kegiatan: '',
-      catatan: 'Pembelajaran berlangsung kondusif dan tertib.',
-      hadirCount: initialTotal,
-      tidakHadirCount: 0,
+      catatan: initialCatatan,
+      hadirCount: initialHadir,
+      tidakHadirCount: initialTidakHadir,
     });
     setIsModalOpen(true);
   };
@@ -1136,11 +1166,49 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                   selectedClassId={editingAgenda.classId || ''}
                   onChange={(newClsId) => {
                     const sel = classes.find((c) => c.id === newClsId);
-                    setEditingAgenda({
-                      ...editingAgenda,
-                      classId: newClsId,
-                      classNameSnapshot: sel?.namaKelas || '',
-                      mataPelajaran: sel?.mataPelajaran || editingAgenda.mataPelajaran || teacher.mataPelajaranUtama,
+                    const stds = classStudentsMap[newClsId] || (currentClass?.id === newClsId ? students : []);
+                    const sessList = classSessionsMap[newClsId] || (currentClass?.id === newClsId ? sessions : []);
+                    const curDate = editingAgenda.tanggal || '';
+                    const matchSess = sessList.find((s) => s.tanggal === curDate);
+
+                    let hadir = stds.length || 32;
+                    let tidakHadir = 0;
+                    let absentNote = '';
+
+                    if (matchSess && stds.length > 0) {
+                      let h = 0;
+                      let th = 0;
+                      const absentList: string[] = [];
+                      stds.forEach((s) => {
+                        const rec = matchSess.records?.[s.id];
+                        const st = rec?.status || 'H';
+                        if (st === 'H' || st === 'D') {
+                          h++;
+                        } else {
+                          th++;
+                          const label = st === 'S' ? 'Sakit' : st === 'I' ? 'Izin' : 'Alpa';
+                          absentList.push(`${s.nama} (${label})`);
+                        }
+                      });
+                      hadir = h;
+                      tidakHadir = th;
+                      if (absentList.length > 0) {
+                        absentNote = `Tidak hadir: ${absentList.join(', ')}`;
+                      }
+                    }
+
+                    setEditingAgenda((prev) => {
+                      if (!prev) return null;
+                      return {
+                        ...prev,
+                        classId: newClsId,
+                        classNameSnapshot: sel?.namaKelas || '',
+                        mataPelajaran: sel?.mataPelajaran || prev.mataPelajaran || teacher.mataPelajaranUtama,
+                        materiAjar: matchSess?.topikMateri || prev.materiAjar,
+                        hadirCount: hadir,
+                        tidakHadirCount: tidakHadir,
+                        catatan: absentNote || prev.catatan,
+                      };
                     });
                   }}
                   placeholder="Pilih kelas yang diajar..."
@@ -1148,23 +1216,62 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                 />
               </div>
 
-              {/* Grid Tanggal, Hari, Jam Ke */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Grid Tanggal & Hari */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                    Tanggal
+                    Tanggal <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="date"
                     required
                     value={editingAgenda.tanggal || ''}
                     onChange={(e) => {
-                      const d = new Date(e.target.value);
+                      const newDate = e.target.value;
+                      const d = new Date(newDate);
                       const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-                      setEditingAgenda({
-                        ...editingAgenda,
-                        tanggal: e.target.value,
-                        hari: days[d.getDay()] || 'Senin',
+                      const curClsId = editingAgenda.classId || '';
+                      const stds = classStudentsMap[curClsId] || (currentClass?.id === curClsId ? students : []);
+                      const sessList = classSessionsMap[curClsId] || (currentClass?.id === curClsId ? sessions : []);
+                      const matchSess = sessList.find((s) => s.tanggal === newDate);
+
+                      let hadir = stds.length || editingAgenda.hadirCount || 32;
+                      let tidakHadir = 0;
+                      let absentNote = '';
+
+                      if (matchSess && stds.length > 0) {
+                        let h = 0;
+                        let th = 0;
+                        const absentList: string[] = [];
+                        stds.forEach((s) => {
+                          const rec = matchSess.records?.[s.id];
+                          const st = rec?.status || 'H';
+                          if (st === 'H' || st === 'D') {
+                            h++;
+                          } else {
+                            th++;
+                            const label = st === 'S' ? 'Sakit' : st === 'I' ? 'Izin' : 'Alpa';
+                            absentList.push(`${s.nama} (${label})`);
+                          }
+                        });
+                        hadir = h;
+                        tidakHadir = th;
+                        if (absentList.length > 0) {
+                          absentNote = `Tidak hadir: ${absentList.join(', ')}`;
+                        }
+                      }
+
+                      setEditingAgenda((prev) => {
+                        if (!prev) return null;
+                        return {
+                          ...prev,
+                          tanggal: newDate,
+                          hari: days[d.getDay()] || 'Senin',
+                          materiAjar: matchSess?.topikMateri || prev.materiAjar,
+                          hadirCount: hadir,
+                          tidakHadirCount: tidakHadir,
+                          catatan: absentNote || prev.catatan,
+                        };
                       });
                     }}
                     className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -1183,32 +1290,109 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                     className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                    Jam Ke-
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 1 - 4"
-                    value={editingAgenda.jamKe || ''}
-                    onChange={(e) => setEditingAgenda({ ...editingAgenda, jamKe: e.target.value })}
-                    className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                  Rentang Waktu
-                </label>
-                <input
-                  type="text"
-                  placeholder="07.00 - 09.45 WIB"
-                  value={editingAgenda.rentangJam || ''}
-                  onChange={(e) => setEditingAgenda({ ...editingAgenda, rentangJam: e.target.value })}
-                  className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+              {/* SEKSI JAM KE - Persis Gambar Terlampir dengan 2 Kolom, Cekbox, Pilih Cepat, dan Roll Kebawah */}
+              <div className="bg-slate-50 dark:bg-slate-850 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-800 space-y-3">
+                {/* Header Bagian Jam Ke */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">
+                      Jam ke <span className="text-rose-500">*</span>
+                    </span>
+                    <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      {editingAgenda.jamKe || '1 - 4'} ({editingAgenda.rentangJam || '07:15 - 09:15 WIB'})
+                    </span>
+                  </div>
+
+                  {/* Pilih Cepat & Tombol Sembunyikan/Roll Kebawah */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Pilih cepat:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickSelectPeriods([1, 2, 3, 4])}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                        isPeriodsActive([1, 2, 3, 4])
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      1-4
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickSelectPeriods([5, 6, 7, 8])}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                        isPeriodsActive([5, 6, 7, 8])
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      5-8
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickSelectPeriods([9, 10, 11, 12])}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                        isPeriodsActive([9, 10, 11, 12])
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      9-12
+                    </button>
+
+                    {/* Tombol Roll Kebawah / Sembunyikan */}
+                    <button
+                      type="button"
+                      onClick={() => setIsPeriodsExpanded((prev) => !prev)}
+                      className="ml-1 px-2.5 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-750 transition flex items-center gap-1 cursor-pointer"
+                      title={isPeriodsExpanded ? 'Sembunyikan Pilihan Jam' : 'Roll Kebawah / Buka Pilihan Jam'}
+                    >
+                      <span>{isPeriodsExpanded ? 'Sembunyikan' : 'Roll Kebawah'}</span>
+                      {isPeriodsExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Grid 2 Kolom Pilihan Jam Pelajaran Sesuai Gambar */}
+                {isPeriodsExpanded && (
+                  <div className="max-h-72 overflow-y-auto pr-1 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {TEACHING_PERIODS.map((period) => {
+                      const isSelected = selectedPeriods.includes(period.no);
+                      return (
+                        <div
+                          key={period.no}
+                          onClick={() => handleTogglePeriod(period.no)}
+                          className={`flex items-center gap-3 p-3 rounded-2xl border transition cursor-pointer select-none ${
+                            isSelected
+                              ? 'bg-indigo-50/90 dark:bg-indigo-950/50 border-indigo-400 dark:border-indigo-600 shadow-xs'
+                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${
+                              isSelected
+                                ? 'bg-indigo-600 border-indigo-600 text-white'
+                                : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                          </div>
+                          <span
+                            className={`text-xs font-semibold ${
+                              isSelected
+                                ? 'text-indigo-950 dark:text-indigo-200 font-bold'
+                                : 'text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            {period.no}. ({period.timeRange})
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1251,30 +1435,124 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                    Jumlah Hadir
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editingAgenda.hadirCount ?? 0}
-                    onChange={(e) => setEditingAgenda({ ...editingAgenda, hadirCount: Number(e.target.value) })}
-                    className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+              {/* SEKSI INTEGRASI PRESENSI SISWA DENGAN KELAS */}
+              <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                      Integrasi Presensi Kelas
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold">
+                      {targetClassStudents.length} Siswa
+                    </span>
+                  </div>
+
+                  {matchingAttendanceSession ? (
+                    <span className="text-[11px] text-emerald-700 dark:text-emerald-300 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Presensi Ditemukan (Pertemuan Ke-{matchingAttendanceSession.pertemuanKe})
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-slate-400 italic">
+                      Belum ada sesi presensi pada {editingAgenda.tanggal || 'tanggal ini'}
+                    </span>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                    Jumlah Tidak Hadir
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={editingAgenda.tidakHadirCount ?? 0}
-                    onChange={(e) => setEditingAgenda({ ...editingAgenda, tidakHadirCount: Number(e.target.value) })}
-                    className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+
+                {/* Kartu Ringkasan Kehadiran */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+                  <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    <span className="text-[10px] text-slate-400 block font-bold">TOTAL SISWA</span>
+                    <span className="text-sm font-extrabold text-slate-900 dark:text-white font-mono">
+                      {targetClassStudents.length}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 block font-bold">HADIR</span>
+                    <span className="text-sm font-extrabold text-emerald-700 dark:text-emerald-300 font-mono">
+                      {attendanceBreakdown.hadir}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800">
+                    <span className="text-[10px] text-rose-700 dark:text-rose-400 block font-bold">TIDAK HADIR</span>
+                    <span className="text-sm font-extrabold text-rose-700 dark:text-rose-300 font-mono">
+                      {attendanceBreakdown.tidakHadir}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800">
+                    <span className="text-[10px] text-indigo-700 dark:text-indigo-400 block font-bold">DETAIL ABSEN</span>
+                    <span className="text-xs font-bold text-indigo-800 dark:text-indigo-300 font-mono">
+                      S:{attendanceBreakdown.sakit} I:{attendanceBreakdown.izin} A:{attendanceBreakdown.alpa}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Daftar Siswa yang Tidak Hadir */}
+                {attendanceBreakdown.absentStudents.length > 0 && (
+                  <div className="p-2.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 text-xs">
+                    <span className="font-bold text-rose-800 dark:text-rose-300 text-[11px] block mb-1">
+                      Siswa tidak hadir ({attendanceBreakdown.absentStudents.length}):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {attendanceBreakdown.absentStudents.map((abs, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-[11px] font-semibold"
+                        >
+                          {abs.name} ({abs.statusLabel})
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tombol Aksi Sinkronkan */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleSyncFromAttendance}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    title="Tarik data hadir & tidak hadir dari presensi siswa kelas ini"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Sinkronkan Hadir & Tidak Hadir dari Presensi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSetAllPresentInAgenda}
+                    className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-semibold transition cursor-pointer"
+                  >
+                    Semua Hadir ({targetClassStudents.length || 32})
+                  </button>
+                </div>
+
+                {/* Input Manual Hadir & Tidak Hadir */}
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                      Jumlah Hadir
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingAgenda.hadirCount ?? 0}
+                      onChange={(e) => setEditingAgenda({ ...editingAgenda, hadirCount: Number(e.target.value) })}
+                      className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                      Jumlah Tidak Hadir
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingAgenda.tidakHadirCount ?? 0}
+                      onChange={(e) => setEditingAgenda({ ...editingAgenda, tidakHadirCount: Number(e.target.value) })}
+                      className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
                 </div>
               </div>
 
