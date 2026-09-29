@@ -1,78 +1,179 @@
-export type GradePredicate = 'A' | 'B' | 'C' | 'D' | '-';
+import { StudentGrade } from '../types';
 
-export interface KurikulumMerdekaResult {
-  predikat: GradePredicate;
+export interface MerdekaAssessmentResult {
+  predikat: 'A' | 'B' | 'C' | 'D';
   predikatLabel: string;
-  isTuntas: boolean;
   deskripsi: string;
   deskripsiSingkat: string;
+  isTuntas: boolean;
 }
 
-/**
- * Menghasilkan Predikat (A, B, C, D) dan Deskripsi Capaian Kompetensi
- * Otomatis sesuai standar Asesmen & Rapor Kurikulum Merdeka (Kemendikbudristek).
- *
- * Rentang Skala Kurikulum Merdeka:
- * - A (90 - 100): Sangat Baik / Mahir
- * - B (80 - 89): Baik / Cakap
- * - C (KKTP - 79): Cukup / Layak (Mencapai Kriteria Ketercapaian Tujuan Pembelajaran)
- * - D (< KKTP): Perlu Bimbingan / Baru Berkembang
- */
 export function getKurikulumMerdekaAssessment(
-  score: number | null | undefined,
-  kkmOrKktp: number = 75,
-  subjectName?: string,
-  studentName?: string
-): KurikulumMerdekaResult {
-  if (score === null || score === undefined || isNaN(score)) {
-    return {
-      predikat: '-',
-      predikatLabel: 'Belum Ada Nilai',
-      isTuntas: false,
-      deskripsi: 'Belum ada data nilai asesmen yang diinputkan.',
-      deskripsiSingkat: 'Belum ada nilai',
-    };
-  }
+  score: number,
+  nama = 'Peserta didik',
+  kkm = 75
+): MerdekaAssessmentResult {
+  const rounded = Math.round(score);
 
-  const kktp = Number(kkmOrKktp) || 75;
-  const mapel = subjectName ? `mata pelajaran ${subjectName}` : 'tujuan pembelajaran';
-  const name = studentName ? `${studentName} ` : '';
-
-  if (score >= 90) {
+  if (rounded >= 90) {
     return {
       predikat: 'A',
-      predikatLabel: 'Sangat Baik (Mahir)',
+      predikatLabel: 'Sangat Baik',
+      deskripsi: `Ananda ${nama} menunjukkan penguasaan yang sangat baik dan istimewa dalam seluruh capaian pembelajaran materi ajar, mampu menganalisis konsep secara mandiri serta memiliki nalar kritis yang tinggi.`,
+      deskripsiSingkat: 'Sangat Baik - Menguasai seluruh TP dengan istimewa',
       isTuntas: true,
-      deskripsi: `${name}menunjukkan penguasaan yang sangat baik dalam seluruh tujuan pembelajaran serta capaian kompetensi ${mapel}. Mampu menganalisis persoalan secara mandiri, bernalar kritis, dan kreatif.`,
-      deskripsiSingkat: 'Sangat baik dalam penguasaan seluruh capaian kompetensi',
     };
   }
 
-  if (score >= 80) {
+  if (rounded >= 80) {
     return {
       predikat: 'B',
-      predikatLabel: 'Baik (Cakap)',
+      predikatLabel: 'Baik',
+      deskripsi: `Ananda ${nama} menunjukkan penguasaan yang baik dan konsisten dalam mencapai tujuan pembelajaran, mampu menyelesaikan penugasan praktik maupun teori dengan cermat dan tepat.`,
+      deskripsiSingkat: 'Baik - Memenuhi capaian TP dengan konsisten',
       isTuntas: true,
-      deskripsi: `${name}menunjukkan penguasaan yang baik dalam mencapai tujuan pembelajaran ${mapel}. Mampu menyelesaikan asesmen dan penugasan materi dengan pemahaman konsep yang solid.`,
-      deskripsiSingkat: 'Baik dalam mencapai tujuan pembelajaran materi',
     };
   }
 
-  if (score >= kktp) {
+  if (rounded >= kkm) {
     return {
       predikat: 'C',
-      predikatLabel: 'Cukup (Mencapai KKTP)',
+      predikatLabel: 'Cukup',
+      deskripsi: `Ananda ${nama} menunjukkan penguasaan yang cukup dalam mencapai tujuan pembelajaran, telah memenuhi Kriteria Ketercapaian Tujuan Pembelajaran (KKTP) dan disarankan terus meningkatkan keaktifan belajar.`,
+      deskripsiSingkat: 'Cukup - Memenuhi kriteria ketercapaian KKTP',
       isTuntas: true,
-      deskripsi: `${name}menunjukkan penguasaan yang cukup dalam mencapai Kriteria Ketercapaian Tujuan Pembelajaran (KKTP) ${mapel}. Perlu sedikit latihan penguatan dan pendalaman pada beberapa materi tertentu agar lebih optimal.`,
-      deskripsiSingkat: 'Cukup dan telah mencapai kriteria ketuntasan (KKTP)',
     };
   }
 
   return {
     predikat: 'D',
     predikatLabel: 'Perlu Bimbingan',
+    deskripsi: `Ananda ${nama} memerlukan bimbingan, pendampingan, serta remedial lebih lanjut dalam memahami materi dan menuntaskan capaian pembelajaran secara optimal.`,
+    deskripsiSingkat: 'Perlu Bimbingan & Pendampingan Remedial TP',
     isTuntas: false,
-    deskripsi: `${name}perlu bimbingan dan pendampingan intensif dari guru serta orang tua dalam memahami konsep dasar materi serta mencapai Kriteria Ketercapaian Tujuan Pembelajaran (KKTP) ${mapel}.`,
-    deskripsiSingkat: 'Perlu bimbingan intensif dan remedial kompetensi',
+  };
+}
+
+export interface ComputedScoreResult {
+  finalScore: number;
+  sumInputted: number;
+  countInputted: number;
+  formatifAvg: number;
+  predicate: 'A' | 'B' | 'C' | 'D';
+  predicateLabel: string;
+  merdekaDeskripsi: string;
+  merdekaDeskripsiSingkat: string;
+  isPassed: boolean;
+  hasAnyScore: boolean;
+}
+
+export function calculateGradeMetrics(
+  grade?: Partial<StudentGrade> | null,
+  studentName = 'Peserta didik',
+  kkm = 75
+): ComputedScoreResult {
+  if (!grade) {
+    const defaultAssess = getKurikulumMerdekaAssessment(0, studentName, kkm);
+    return {
+      finalScore: 0,
+      sumInputted: 0,
+      countInputted: 0,
+      formatifAvg: 0,
+      predicate: defaultAssess.predikat,
+      predicateLabel: defaultAssess.predikatLabel,
+      merdekaDeskripsi: '',
+      merdekaDeskripsiSingkat: '',
+      isPassed: false,
+      hasAnyScore: false,
+    };
+  }
+
+  const formatifKeys: (keyof StudentGrade)[] = [
+    'formatif1',
+    'formatif2',
+    'formatif3',
+    'formatif4',
+    'formatif5',
+    'formatif6',
+    'formatif7',
+    'formatif8',
+    'formatif9',
+    'formatif10',
+  ];
+
+  const formatifValues: number[] = [];
+  formatifKeys.forEach((k) => {
+    const val = grade[k];
+    if (val !== null && val !== undefined && (val as unknown) !== '' && !isNaN(Number(val))) {
+      formatifValues.push(Number(val));
+    }
+  });
+
+  const stsVal =
+    grade.sumatifTengah !== null &&
+    grade.sumatifTengah !== undefined &&
+    (grade.sumatifTengah as unknown) !== '' &&
+    !isNaN(Number(grade.sumatifTengah))
+      ? Number(grade.sumatifTengah)
+      : null;
+
+  const sasVal =
+    grade.sumatifAkhir !== null &&
+    grade.sumatifAkhir !== undefined &&
+    (grade.sumatifAkhir as unknown) !== '' &&
+    !isNaN(Number(grade.sumatifAkhir))
+      ? Number(grade.sumatifAkhir)
+      : null;
+
+  let sumInputted = 0;
+  let countInputted = 0;
+
+  formatifValues.forEach((v) => {
+    sumInputted += v;
+    countInputted++;
+  });
+
+  if (stsVal !== null) {
+    sumInputted += stsVal;
+    countInputted++;
+  }
+  if (sasVal !== null) {
+    sumInputted += sasVal;
+    countInputted++;
+  }
+
+  const hasAnyScore = countInputted > 0;
+  const formatifAvg =
+    formatifValues.length > 0
+      ? Math.round(formatifValues.reduce((a, b) => a + b, 0) / formatifValues.length)
+      : 0;
+
+  let finalScore = 0;
+  if (hasAnyScore) {
+    if (formatifValues.length > 0 && stsVal !== null && sasVal !== null) {
+      // 50% Formatif + 25% STS + 25% SAS
+      finalScore = Math.round(formatifAvg * 0.5 + stsVal * 0.25 + sasVal * 0.25);
+    } else {
+      finalScore = Math.round(sumInputted / countInputted);
+    }
+  }
+
+  const assessment = getKurikulumMerdekaAssessment(
+    hasAnyScore ? finalScore : 0,
+    studentName,
+    kkm
+  );
+
+  return {
+    finalScore,
+    sumInputted,
+    countInputted,
+    formatifAvg,
+    predicate: assessment.predikat,
+    predicateLabel: assessment.predikatLabel,
+    merdekaDeskripsi: assessment.deskripsi,
+    merdekaDeskripsiSingkat: assessment.deskripsiSingkat,
+    isPassed: hasAnyScore && finalScore >= kkm,
+    hasAnyScore,
   };
 }

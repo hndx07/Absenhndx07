@@ -306,8 +306,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     </div>
 
       {/* Footer inheriting Muhammadiyah Visual Identity */}
-      <footer className="relative z-10 text-center text-xs text-white font-medium py-3.5 bg-muh-footer border-t border-white/20 shadow-lg">
-        &copy; SMK Muhammadiyah Bawang &bull; BATANG, JAWA TENGAH &bull; Dikembangkan oleh @hndx07
+      <footer className="relative z-10 text-center text-xs text-white font-medium py-3.5 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] border-t border-[#008276]/40 shadow-lg">
+        &copy; {SCHOOL_CONFIG.namaSekolah} &bull; BATANG, JAWA TENGAH &bull; Dikembangkan oleh @hndx07
       </footer>
     </div>
   );

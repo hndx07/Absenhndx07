@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Edit2, BookOpen, GraduationCap, Check, AlertTriangle, AlertCircle, Cloud, RefreshCw, Save } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, GraduationCap, Check, AlertTriangle } from 'lucide-react';
 import { ClassRoom } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { getClassDependencyCounts } from '../services/data';
@@ -31,8 +31,7 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
     attendanceCount: number;
     gradesCount: number;
   } | null>(null);
-  const [isCheckingDeps, setIsCheckingDeps] = useState(false);
-  const [isSavingClass, setIsSavingClass] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   if (!isOpen) return null;
 
@@ -42,7 +41,7 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
       namaKelas: '',
       mataPelajaran: '',
       kkm: 75,
-      jurusan: 'Akuntansi dan Keuangan Lembaga',
+      jurusan: 'Teknik Jaringan Komputer dan Telekomunikasi',
       keterangan: 'Tahun Ajaran 2025/2026',
       createdAt: new Date().toISOString().split('T')[0],
     });
@@ -60,62 +59,51 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
       alert('Nama kelas dan mata pelajaran wajib diisi!');
       return;
     }
-    setIsSavingClass(true);
+    setIsSaving(true);
     try {
       await onSaveClass(editingClass as ClassRoom);
       setIsFormOpen(false);
       setEditingClass(null);
-    } catch (err: any) {
-      alert('Gagal menyimpan kelas: ' + (err.message || 'Error'));
     } finally {
-      setIsSavingClass(false);
+      setIsSaving(false);
     }
   };
 
   const handleDeleteClick = async (cls: ClassRoom) => {
-    setIsCheckingDeps(true);
-    try {
-      const deps = await getClassDependencyCounts(cls.id);
-      if (deps.studentsCount > 0 || deps.attendanceCount > 0 || deps.gradesCount > 0) {
-        setDeleteWarning({
-          classRoom: cls,
-          studentsCount: deps.studentsCount,
-          attendanceCount: deps.attendanceCount,
-          gradesCount: deps.gradesCount,
-        });
-      } else {
-        if (window.confirm(`Yakin ingin menghapus kelas "${cls.namaKelas}"? Kelas ini belum memiliki data siswa atau absensi.`)) {
-          onDeleteClass(cls.id);
-        }
-      }
-    } catch {
-      if (window.confirm(`Yakin ingin menghapus kelas "${cls.namaKelas}"? Periksa kembali data siswa & absensi terkait.`)) {
-        onDeleteClass(cls.id);
-      }
-    } finally {
-      setIsCheckingDeps(false);
+    const deps = await getClassDependencyCounts(cls.id);
+    if (deps.studentsCount > 0 || deps.attendanceCount > 0 || deps.gradesCount > 0) {
+      setDeleteWarning({
+        classRoom: cls,
+        studentsCount: deps.studentsCount,
+        attendanceCount: deps.attendanceCount,
+        gradesCount: deps.gradesCount,
+      });
+      return;
+    }
+    if (confirm(`Hapus kelas "${cls.namaKelas}"?`)) {
+      onDeleteClass(cls.id);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[85vh]">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 px-6 py-5 text-white flex items-center justify-between">
+      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
+        {/* Header with Muhammadiyah Visual Identity */}
+        <div className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] px-6 py-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
-              <GraduationCap className="w-5 h-5 text-indigo-200" />
+              <GraduationCap className="w-5 h-5 text-emerald-100" />
             </div>
             <div>
-              <h3 className="font-bold text-lg leading-tight">Manajemen Kelas & Rombel</h3>
-              <p className="text-xs text-indigo-200">
+              <h3 className="font-bold text-lg leading-tight text-white">Manajemen Kelas & Rombel</h3>
+              <p className="text-xs text-emerald-100">
                 Daftar kelas pengampu {SCHOOL_CONFIG.namaSekolah}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-white/10 transition text-slate-300 hover:text-white"
+            className="p-1.5 rounded-full hover:bg-white/20 transition text-white cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -123,19 +111,18 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto space-y-4 flex-1">
-          {/* Dependency Warning Dialog if class still has data */}
           {deleteWarning && (
-            <div className="p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 space-y-3">
+            <div className="p-5 rounded-2xl bg-amber-50 border border-amber-300 space-y-3">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                  <h4 className="text-sm font-bold text-amber-900">
                     Peringatan: Relasi Data Masih Aktif!
                   </h4>
-                  <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                  <p className="text-xs text-amber-800 leading-relaxed">
                     Kelas <strong>"{deleteWarning.classRoom.namaKelas}"</strong> saat ini masih digunakan oleh:
                   </p>
-                  <ul className="text-xs font-semibold text-amber-900 dark:text-amber-200 list-disc list-inside space-y-0.5 mt-1">
+                  <ul className="text-xs font-semibold text-amber-900 list-disc list-inside space-y-0.5 mt-1">
                     {deleteWarning.studentsCount > 0 && (
                       <li>{deleteWarning.studentsCount} data siswa</li>
                     )}
@@ -146,19 +133,19 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
                       <li>{deleteWarning.gradesCount} catatan penilaian siswa</li>
                     )}
                   </ul>
-                  <p className="text-[11px] text-amber-700 dark:text-amber-400 pt-1">
-                    Kelas tidak disarankan dihapus langsung sebelum data terkait dipindahkan atau ditangani agar integritas data historis tidak hilang.
+                  <p className="text-[11px] text-amber-700 pt-1">
+                    Kelas tidak disarankan dihapus langsung sebelum data terkait dipindahkan atau ditangani.
                   </p>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-2 border-t border-amber-200 dark:border-amber-800/60">
+              <div className="flex justify-end gap-2.5 pt-2 border-t border-amber-200">
                 <button
                   type="button"
                   onClick={() => setDeleteWarning(null)}
-                  className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition"
+                  className="px-3.5 py-1.5 rounded-xl bg-white text-slate-700 text-xs font-bold border border-slate-200 hover:bg-slate-50 transition cursor-pointer"
                 >
-                  Batal / Tangani Data Dulu
+                  Batal
                 </button>
                 <button
                   type="button"
@@ -167,9 +154,9 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
                     setDeleteWarning(null);
                     onDeleteClass(cls.id);
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-sm"
+                  className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
                 >
-                  Tetap Hapus Beserta Data Terkait
+                  Tetap Hapus
                 </button>
               </div>
             </div>
@@ -178,88 +165,68 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
           {!isFormOpen ? (
             <>
               <div className="flex justify-between items-center mb-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Total {classes.length} Rombongan Belajar
+                <p className="text-xs text-slate-500 font-medium">
+                  Klik kelas untuk memilih sebagai kelas aktif yang sedang dikelola:
                 </p>
                 <button
+                  type="button"
                   onClick={handleStartAdd}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  className="px-3 py-1.5 bg-[#009B62] hover:bg-[#008276] text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
-                  Tambah Kelas Baru
+                  <Plus className="w-3.5 h-3.5" />
+                  Tambah Kelas
                 </button>
               </div>
 
-              <div className="grid gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {classes.map((cls) => {
                   const isActive = cls.id === activeClassId;
                   return (
                     <div
                       key={cls.id}
-                      onClick={() => {
-                        onSelectClass(cls.id);
-                        onClose();
-                      }}
-                      className={`group p-4 rounded-2xl border transition-all duration-150 flex items-center justify-between cursor-pointer select-none ${
+                      onClick={() => onSelectClass(cls.id)}
+                      className={`p-4 rounded-2xl border transition-all text-left flex items-start justify-between cursor-pointer group ${
                         isActive
-                          ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40 shadow-sm ring-2 ring-indigo-500/20'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-indigo-400 hover:bg-indigo-50/40 dark:hover:bg-slate-800/80 hover:shadow-xs'
+                          ? 'border-[#009B62] bg-emerald-50/70 shadow-sm ring-2 ring-[#009B62]/20'
+                          : 'border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/30'
                       }`}
-                      title={isActive ? `Kelas aktif saat ini: ${cls.namaKelas}` : `Klik untuk langsung membuka kelas ${cls.namaKelas}`}
                     >
-                      <div className="space-y-1 flex-1 pr-3">
+                      <div className="truncate pr-2">
                         <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          <h4 className="font-bold text-slate-900 text-base group-hover:text-[#009B62] transition-colors">
                             {cls.namaKelas}
                           </h4>
-                          {isActive ? (
-                            <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-xs">
-                              <Check className="w-3 h-3" />
+                          {isActive && (
+                            <span className="px-2 py-0.5 rounded-md bg-[#009B62] text-white text-[10px] font-bold">
                               Aktif
-                            </span>
-                          ) : (
-                            <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
-                              &rarr; Klik untuk langsung buka
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1.5">
-                          <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
-                          {cls.mataPelajaran} &bull; <span className="font-mono font-bold text-indigo-700 dark:text-indigo-400">KKM: {cls.kkm}</span>
+                        <p className="text-xs text-slate-600 font-medium mt-1 truncate">
+                          {cls.mataPelajaran} &bull; <span className="font-bold text-[#009B62]">KKM: {cls.kkm}</span>
                         </p>
-                        {cls.jurusan && (
-                          <p className="text-[11px] text-slate-400">
-                            Jurusan: {cls.jurusan} {cls.keterangan ? `• ${cls.keterangan}` : ''}
-                          </p>
-                        )}
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          {cls.jurusan || 'Umum'}
+                        </p>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStartEdit(cls);
-                          }}
-                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                          onClick={() => handleStartEdit(cls)}
+                          className="p-1.5 text-slate-400 hover:text-[#009B62] hover:bg-slate-100 rounded-lg transition cursor-pointer"
                           title="Edit Kelas"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        {classes.length > 1 && (
-                          <button
-                            type="button"
-                            disabled={isCheckingDeps}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteClick(cls);
-                            }}
-                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition cursor-pointer"
-                            title="Hapus Kelas"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClick(cls)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                          title="Hapus Kelas"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   );
@@ -268,124 +235,101 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
             </>
           ) : (
             <form onSubmit={handleFormSubmit} className="space-y-4">
-              <div className="border-b dark:border-slate-800 pb-3 mb-2 flex items-center justify-between">
-                <h4 className="font-bold text-slate-800 dark:text-white text-sm">
-                  {editingClass?.id ? 'Edit Rombel Kelas' : 'Tambah Rombel Kelas Baru'}
+              <div className="border-b pb-3 mb-2 flex items-center justify-between">
+                <h4 className="font-bold text-slate-800 text-sm">
+                  {editingClass?.id?.startsWith('cls_') && !classes.some((c) => c.id === editingClass.id)
+                    ? 'Tambah Kelas Baru'
+                    : 'Edit Informasi Kelas'}
                 </h4>
                 <button
                   type="button"
                   onClick={() => setIsFormOpen(false)}
-                  className="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                  className="text-xs text-slate-400 hover:text-slate-700 cursor-pointer"
                 >
                   Batal
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 uppercase mb-1">
-                    Nama Kelas / Rombel *
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nama Rombel / Kelas *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: X AKL 1, XI TKJ 2"
+                    placeholder="e.g. XII TKJ 1"
                     value={editingClass?.namaKelas || ''}
                     onChange={(e) => setEditingClass({ ...editingClass, namaKelas: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#009B62]"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 uppercase mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                     Mata Pelajaran *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="Contoh: Akuntansi Dasar, Konsentrasi Keahlian"
+                    placeholder="e.g. Administrasi Sistem Jaringan"
                     value={editingClass?.mataPelajaran || ''}
                     onChange={(e) => setEditingClass({ ...editingClass, mataPelajaran: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#009B62]"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 uppercase mb-1">
-                    Kriteria Ketuntasan Minimal (KKM)
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nilai KKM (KKTP)
                   </label>
                   <input
                     type="number"
                     min="50"
                     max="100"
-                    required
-                    value={editingClass?.kkm ?? 75}
-                    onChange={(e) => setEditingClass({ ...editingClass, kkm: Number(e.target.value) })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                    value={editingClass?.kkm || 75}
+                    onChange={(e) => setEditingClass({ ...editingClass, kkm: Number(e.target.value) || 75 })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#009B62] font-mono"
                   />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 uppercase mb-1">
-                    Kompetensi Keahlian / Jurusan
-                  </label>
-                  <select
-                    value={editingClass?.jurusan || 'Akuntansi dan Keuangan Lembaga'}
-                    onChange={(e) => setEditingClass({ ...editingClass, jurusan: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                  >
-                    <option value="Akuntansi dan Keuangan Lembaga">Akuntansi dan Keuangan Lembaga</option>
-                    <option value="Akl/perbankan syari'ah">Akl/perbankan syari'ah</option>
-                    <option value="TJKT (Teknik Jaringan Komputer & Telekomunikasi)">TJKT (Teknik Jaringan Komputer & Telekomunikasi)</option>
-                    <option value="TKJ">TKJ (Teknik Komputer & Jaringan)</option>
-                    <option value="TKR">TKR (Teknik Kendaraan Ringan)</option>
-                    <option value="TSM">TSM (Teknik Sepeda Motor / TBSM)</option>
-                    <option value="TO">TO (Teknik Otomotif)</option>
-                    <option value="DKV">DKV (Desain Komunikasi Visual)</option>
-                    <option value="PPLG">PPLG (Pengembangan Perangkat Lunak dan Gim)</option>
-                    <option value="MPLB">MPLB (Manajemen Perkantoran & Layanan Bisnis)</option>
-                    <option value="Umum">Umum / Lintas Jurusan</option>
-                  </select>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 uppercase mb-1">
-                    Keterangan Tambahan
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Jurusan / Program Keahlian
                   </label>
                   <input
                     type="text"
-                    placeholder="Contoh: Kurikulum Merdeka - Fase E (Tahun Ajaran 2025/2026)"
-                    value={editingClass?.keterangan || ''}
-                    onChange={(e) => setEditingClass({ ...editingClass, keterangan: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={editingClass?.jurusan || ''}
+                    onChange={(e) => setEditingClass({ ...editingClass, jurusan: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#009B62]"
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t dark:border-slate-800">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Keterangan Tambahan
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Kurikulum Merdeka - Fase F"
+                  value={editingClass?.keterangan || ''}
+                  onChange={(e) => setEditingClass({ ...editingClass, keterangan: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#009B62]"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t">
                 <button
                   type="button"
                   onClick={() => setIsFormOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingClass}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  disabled={isSaving}
+                  className="px-5 py-2 bg-[#009B62] hover:bg-[#008276] text-white text-xs font-bold rounded-xl transition shadow-md shadow-[#009B62]/20 cursor-pointer disabled:opacity-50"
                 >
-                  {isSavingClass ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Menyimpan ke Cloud...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Cloud className="w-4 h-4" />
-                      <span>Simpan Kelas ke Cloud</span>
-                    </>
-                  )}
+                  {isSaving ? 'Menyimpan...' : 'Simpan Kelas'}
                 </button>
               </div>
             </form>

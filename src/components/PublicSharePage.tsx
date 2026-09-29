@@ -1833,21 +1833,21 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         )}
       </main>
 
-      {/* Official Footer */}
-      <footer className="text-center py-8 mt-10 border-t border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xs">
+      {/* Official Footer matching Header Color Identity */}
+      <footer className="text-center py-8 mt-10 border-t border-[#008276]/40 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white shadow-lg">
         <div className="max-w-5xl mx-auto px-4 space-y-2">
-          <p className="font-black text-sm text-slate-900 dark:text-white uppercase tracking-wider">
+          <p className="font-black text-sm text-white uppercase tracking-wider">
             &copy; {SCHOOL_CONFIG.namaSekolah} &bull; BATANG, JAWA TENGAH
           </p>
-          <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <p className="text-xs font-semibold text-emerald-100">
             {SCHOOL_CONFIG.alamat} &bull; Portal Resmi:{' '}
-            <a href={SCHOOL_CONFIG.websiteUrl} target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline">
+            <a href={SCHOOL_CONFIG.websiteUrl} target="_blank" rel="noreferrer" className="text-white underline decoration-emerald-300 font-bold hover:text-emerald-200 transition">
               {SCHOOL_CONFIG.website}
             </a>
           </p>
-          <p className="text-xs font-extrabold text-indigo-700 dark:text-indigo-400 pt-1">
+          <p className="text-xs font-extrabold text-emerald-100 pt-1">
             Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; Dikembangkan oleh{' '}
-            <span className="font-mono bg-indigo-50 dark:bg-indigo-950/80 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800 text-slate-900 dark:text-white">
+            <span className="font-mono bg-white/20 text-white px-2 py-0.5 rounded-md border border-white/30">
               @hndx07
             </span>
           </p>

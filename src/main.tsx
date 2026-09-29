@@ -1,22 +1,23 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
 import './index.css';
 
-// Permanently purge any dark mode class and enforce static light theme
-if (typeof window !== 'undefined') {
+// Ensure dark mode is permanently disabled and light theme is enforced
+try {
   document.documentElement.classList.remove('dark');
-  try {
-    localStorage.removeItem('smk_theme');
-    localStorage.setItem('smk_theme', 'light');
-  } catch {
-    // ignore
-  }
+  document.documentElement.style.colorScheme = 'light';
+  localStorage.removeItem('theme');
+  localStorage.removeItem('color-theme');
+} catch {
+  // ignore
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
-
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}

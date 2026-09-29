@@ -1,20 +1,19 @@
-export type Gender = 'L' | 'P';
 export type AttendanceStatus = 'H' | 'S' | 'I' | 'A' | 'D';
 
-export interface TeacherProfile {
+export interface AttendanceRecord {
+  status: AttendanceStatus;
+  catatan?: string;
+}
+
+export interface AttendanceSession {
   id: string;
-  namaGuru: string;
-  nip: string;
-  nbm?: string; // Nomor Baku Muhammadiyah
-  namaSekolah: string;
-  mataPelajaranUtama: string;
-  tahunAjaran: string;
-  semester: 'Ganjil' | 'Genap';
-  isLoggedIn: boolean;
-  email?: string;
-  avatarUrl?: string;
-  googleId?: string;
-  activeClassId?: string;
+  classId: string;
+  tanggal: string;
+  pertemuanKe: number;
+  topikMateri?: string;
+  records: Record<string, AttendanceRecord>;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ClassRoom {
@@ -24,43 +23,27 @@ export interface ClassRoom {
   kkm: number;
   jurusan?: string;
   keterangan?: string;
-  createdAt: string;
+  createdAt?: string;
+  updated_at?: string;
 }
 
 export interface Student {
   id: string;
   classId: string;
   no: number;
-  nisn: string;
+  nisn?: string;
   nama: string;
-  gender: Gender;
-  catatanUmum: string;
+  gender: 'L' | 'P';
+  catatanUmum?: string;
   noHpOrangTua?: string;
-}
-
-export interface AttendanceSession {
-  id: string;
-  classId: string;
-  tanggal: string; // YYYY-MM-DD
-  pertemuanKe: number;
-  topikMateri: string;
-  records: Record<string, { status: AttendanceStatus; catatan: string }>;
-}
-
-export interface GradeColumn {
-  id: string;
-  key: string;
-  label: string;
-  tanggal?: string;
-  keterangan?: string;
-  bobot?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface StudentGrade {
   id: string;
   studentId: string;
   classId: string;
-  monthlyGrades?: Record<string, number | null>;
   formatif1?: number | null;
   formatif2?: number | null;
   formatif3?: number | null;
@@ -73,24 +56,52 @@ export interface StudentGrade {
   formatif10?: number | null;
   sumatifTengah?: number | null;
   sumatifAkhir?: number | null;
-  catatan: string;
+  catatan?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface GradeColumn {
+  id: string;
+  classId?: string;
+  key: string;
+  label: string;
+  tanggal?: string;
+  keterangan?: string;
+  bobot?: number;
+}
+
+export interface TeacherProfile {
+  id: string;
+  namaGuru: string;
+  nip?: string;
+  nbm?: string;
+  namaSekolah: string;
+  mataPelajaranUtama: string;
+  tahunAjaran: string;
+  semester: string;
+  email: string;
+  avatarUrl?: string;
+  activeClassId?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface TeachingAgenda {
   id: string;
   classId: string;
+  classNameSnapshot?: string;
+  mataPelajaran?: string;
+  guruName?: string;
   tanggal: string;
   hari: string;
   jamKe: string;
   rentangJam: string;
   materiAjar: string;
-  kegiatan: string;
-  catatan: string;
+  kegiatan?: string;
+  catatan?: string;
   hadirCount: number;
   tidakHadirCount: number;
-  classNameSnapshot?: string;
-  mataPelajaran?: string;
-  guruName?: string;
   pertemuanKe?: number;
   created_at?: string;
   updated_at?: string;
@@ -99,73 +110,34 @@ export interface TeachingAgenda {
 export interface SavingTransaction {
   id: string;
   classId: string;
-  studentId?: string; // if null, it's Kas Kelas
-  isClassCash: boolean;
+  studentId?: string;
+  isClassCash?: boolean;
   tanggal: string;
   tipe: 'masuk' | 'keluar';
   jumlah: number;
   keterangan: string;
   pencatat?: string;
-}
-
-export interface ModuleAjarForm {
-  fase: 'E (Kelas X)' | 'F (Kelas XI)' | 'F (Kelas XII)';
-  mataPelajaran: string;
-  kelas: string;
-  topik: string;
-  alokasiWaktu: string;
-  pendekatan: string; // e.g. Deep Learning, Saintifik, Konstruktivisme
-  metode: string; // PjBL, PBL, Discovery Learning, Teaching Factory
-  capaianPembelajaran: string;
-  alurTujuanPembelajaran: string;
-  tujuanPembelajaran: string;
-  sintaksPembelajaran: string;
-  integrasiHardSoftSkill: string;
-  integrasiK3BudayaKerja: string;
-  karakterKemuhammadiyahan: string;
-  tujuhKebiasaanAnakHebat: string;
-  strukturLkpd: string;
-}
-
-export interface KisiKisiItem {
-  id: string;
-  no: number;
-  elemen: string;
-  capaianPembelajaran: string;
-  tujuanPembelajaran: string;
-  materi: string;
-  indikatorSoal: string;
-  levelKognitif: 'C1' | 'C2' | 'C3' | 'C4' | 'C5' | 'C6';
-  bentukSoal: 'Pilihan Ganda' | 'Uraian' | 'Praktik';
-  nomorSoal: number;
-}
-
-export interface KartuSoalItem {
-  id: string;
-  noSoal: number;
-  bentukSoal: string;
-  kompetensi: string;
-  materi: string;
-  indikator: string;
-  butirSoal: string;
-  kunciJawaban: string;
-  pedomanPenskoran: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PublicShareRecord {
   id: string;
+  classId?: string;
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
-  classId: string;
-  studentId?: string;
   title: string;
-  createdAt: string;
-  updatedAt: string;
-  data: Record<string, any>;
+  payload: any;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface SupabaseConfig {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-  autoSync: boolean;
-  lastSyncedAt?: string;
-}
+export type NavTab =
+  | 'attendance'
+  | 'recap'
+  | 'grades'
+  | 'agenda'
+  | 'students'
+  | 'savings'
+  | 'parent_report'
+  | 'statistics'
+  | 'school_map';

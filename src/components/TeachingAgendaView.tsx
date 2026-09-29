@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BookMarked,
   Plus,
@@ -23,18 +23,90 @@ import {
   RefreshCw,
   Save,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  UserCheck,
+  UserX,
+  AlertCircle,
+  HelpCircle,
 } from 'lucide-react';
-import { TeachingAgenda, ClassRoom, TeacherProfile } from '../types';
+import { TeachingAgenda, ClassRoom, TeacherProfile, Student, AttendanceSession } from '../types';
 import { exportAgendasToExcel, exportToWordDocument, exportAgendaToPDF } from '../utils/exportUtils';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { SearchableClassSelect } from './SearchableClassSelect';
 import { UiStatePersistence } from '../utils/storageCache';
+import { getStudents, getAttendanceSessions } from '../services/data';
+
+// 12 Jam Pelajaran Sesuai Jadwal Resmi Sekolah
+export const TEACHING_PERIODS = [
+  { no: 1, timeRange: '07:15 - 07:45', start: '07:15', end: '07:45' },
+  { no: 2, timeRange: '07:45 - 08:15', start: '07:45', end: '08:15' },
+  { no: 3, timeRange: '08:15 - 08:45', start: '08:15', end: '08:45' },
+  { no: 4, timeRange: '08:45 - 09:15', start: '08:45', end: '09:15' },
+  { no: 5, timeRange: '09:30 - 10:00', start: '09:30', end: '10:00' },
+  { no: 6, timeRange: '10:00 - 10:30', start: '10:00', end: '10:30' },
+  { no: 7, timeRange: '10:30 - 11:00', start: '10:30', end: '11:00' },
+  { no: 8, timeRange: '11:00 - 11:30', start: '11:00', end: '11:30' },
+  { no: 9, timeRange: '11:30 - 12:00', start: '11:30', end: '12:00' },
+  { no: 10, timeRange: '13:00 - 13:40', start: '13:00', end: '13:40' },
+  { no: 11, timeRange: '13:40 - 14:20', start: '13:40', end: '14:20' },
+  { no: 12, timeRange: '14:20 - 15:00', start: '14:20', end: '15:00' },
+];
+
+export function parsePeriodsFromJamKe(jamKe?: string): number[] {
+  if (!jamKe) return [1, 2, 3, 4];
+  const cleaned = jamKe.trim();
+  if (cleaned.includes('-')) {
+    const parts = cleaned.split('-').map((p) => parseInt(p.trim(), 10)).filter((n) => !isNaN(n));
+    if (parts.length >= 2) {
+      const start = Math.min(parts[0], parts[1]);
+      const end = Math.max(parts[0], parts[1]);
+      const res: number[] = [];
+      for (let i = start; i <= end; i++) {
+        if (i >= 1 && i <= 12) res.push(i);
+      }
+      return res.length > 0 ? res : [1, 2, 3, 4];
+    }
+  }
+  const nums = cleaned.match(/\d+/g);
+  if (nums && nums.length > 0) {
+    const res = Array.from(new Set(nums.map((n) => parseInt(n, 10)).filter((n) => n >= 1 && n <= 12)));
+    return res.length > 0 ? res.sort((a, b) => a - b) : [1, 2, 3, 4];
+  }
+  return [1, 2, 3, 4];
+}
+
+export function formatPeriodsToJamKe(periods: number[]): { jamKe: string; rentangJam: string } {
+  if (!periods || periods.length === 0) {
+    return { jamKe: '1 - 4', rentangJam: '07:15 - 09:15 WIB' };
+  }
+  const sorted = Array.from(new Set(periods)).sort((a, b) => a - b);
+  let isConsecutive = sorted.length > 1;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (sorted[i + 1] !== sorted[i] + 1) {
+      isConsecutive = false;
+      break;
+    }
+  }
+
+  const jamKe = isConsecutive
+    ? `${sorted[0]} - ${sorted[sorted.length - 1]}`
+    : sorted.join(', ');
+
+  const firstPeriod = TEACHING_PERIODS.find((p) => p.no === sorted[0]) || TEACHING_PERIODS[0];
+  const lastPeriod = TEACHING_PERIODS.find((p) => p.no === sorted[sorted.length - 1]) || TEACHING_PERIODS[sorted.length - 1] || firstPeriod;
+
+  const rentangJam = `${firstPeriod.start} - ${lastPeriod.end} WIB`;
+  return { jamKe, rentangJam };
+}
 
 interface TeachingAgendaViewProps {
   classes: ClassRoom[];
   agendas: TeachingAgenda[];
   teacher: TeacherProfile;
   currentClass?: ClassRoom;
+  students?: Student[];
+  sessions?: AttendanceSession[];
   onSaveAgenda: (agenda: TeachingAgenda) => Promise<void> | void;
   onDeleteAgenda: (id: string) => Promise<void> | void;
 }
@@ -44,6 +116,8 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
   agendas,
   teacher,
   currentClass,
+  students = [],
+  sessions = [],
   onSaveAgenda,
   onDeleteAgenda,
 }) => {
@@ -68,6 +142,132 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [editingAgenda, setEditingAgenda] = useState<Partial<TeachingAgenda> | null>(null);
+
+  // Hour Period Picker State (Accordion / Roll Down)
+  const [isPeriodsExpanded, setIsPeriodsExpanded] = useState<boolean>(true);
+  const [selectedPeriods, setSelectedPeriods] = useState<number[]>([1, 2, 3, 4]);
+
+  // Class Students & Attendance Sessions Cache for any selected class
+  const [classStudentsMap, setClassStudentsMap] = useState<Record<string, Student[]>>({});
+  const [classSessionsMap, setClassSessionsMap] = useState<Record<string, AttendanceSession[]>>({});
+
+  // Seed cache with currentClass data if available
+  useEffect(() => {
+    if (currentClass?.id) {
+      if (students.length > 0) {
+        setClassStudentsMap((prev) => ({ ...prev, [currentClass.id]: students }));
+      }
+      if (sessions.length > 0) {
+        setClassSessionsMap((prev) => ({ ...prev, [currentClass.id]: sessions }));
+      }
+    }
+  }, [currentClass?.id, students, sessions]);
+
+  // Lazy-load students & attendance sessions for the currently editing agenda's class
+  const activeModalClassId = editingAgenda?.classId || '';
+  const activeModalDate = editingAgenda?.tanggal || '';
+
+  useEffect(() => {
+    if (!activeModalClassId) return;
+
+    if (!classStudentsMap[activeModalClassId]) {
+      getStudents(activeModalClassId)
+        .then((stds) => {
+          setClassStudentsMap((prev) => ({ ...prev, [activeModalClassId]: stds }));
+        })
+        .catch(console.error);
+    }
+
+    if (!classSessionsMap[activeModalClassId]) {
+      getAttendanceSessions(activeModalClassId)
+        .then((sessList) => {
+          setClassSessionsMap((prev) => ({ ...prev, [activeModalClassId]: sessList }));
+        })
+        .catch(console.error);
+    }
+  }, [activeModalClassId, classStudentsMap, classSessionsMap]);
+
+  // Target class students
+  const targetClassStudents = useMemo(() => {
+    if (!activeModalClassId) return [];
+    if (classStudentsMap[activeModalClassId]) return classStudentsMap[activeModalClassId];
+    if (currentClass?.id === activeModalClassId && students.length > 0) return students;
+    return [];
+  }, [activeModalClassId, classStudentsMap, currentClass?.id, students]);
+
+  // Target class sessions
+  const targetClassSessions = useMemo(() => {
+    if (!activeModalClassId) return [];
+    if (classSessionsMap[activeModalClassId]) return classSessionsMap[activeModalClassId];
+    if (currentClass?.id === activeModalClassId && sessions.length > 0) return sessions;
+    return [];
+  }, [activeModalClassId, classSessionsMap, currentClass?.id, sessions]);
+
+  // Find attendance session matching the agenda's date
+  const matchingAttendanceSession = useMemo(() => {
+    if (!targetClassSessions || targetClassSessions.length === 0 || !activeModalDate) return null;
+    return targetClassSessions.find((s) => s.tanggal === activeModalDate) || null;
+  }, [targetClassSessions, activeModalDate]);
+
+  // Breakdown of attendance for this date
+  const attendanceBreakdown = useMemo(() => {
+    const totalStudents = targetClassStudents.length;
+    if (!matchingAttendanceSession || totalStudents === 0) {
+      return {
+        hasSession: false,
+        totalStudents,
+        hadir: totalStudents,
+        tidakHadir: 0,
+        sakit: 0,
+        izin: 0,
+        alpa: 0,
+        dispen: 0,
+        absentStudents: [] as { name: string; status: string; statusLabel: string; catatan?: string }[],
+      };
+    }
+
+    let hadir = 0;
+    let sakit = 0;
+    let izin = 0;
+    let alpa = 0;
+    let dispen = 0;
+    const absentStudents: { name: string; status: string; statusLabel: string; catatan?: string }[] = [];
+
+    targetClassStudents.forEach((std) => {
+      const rec = matchingAttendanceSession.records?.[std.id];
+      const st = rec?.status || 'H';
+      if (st === 'H') hadir++;
+      else if (st === 'D') {
+        dispen++;
+        hadir++;
+      } else if (st === 'S') {
+        sakit++;
+        absentStudents.push({ name: std.nama, status: 'S', statusLabel: 'Sakit', catatan: rec?.catatan });
+      } else if (st === 'I') {
+        izin++;
+        absentStudents.push({ name: std.nama, status: 'I', statusLabel: 'Izin', catatan: rec?.catatan });
+      } else if (st === 'A') {
+        alpa++;
+        absentStudents.push({ name: std.nama, status: 'A', statusLabel: 'Alpa', catatan: rec?.catatan });
+      }
+    });
+
+    const tidakHadir = sakit + izin + alpa;
+
+    return {
+      hasSession: true,
+      totalStudents,
+      hadir,
+      tidakHadir,
+      sakit,
+      izin,
+      alpa,
+      dispen,
+      absentStudents,
+      pertemuanKe: matchingAttendanceSession.pertemuanKe,
+      topikMateri: matchingAttendanceSession.topikMateri,
+    };
+  }, [matchingAttendanceSession, targetClassStudents]);
 
   // Map of classId -> className & subject
   const classesMap = useMemo(() => {
@@ -153,6 +353,58 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
     return { total, totalHadir, totalAbsen, avgKehadiran };
   }, [filteredAgendas]);
 
+  // Handle period toggles
+  const handleTogglePeriod = (periodNo: number) => {
+    let updated: number[];
+    if (selectedPeriods.includes(periodNo)) {
+      updated = selectedPeriods.filter((n) => n !== periodNo);
+      if (updated.length === 0) updated = [periodNo];
+    } else {
+      updated = [...selectedPeriods, periodNo].sort((a, b) => a - b);
+    }
+    setSelectedPeriods(updated);
+    const formatted = formatPeriodsToJamKe(updated);
+    setEditingAgenda((prev) => (prev ? { ...prev, jamKe: formatted.jamKe, rentangJam: formatted.rentangJam } : null));
+  };
+
+  const handleQuickSelectPeriods = (periods: number[]) => {
+    setSelectedPeriods(periods);
+    const formatted = formatPeriodsToJamKe(periods);
+    setEditingAgenda((prev) => (prev ? { ...prev, jamKe: formatted.jamKe, rentangJam: formatted.rentangJam } : null));
+  };
+
+  const isPeriodsActive = (periods: number[]) => {
+    if (selectedPeriods.length !== periods.length) return false;
+    return periods.every((p) => selectedPeriods.includes(p));
+  };
+
+  // Sync attendance into agenda form
+  const handleSyncFromAttendance = () => {
+    if (!editingAgenda) return;
+    setEditingAgenda((prev) => {
+      if (!prev) return null;
+      let newCatatan = prev.catatan || '';
+      if (attendanceBreakdown.absentStudents.length > 0) {
+        const absentSummary = `Tidak hadir: ${attendanceBreakdown.absentStudents.map((s) => `${s.name} (${s.statusLabel})`).join(', ')}`;
+        if (!newCatatan.includes(absentSummary)) {
+          newCatatan = newCatatan.trim() ? `${newCatatan} - ${absentSummary}` : absentSummary;
+        }
+      }
+      return {
+        ...prev,
+        hadirCount: attendanceBreakdown.hadir,
+        tidakHadirCount: attendanceBreakdown.tidakHadir,
+        catatan: newCatatan,
+      };
+    });
+  };
+
+  const handleSetAllPresentInAgenda = () => {
+    if (!editingAgenda) return;
+    const total = targetClassStudents.length || editingAgenda.hadirCount || 32;
+    setEditingAgenda((prev) => (prev ? { ...prev, hadirCount: total, tidakHadirCount: 0 } : null));
+  };
+
   // Handle open Add Modal
   const handleOpenAdd = () => {
     const today = new Date();
@@ -166,6 +418,13 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
       (classes.length > 0 ? classes[0].id : '');
 
     const initialClass = classes.find((c) => c.id === initialClassId);
+    const defaultPeriods = [1, 2, 3, 4];
+    setSelectedPeriods(defaultPeriods);
+    setIsPeriodsExpanded(true);
+    const formatted = formatPeriodsToJamKe(defaultPeriods);
+
+    const stds = classStudentsMap[initialClassId] || (currentClass?.id === initialClassId ? students : []);
+    const initialTotal = stds.length > 0 ? stds.length : 32;
 
     setEditingAgenda({
       id: `ag_${Date.now()}`,
@@ -175,18 +434,21 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
       guruName: teacher.namaGuru,
       tanggal: today.toISOString().split('T')[0],
       hari: currentDay,
-      jamKe: '1 - 4',
-      rentangJam: '07.00 - 09.45 WIB',
+      jamKe: formatted.jamKe,
+      rentangJam: formatted.rentangJam,
       materiAjar: '',
       kegiatan: '',
       catatan: 'Pembelajaran berlangsung kondusif dan tertib.',
-      hadirCount: 32,
+      hadirCount: initialTotal,
       tidakHadirCount: 0,
     });
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (ag: TeachingAgenda) => {
+    const parsed = parsePeriodsFromJamKe(ag.jamKe);
+    setSelectedPeriods(parsed);
+    setIsPeriodsExpanded(false);
     setEditingAgenda({ ...ag });
     setIsModalOpen(true);
   };

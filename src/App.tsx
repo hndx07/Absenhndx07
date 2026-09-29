@@ -984,6 +984,8 @@ export default function App() {
                 agendas={agendas}
                 teacher={activeTeacher}
                 currentClass={activeClass}
+                students={students}
+                sessions={attendance}
                 onSaveAgenda={handleSaveAgenda}
                 onDeleteAgenda={handleDeleteAgenda}
               />
@@ -1025,11 +1027,22 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer inheriting Muhammadiyah Visual Identity */}
-      <footer className="bg-muh-footer border-t border-[#008276]/40 mt-12 py-8 text-center text-white shadow-lg transition-colors">
+      {/* Footer inheriting Muhammadiyah Visual Identity (Matches Header Colors) */}
+      <footer className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] border-t border-[#008276]/40 mt-12 py-8 text-center text-white shadow-lg transition-colors">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p className="font-black text-sm sm:text-base text-white tracking-wide uppercase drop-shadow-xs">
-            &copy; SMK MUHAMMADIYAH BAWANG &bull; BATANG, JAWA TENGAH
+            &copy; {SCHOOL_CONFIG.namaSekolah} &bull; BATANG, JAWA TENGAH
+          </p>
+          <p className="text-xs sm:text-sm font-semibold text-emerald-100">
+            {SCHOOL_CONFIG.alamat} &bull; Portal Tautan Resmi:{' '}
+            <a
+              href={SCHOOL_CONFIG.websiteUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-white underline decoration-emerald-300 font-bold hover:text-emerald-200 transition"
+            >
+              {SCHOOL_CONFIG.website}
+            </a>
           </p>
           <p className="text-xs sm:text-sm font-bold text-emerald-100">
             Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; Dikembangkan oleh{' '}
