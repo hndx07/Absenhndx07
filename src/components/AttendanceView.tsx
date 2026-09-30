@@ -81,7 +81,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const [filterQuery, setFilterQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('no');
+  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareQrUrl, setShareQrUrl] = useState('');
   const [shareLink, setShareLink] = useState('');
@@ -203,10 +203,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const handleCreateSession = (e: React.FormEvent) => {
     e.preventDefault();
     const newId = `att_${Date.now()}`;
+    // Records kosong: status belum diisi. Guru mengisi manual atau lewat tombol "Set Semua Hadir".
     const initialRecords: Record<string, { status: AttendanceStatus; catatan: string }> = {};
-    classStudents.forEach((s) => {
-      initialRecords[s.id] = { status: 'H', catatan: '' };
-    });
 
     const created: AttendanceSession = {
       id: newId,
@@ -406,7 +404,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
             <div className="flex items-center rounded-2xl border border-slate-200 p-1 bg-slate-50">
               <button
-                onClick={() => exportAttendanceToExcel(currentClass, classStudents, classSessions, teacher)}
+                onClick={() => {
+                  if (currentSession) {
+                    exportAttendanceToExcel(currentSession, currentClass, classStudents, teacher);
+                  } else {
+                    alert('Silakan buat atau pilih sesi pertemuan terlebih dahulu.');
+                  }
+                }}
                 className="px-3 py-1.5 hover:bg-white text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1"
                 title="Unduh file Excel"
               >
@@ -414,7 +418,13 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 Excel
               </button>
               <button
-                onClick={() => exportAttendanceToPDF(currentClass, classStudents, classSessions, teacher)}
+                onClick={() => {
+                  if (currentSession) {
+                    exportAttendanceToPDF(currentSession, currentClass, classStudents, teacher);
+                  } else {
+                    alert('Silakan buat atau pilih sesi pertemuan terlebih dahulu.');
+                  }
+                }}
                 className="px-3 py-1.5 hover:bg-white text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1"
                 title="Cetak format PDF resmi"
               >
@@ -772,8 +782,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredStudents.map((std, idx) => {
-                  const record = currentSession.records?.[std.id] || { status: 'H', catatan: '' };
-                  const status = record.status;
+                  const record = currentSession.records?.[std.id]; // bisa undefined
+                  const status = record?.status; // undefined = belum dipilih
+                  const catatan = record?.catatan || '';
 
                   return (
                     <tr
@@ -811,7 +822,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                                 key={st}
                                 type="button"
                                 onClick={() => handleUpdateRecord(std.id, st)}
-                                className={`w-8 h-8 rounded-xl font-bold font-mono transition text-xs flex items-center justify-center ${style}`}
+                                className={`w-8 h-8 rounded-xl font-bold font-mono transition text-xs flex items-center justify-center cursor-pointer ${style}`}
                                 title={
                                   st === 'H'
                                     ? 'Hadir'
@@ -834,9 +845,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                         <input
                           type="text"
                           placeholder="Catatan izin/keterangan..."
-                          value={record.catatan || ''}
-                          onChange={(e) => handleUpdateRecord(std.id, status, e.target.value)}
-                          className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                          value={catatan}
+                          onChange={(e) => handleUpdateRecord(std.id, status || 'H', e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-[#009B62] bg-white"
                         />
                       </td>
                     </tr>

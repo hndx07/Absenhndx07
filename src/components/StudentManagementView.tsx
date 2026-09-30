@@ -76,7 +76,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   const [isSavingStudent, setIsSavingStudent] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
-  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('no');
+  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const classStudents = students
@@ -86,7 +86,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     .filter(
       (s) =>
         s.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.nisn.includes(searchTerm)
+        (s.nisn || '').includes(searchTerm)
     )
     .sort((a, b) => {
       if (sortOrder === 'name-asc') {

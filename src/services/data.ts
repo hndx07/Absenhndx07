@@ -22,7 +22,12 @@ import {
 // 1. TEACHER PROFILE SERVICE
 // ============================================================================
 
-export async function getTeacherProfile(): Promise<TeacherProfile | null> {
+export async function getTeacherProfile(force = false): Promise<TeacherProfile | null> {
+  if (!force) {
+    const cached = SafeCache.get<TeacherProfile>('teacher_profile');
+    if (cached) return cached;
+  }
+
   const supabase = getSupabaseClient();
   const user = await getAuthUser();
   if (!user) return null;
@@ -40,7 +45,7 @@ export async function getTeacherProfile(): Promise<TeacherProfile | null> {
 
   if (!data) return null;
 
-  return {
+  const profile: TeacherProfile = {
     id: data.id,
     namaGuru: data.nama_guru || user.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
     nip: data.nip || '',
@@ -54,6 +59,13 @@ export async function getTeacherProfile(): Promise<TeacherProfile | null> {
     activeClassId: data.active_class_id,
     isLoggedIn: true,
   };
+
+  SafeCache.set('teacher_profile', profile);
+  try {
+    localStorage.setItem('muhiba_teacher_profile', JSON.stringify(profile));
+  } catch {}
+
+  return profile;
 }
 
 export async function createOrUpdateTeacherProfile(
@@ -83,7 +95,7 @@ export async function createOrUpdateTeacherProfile(
     nama_sekolah: profile.namaSekolah ?? existing?.nama_sekolah ?? SCHOOL_CONFIG.namaSekolah,
     mata_pelajaran_utama:
       profile.mataPelajaranUtama ?? existing?.mata_pelajaran_utama ?? 'Konsentrasi Keahlian TKJ',
-    tahun_ajaran: profile.tahunAjaran ?? existing?.tahun_ajaran ?? '2025/2026',
+    tahunAjaran: profile.tahunAjaran ?? existing?.tahun_ajaran ?? '2025/2026',
     semester: profile.semester ?? existing?.semester ?? 'Genap',
     email: user.email || profile.email || existing?.email || '',
     avatar_url: profile.avatarUrl ?? existing?.avatar_url ?? '',
@@ -103,7 +115,7 @@ export async function createOrUpdateTeacherProfile(
     throw error;
   }
 
-  return {
+  const result: TeacherProfile = {
     id: data.id,
     namaGuru: data.nama_guru,
     nip: data.nip || '',
@@ -117,6 +129,13 @@ export async function createOrUpdateTeacherProfile(
     activeClassId: data.active_class_id,
     isLoggedIn: true,
   };
+
+  SafeCache.set('teacher_profile', result);
+  try {
+    localStorage.setItem('muhiba_teacher_profile', JSON.stringify(result));
+  } catch {}
+
+  return result;
 }
 
 // ============================================================================

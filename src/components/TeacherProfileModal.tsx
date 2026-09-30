@@ -10,7 +10,10 @@ interface TeacherProfileModalProps {
   teacher?: TeacherProfile;
   onSave?: (profile: TeacherProfile) => Promise<void> | void;
   onSaveTeacher?: (profile: TeacherProfile) => Promise<void> | void;
+  onUpdateTeacher?: (profile: TeacherProfile) => Promise<void> | void;
   onLogout?: () => void;
+  onDataMigrated?: () => Promise<void> | void;
+  onDownloadBackup?: () => void;
 }
 
 export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
@@ -20,7 +23,10 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   teacher,
   onSave,
   onSaveTeacher,
+  onUpdateTeacher,
   onLogout,
+  onDataMigrated,
+  onDownloadBackup,
 }) => {
   const activeProfile = profile || teacher || {
     id: 'guru_default',
@@ -48,6 +54,8 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
     try {
       if (onSaveTeacher) {
         await onSaveTeacher(formData);
+      } else if (onUpdateTeacher) {
+        await onUpdateTeacher(formData);
       } else if (onSave) {
         await onSave(formData);
       }
@@ -56,9 +64,9 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
         setIsSuccess(false);
         onClose();
       }, 700);
-    } catch (err) {
-      console.error(err);
-      alert('Gagal menyimpan profil guru.');
+    } catch (err: any) {
+      console.error('Error saving teacher profile:', err);
+      alert(`Gagal menyimpan profil guru ke cloud: ${err?.message || 'Terjadi kesalahan jaringan atau server.'}`);
     } finally {
       setIsSaving(false);
     }

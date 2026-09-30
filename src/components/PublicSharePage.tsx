@@ -82,7 +82,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   const [gradeViewMode, setGradeViewMode] = useState<'summary' | 'detailed'>('summary');
   const [gradeFilterStatus, setGradeFilterStatus] = useState<'all' | 'tuntas' | 'belum_tuntas'>('all');
   const [selectedStudentGrade, setSelectedStudentGrade] = useState<any | null>(null);
-  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('no');
+  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
 
   const effectiveType: 'absen' | 'nilai' | 'tabungan' | 'agenda' =
     data?.shareType || initialType;
@@ -219,7 +219,10 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
 
   // Grade-specific calculations
   const classStudentsList = useMemo(() => {
-    return Array.isArray(data?.students) ? data.students : [];
+    const list = Array.isArray(data?.students) ? [...data.students] : [];
+    return list.sort((a: any, b: any) =>
+      (a.nama || '').localeCompare(b.nama || '', 'id', { sensitivity: 'base' })
+    );
   }, [data?.students]);
 
   const rawGradesList = useMemo(() => {

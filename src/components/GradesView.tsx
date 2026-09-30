@@ -69,7 +69,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
   onSaveGradeColumns,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('no');
+  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
   const [activeColumnsCount, setActiveColumnsCount] = useState<number>(5);
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
   const [editingColumns, setEditingColumns] = useState<GradeColumn[]>(gradeColumns);
@@ -748,7 +748,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
       .filter(
         (s) =>
           s.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          s.nisn.includes(searchTerm)
+          (s.nisn || '').includes(searchTerm)
       )
       .sort((a, b) => {
         if (sortOrder === 'name-asc') {

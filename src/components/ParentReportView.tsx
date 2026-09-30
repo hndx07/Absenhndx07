@@ -33,7 +33,7 @@ export const ParentReportView: React.FC<ParentReportViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('no');
+  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
 
   const classStudents = useMemo(() => {
     return students

@@ -14,3 +14,11 @@ export const SCHOOL_CONFIG = {
   tahunAjaran: '2025/2026',
   semester: 'Genap',
 };
+
+export const JURUSAN_OPTIONS = [
+  'Teknik Jaringan Komputer dan Telekomunikasi',
+  'Teknik Jaringan Komputer dan Telekomunikasi (TJKT / TKJ)',
+  'Teknik Jaringan Akses Telekomunikasi (TJAT)',
+  'Teknik Komputer dan Jaringan (TKJ)',
+  'Lainnya / Umum',
+] as const;

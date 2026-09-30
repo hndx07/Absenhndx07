@@ -30,8 +30,8 @@ export function downloadDataBackupJSON(data: any, fileName = 'backup_data_muhiba
 export function exportStudentsToExcel(
   classRoom: ClassRoom | null,
   students: Student[],
-  teacher: TeacherProfile,
-  allClasses: ClassRoom[]
+  teacher?: TeacherProfile,
+  allClasses: ClassRoom[] = []
 ) {
   const rows = students.map((s, idx) => {
     const cls = allClasses.find((c) => c.id === s.classId);
@@ -52,6 +52,41 @@ export function exportStudentsToExcel(
   XLSX.utils.book_append_sheet(wb, ws, 'Daftar Siswa');
   const fname = `Data_Siswa_${classRoom ? classRoom.namaKelas.replace(/\s+/g, '_') : 'Semua'}_${Date.now()}.xlsx`;
   XLSX.writeFile(wb, fname);
+}
+
+export function downloadStudentTemplateExcel(classRoom?: ClassRoom) {
+  const sampleRows = [
+    {
+      No: 1,
+      NISN: '0012345678',
+      'Nama Siswa': 'Ahmad Fauzi',
+      'L/P': 'L',
+      'No HP Ortu': '081234567890',
+      Catatan: 'Aktif dalam pembelajaran',
+    },
+    {
+      No: 2,
+      NISN: '0012345679',
+      'Nama Siswa': 'Budi Santoso',
+      'L/P': 'L',
+      'No HP Ortu': '081234567891',
+      Catatan: '',
+    },
+    {
+      No: 3,
+      NISN: '0012345680',
+      'Nama Siswa': 'Citra Lestari',
+      'L/P': 'P',
+      'No HP Ortu': '081234567892',
+      Catatan: '',
+    },
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(sampleRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Template Siswa');
+  const className = classRoom?.namaKelas ? classRoom.namaKelas.replace(/\s+/g, '_') : 'Umum';
+  XLSX.writeFile(wb, `Template_Data_Siswa_${className}.xlsx`);
 }
 
 export function exportAttendanceToExcel(
@@ -84,6 +119,56 @@ export function exportAttendanceToExcel(
   XLSX.utils.book_append_sheet(wb, ws, 'Presensi Harian');
   const fname = `Presensi_${classRoom.namaKelas.replace(/\s+/g, '_')}_P${session.pertemuanKe}_${session.tanggal}.xlsx`;
   XLSX.writeFile(wb, fname);
+}
+
+export function exportAttendanceToPDF(
+  session: AttendanceSession,
+  classRoom: ClassRoom,
+  students: Student[],
+  teacher: TeacherProfile
+) {
+  const doc = new jsPDF('portrait');
+  doc.setFontSize(14);
+  doc.text(SCHOOL_CONFIG.namaSekolah, 14, 15);
+  doc.setFontSize(11);
+  doc.text(`Presensi Harian Siswa - Pertemuan Ke-${session.pertemuanKe}`, 14, 22);
+  doc.setFontSize(9);
+  doc.text(
+    `Kelas: ${classRoom.namaKelas} | Tanggal: ${session.tanggal} | Topik: ${session.topikMateri || '-'}`,
+    14,
+    28
+  );
+
+  const statusMap: Record<string, string> = {
+    H: 'Hadir',
+    S: 'Sakit',
+    I: 'Izin',
+    A: 'Alpa',
+    D: 'Dispen',
+  };
+
+  const tableRows = students.map((s, idx) => {
+    const rec = session.records?.[s.id];
+    return [
+      idx + 1,
+      s.nisn || '-',
+      s.nama,
+      s.gender,
+      statusMap[rec?.status || 'H'] || 'Hadir',
+      rec?.catatan || '-',
+    ];
+  });
+
+  autoTable(doc, {
+    startY: 32,
+    head: [['No', 'NISN', 'Nama Siswa', 'L/P', 'Status', 'Catatan']],
+    body: tableRows,
+    theme: 'grid',
+    headStyles: { fillColor: [0, 155, 98], textColor: 255, fontStyle: 'bold' },
+    styles: { fontSize: 8 },
+  });
+
+  doc.save(`Presensi_${classRoom.namaKelas.replace(/\s+/g, '_')}_P${session.pertemuanKe}.pdf`);
 }
 
 export function exportMonthlyRecapToExcel(
@@ -367,6 +452,36 @@ export function exportGradesToPDF(
   doc.save(`Nilai_${classRoom.namaKelas.replace(/\s+/g, '_')}.pdf`);
 }
 
+export function downloadGradesTemplateExcel(
+  classRoom: ClassRoom,
+  students: Student[],
+  activeColumnsCountOrColumns: number | any[] = 4,
+  _teacher?: TeacherProfile
+) {
+  const activeCount = Array.isArray(activeColumnsCountOrColumns)
+    ? activeColumnsCountOrColumns.length
+    : (typeof activeColumnsCountOrColumns === 'number' ? activeColumnsCountOrColumns : 4);
+
+  const rows = students.map((std, idx) => {
+    const rowObj: Record<string, any> = {
+      No: idx + 1,
+      NISN: std.nisn || '',
+      'Nama Siswa': std.nama,
+    };
+    for (let i = 1; i <= activeCount; i++) {
+      rowObj[`Formatif_${i}`] = '';
+    }
+    rowObj['Sumatif_Tengah_Semester'] = '';
+    rowObj['Sumatif_Akhir_Semester'] = '';
+    return rowObj;
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Template Nilai');
+  XLSX.writeFile(wb, `Template_Nilai_${classRoom.namaKelas.replace(/\s+/g, '_')}.xlsx`);
+}
+
 export function exportAgendasToExcel(
   agendas: TeachingAgenda[],
   classRoom: ClassRoom | null,
@@ -432,6 +547,34 @@ export function exportAgendaToPDF(
   });
 
   doc.save(`Agenda_Mengajar_Guru_${Date.now()}.pdf`);
+}
+
+export function exportToWordDocument(fileName: string, htmlContent: string) {
+  const header = `<!DOCTYPE html>
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='utf-8'><title>${fileName}</title>
+<style>
+  body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; color: #111; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+  th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
+  th { background-color: #f2f2f2; font-weight: bold; }
+  h1, h2, h3 { text-align: center; margin: 4px 0; }
+</style>
+</head><body>`;
+  const footer = '</body></html>';
+  const sourceHtml = header + htmlContent + footer;
+
+  const blob = new Blob(['\ufeff', sourceHtml], {
+    type: 'application/msword',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${fileName}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function exportSavingsToExcel(

@@ -57,7 +57,7 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
-  const [studentSortOrder, setStudentSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('no');
+  const [studentSortOrder, setStudentSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
 
   const classStudents = useMemo(() => {
@@ -68,7 +68,7 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
 
   const sortedAndFilteredClassStudents = useMemo(() => {
     return classStudents
-      .filter((s) => s.nama.toLowerCase().includes(studentSearchQuery.toLowerCase()) || s.nisn.includes(studentSearchQuery))
+      .filter((s) => s.nama.toLowerCase().includes(studentSearchQuery.toLowerCase()) || (s.nisn || '').includes(studentSearchQuery))
       .sort((a, b) => {
         if (studentSortOrder === 'name-asc') {
           return a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' });
@@ -617,11 +617,13 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
                     onChange={(e) => setEditingTx({ ...editingTx, studentId: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white font-semibold"
                   >
-                    {classStudents.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.no}. {s.nama} ({s.gender})
-                      </option>
-                    ))}
+                    {[...classStudents]
+                      .sort((a, b) => a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }))
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.nama} (No. {s.no} - {s.gender})
+                        </option>
+                      ))}
                   </select>
                 </div>
               )}

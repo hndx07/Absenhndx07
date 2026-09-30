@@ -83,6 +83,7 @@ export interface TeacherProfile {
   email: string;
   avatarUrl?: string;
   activeClassId?: string;
+  isLoggedIn?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -126,7 +127,10 @@ export interface PublicShareRecord {
   classId?: string;
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
   title: string;
-  payload: any;
+  payload?: any;
+  data?: any;
+  createdAt?: string;
+  updatedAt?: string;
   created_at?: string;
   updated_at?: string;
 }

@@ -9,17 +9,42 @@ export interface MerdekaAssessmentResult {
 }
 
 export function getKurikulumMerdekaAssessment(
-  score: number,
-  nama = 'Peserta didik',
-  kkm = 75
+  score: number | null | undefined,
+  arg2?: string | number,
+  arg3?: number | string,
+  arg4?: string
 ): MerdekaAssessmentResult {
+  let nama = 'Peserta didik';
+  let kkm = 75;
+  let mataPelajaran = '';
+
+  if (typeof arg2 === 'number') {
+    kkm = arg2;
+    mataPelajaran = typeof arg3 === 'string' ? arg3 : '';
+    nama = arg4 || 'Peserta didik';
+  } else {
+    nama = typeof arg2 === 'string' ? arg2 : 'Peserta didik';
+    kkm = typeof arg3 === 'number' ? arg3 : 75;
+    mataPelajaran = arg4 || '';
+  }
+
+  if (score === null || score === undefined) {
+    return {
+      predikat: 'D',
+      predikatLabel: 'Belum Ada Nilai',
+      deskripsi: `Ananda ${nama} belum memiliki rekaman nilai untuk ${mataPelajaran || 'mata pelajaran ini'}.`,
+      deskripsiSingkat: 'Belum ada penilaian',
+      isTuntas: false,
+    };
+  }
+
   const rounded = Math.round(score);
 
   if (rounded >= 90) {
     return {
       predikat: 'A',
       predikatLabel: 'Sangat Baik',
-      deskripsi: `Ananda ${nama} menunjukkan penguasaan yang sangat baik dan istimewa dalam seluruh capaian pembelajaran materi ajar, mampu menganalisis konsep secara mandiri serta memiliki nalar kritis yang tinggi.`,
+      deskripsi: `Ananda ${nama} menunjukkan penguasaan yang sangat baik dan istimewa dalam seluruh capaian pembelajaran ${mataPelajaran ? `mata pelajaran ${mataPelajaran}` : 'materi ajar'}, mampu menganalisis konsep secara mandiri serta memiliki nalar kritis yang tinggi.`,
       deskripsiSingkat: 'Sangat Baik - Menguasai seluruh TP dengan istimewa',
       isTuntas: true,
     };
@@ -29,7 +54,7 @@ export function getKurikulumMerdekaAssessment(
     return {
       predikat: 'B',
       predikatLabel: 'Baik',
-      deskripsi: `Ananda ${nama} menunjukkan penguasaan yang baik dan konsisten dalam mencapai tujuan pembelajaran, mampu menyelesaikan penugasan praktik maupun teori dengan cermat dan tepat.`,
+      deskripsi: `Ananda ${nama} menunjukkan penguasaan yang baik dan konsisten dalam mencapai tujuan pembelajaran ${mataPelajaran ? `mata pelajaran ${mataPelajaran}` : ''}, mampu menyelesaikan penugasan praktik maupun teori dengan cermat dan tepat.`,
       deskripsiSingkat: 'Baik - Memenuhi capaian TP dengan konsisten',
       isTuntas: true,
     };

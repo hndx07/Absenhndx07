@@ -187,21 +187,28 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
     }
   }, [activeModalClassId, classStudentsMap, classSessionsMap]);
 
-  // Target class students
+  // Target class students - strictly from selected class_id, sorted A-Z
   const targetClassStudents = useMemo(() => {
     if (!activeModalClassId) return [];
-    if (classStudentsMap[activeModalClassId]) return classStudentsMap[activeModalClassId];
-    if (currentClass?.id === activeModalClassId && students.length > 0) return students;
-    return [];
-  }, [activeModalClassId, classStudentsMap, currentClass?.id, students]);
+    const fromProps = (students || []).filter((s) => s.classId === activeModalClassId);
+    const fromMap = classStudentsMap[activeModalClassId] || [];
+    const map = new Map<string, Student>();
+    fromMap.forEach((s) => map.set(s.id, s));
+    fromProps.forEach((s) => map.set(s.id, s));
+    const list = Array.from(map.values());
+    return list.sort((a, b) => a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }));
+  }, [activeModalClassId, classStudentsMap, students]);
 
-  // Target class sessions
+  // Target class sessions - strictly from selected class_id
   const targetClassSessions = useMemo(() => {
     if (!activeModalClassId) return [];
-    if (classSessionsMap[activeModalClassId]) return classSessionsMap[activeModalClassId];
-    if (currentClass?.id === activeModalClassId && sessions.length > 0) return sessions;
-    return [];
-  }, [activeModalClassId, classSessionsMap, currentClass?.id, sessions]);
+    const fromProps = (sessions || []).filter((s) => s.classId === activeModalClassId);
+    const fromMap = classSessionsMap[activeModalClassId] || [];
+    const map = new Map<string, AttendanceSession>();
+    fromMap.forEach((s) => map.set(s.id, s));
+    fromProps.forEach((s) => map.set(s.id, s));
+    return Array.from(map.values());
+  }, [activeModalClassId, classSessionsMap, sessions]);
 
   // Find attendance session matching the agenda's date
   const matchingAttendanceSession = useMemo(() => {
@@ -352,6 +359,36 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
     const avgKehadiran = sum > 0 ? Math.round((totalHadir / sum) * 100) : 100;
     return { total, totalHadir, totalAbsen, avgKehadiran };
   }, [filteredAgendas]);
+
+  // Collapsible Waktu Mengajar State & Time Helpers
+  const [isTimeSectionExpanded, setIsTimeSectionExpanded] = useState<boolean>(true);
+
+  const parseTimeRange = (rangeStr?: string) => {
+    if (!rangeStr) return { start: '07:15', end: '09:15' };
+    const cleaned = rangeStr.replace(/WIB/gi, '').trim();
+    const parts = cleaned.split('-');
+    if (parts.length === 2) {
+      const s = parts[0].trim();
+      const e = parts[1].trim();
+      return {
+        start: s.length >= 4 ? s.slice(0, 5) : '07:15',
+        end: e.length >= 4 ? e.slice(0, 5) : '09:15',
+      };
+    }
+    return { start: '07:15', end: '09:15' };
+  };
+
+  const handleStartTimeChange = (newStart: string) => {
+    const currentTimes = parseTimeRange(editingAgenda?.rentangJam);
+    const newRange = `${newStart} - ${currentTimes.end} WIB`;
+    setEditingAgenda((prev) => (prev ? { ...prev, rentangJam: newRange } : null));
+  };
+
+  const handleEndTimeChange = (newEnd: string) => {
+    const currentTimes = parseTimeRange(editingAgenda?.rentangJam);
+    const newRange = `${currentTimes.start} - ${newEnd} WIB`;
+    setEditingAgenda((prev) => (prev ? { ...prev, rentangJam: newRange } : null));
+  };
 
   // Handle period toggles
   const handleTogglePeriod = (periodNo: number) => {
@@ -978,14 +1015,19 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                       </td>
 
                       <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <span className="inline-block px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-mono font-bold text-[10px]">
-                          H: {ag.hadirCount ?? 0}
-                        </span>
-                        {ag.tidakHadirCount > 0 && (
-                          <span className="inline-block ml-1 px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 font-mono font-bold text-[10px]">
-                            A: {ag.tidakHadirCount}
+                        <div className="flex flex-col gap-0.5 items-center">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold">
+                            Total: {(ag.hadirCount ?? 0) + (ag.tidakHadirCount ?? 0)}
                           </span>
-                        )}
+                          <div className="flex items-center gap-1">
+                            <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 font-mono font-bold text-[10px]">
+                              H: {ag.hadirCount ?? 0}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 font-mono font-bold text-[10px]">
+                              TH: {ag.tidakHadirCount ?? 0}
+                            </span>
+                          </div>
+                        </div>
                       </td>
 
                       <td className="py-3 px-3 text-center whitespace-nowrap">
@@ -1075,15 +1117,16 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs font-bold">
-                      Hadir: {ag.hadirCount}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold">
+                      Total: {(ag.hadirCount ?? 0) + (ag.tidakHadirCount ?? 0)}
                     </span>
-                    {ag.tidakHadirCount > 0 && (
-                      <span className="px-2.5 py-1 bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 rounded-lg text-xs font-bold">
-                        Absen: {ag.tidakHadirCount}
-                      </span>
-                    )}
+                    <span className="px-2 py-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs font-bold">
+                      Hadir: {ag.hadirCount ?? 0}
+                    </span>
+                    <span className="px-2 py-1 bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 rounded-lg text-xs font-bold">
+                      Tidak Hadir: {ag.tidakHadirCount ?? 0}
+                    </span>
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(ag)}
@@ -1216,181 +1259,237 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                 />
               </div>
 
-              {/* Grid Tanggal & Hari */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                    Tanggal <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={editingAgenda.tanggal || ''}
-                    onChange={(e) => {
-                      const newDate = e.target.value;
-                      const d = new Date(newDate);
-                      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-                      const curClsId = editingAgenda.classId || '';
-                      const stds = classStudentsMap[curClsId] || (currentClass?.id === curClsId ? students : []);
-                      const sessList = classSessionsMap[curClsId] || (currentClass?.id === curClsId ? sessions : []);
-                      const matchSess = sessList.find((s) => s.tanggal === newDate);
-
-                      let hadir = stds.length || editingAgenda.hadirCount || 0;
-                      let tidakHadir = 0;
-                      let absentNote = '';
-
-                      if (matchSess && stds.length > 0) {
-                        let h = 0;
-                        let th = 0;
-                        const absentList: string[] = [];
-                        stds.forEach((s) => {
-                          const rec = matchSess.records?.[s.id];
-                          const st = rec?.status || 'H';
-                          if (st === 'H' || st === 'D') {
-                            h++;
-                          } else {
-                            th++;
-                            const label = st === 'S' ? 'Sakit' : st === 'I' ? 'Izin' : 'Alpa';
-                            absentList.push(`${s.nama} (${label})`);
-                          }
-                        });
-                        hadir = h;
-                        tidakHadir = th;
-                        if (absentList.length > 0) {
-                          absentNote = `Tidak hadir: ${absentList.join(', ')}`;
-                        }
-                      }
-
-                      setEditingAgenda((prev) => {
-                        if (!prev) return null;
-                        return {
-                          ...prev,
-                          tanggal: newDate,
-                          hari: days[d.getDay()] || 'Senin',
-                          materiAjar: matchSess?.topikMateri || prev.materiAjar,
-                          hadirCount: hadir,
-                          tidakHadirCount: tidakHadir,
-                          catatan: absentNote || prev.catatan,
-                        };
-                      });
-                    }}
-                    className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                    Hari
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editingAgenda.hari || ''}
-                    onChange={(e) => setEditingAgenda({ ...editingAgenda, hari: e.target.value })}
-                    className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* SEKSI JAM KE - Persis Gambar Terlampir dengan 2 Kolom, Cekbox, Pilih Cepat, dan Roll Kebawah */}
-              <div className="bg-slate-50 dark:bg-slate-850 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-800 space-y-3">
-                {/* Header Bagian Jam Ke */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-900 dark:text-white">
-                      Jam ke <span className="text-rose-500">*</span>
-                    </span>
-                    <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                      {editingAgenda.jamKe || '1 - 4'} ({editingAgenda.rentangJam || '07:15 - 09:15 WIB'})
+              {/* SEKSI WAKTU MENGAJAR - Collapsible (Bisa Roll / Tutup) */}
+              <div className="bg-slate-50 dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
+                {/* Header Collapsible Waktu Mengajar */}
+                <div
+                  onClick={() => setIsTimeSectionExpanded((prev) => !prev)}
+                  className="w-full flex items-center justify-between p-3.5 bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer select-none transition border-b border-slate-200/60 dark:border-slate-700/60"
+                  title={isTimeSectionExpanded ? 'Tutup Waktu Mengajar' : 'Buka Waktu Mengajar'}
+                >
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <span className="text-xs font-black tracking-wider text-slate-800 dark:text-slate-200 uppercase">
+                        WAKTU MENGAJAR
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      {editingAgenda.tanggal ? new Date(editingAgenda.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Tanggal belum diisi'} &bull; {editingAgenda.rentangJam || '07:15 - 09:15 WIB'}
                     </span>
                   </div>
 
-                  {/* Pilih Cepat & Tombol Sembunyikan/Roll Kebawah */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Pilih cepat:</span>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickSelectPeriods([1, 2, 3, 4])}
-                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
-                        isPeriodsActive([1, 2, 3, 4])
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      1-4
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickSelectPeriods([5, 6, 7, 8])}
-                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
-                        isPeriodsActive([5, 6, 7, 8])
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      5-8
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickSelectPeriods([9, 10, 11, 12])}
-                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition cursor-pointer ${
-                        isPeriodsActive([9, 10, 11, 12])
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-                      }`}
-                    >
-                      9-12
-                    </button>
-
-                    {/* Tombol Roll Kebawah / Sembunyikan */}
-                    <button
-                      type="button"
-                      onClick={() => setIsPeriodsExpanded((prev) => !prev)}
-                      className="ml-1 px-2.5 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-750 transition flex items-center gap-1 cursor-pointer"
-                      title={isPeriodsExpanded ? 'Sembunyikan Pilihan Jam' : 'Roll Kebawah / Buka Pilihan Jam'}
-                    >
-                      <span>{isPeriodsExpanded ? 'Sembunyikan' : 'Roll Kebawah'}</span>
-                      {isPeriodsExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="p-1 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition"
+                  >
+                    {isTimeSectionExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
                 </div>
 
-                {/* Grid 2 Kolom Pilihan Jam Pelajaran Sesuai Gambar */}
-                {isPeriodsExpanded && (
-                  <div className="max-h-72 overflow-y-auto pr-1 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-2.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                    {TEACHING_PERIODS.map((period) => {
-                      const isSelected = selectedPeriods.includes(period.no);
-                      return (
-                        <div
-                          key={period.no}
-                          onClick={() => handleTogglePeriod(period.no)}
-                          className={`flex items-center gap-3 p-3 rounded-2xl border transition cursor-pointer select-none ${
-                            isSelected
-                              ? 'bg-indigo-50/90 dark:bg-indigo-950/50 border-indigo-400 dark:border-indigo-600 shadow-xs'
-                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'
-                          }`}
-                        >
-                          <div
-                            className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${
-                              isSelected
-                                ? 'bg-indigo-600 border-indigo-600 text-white'
-                                : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'
-                            }`}
-                          >
-                            {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                          </div>
-                          <span
-                            className={`text-xs font-semibold ${
-                              isSelected
-                                ? 'text-indigo-950 dark:text-indigo-200 font-bold'
-                                : 'text-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            {period.no}. ({period.timeRange})
+                {/* Body Collapsible Waktu Mengajar */}
+                {isTimeSectionExpanded && (
+                  <div className="p-3.5 space-y-3.5 max-h-[360px] overflow-y-auto animate-in fade-in duration-200">
+                    {/* Grid Tanggal & Hari */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                          Tanggal <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={editingAgenda.tanggal || ''}
+                          onChange={(e) => {
+                            const newDate = e.target.value;
+                            const d = new Date(newDate);
+                            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                            const curClsId = editingAgenda.classId || '';
+                            const stds = classStudentsMap[curClsId] || (currentClass?.id === curClsId ? students : []);
+                            const sessList = classSessionsMap[curClsId] || (currentClass?.id === curClsId ? sessions : []);
+                            const matchSess = sessList.find((s) => s.tanggal === newDate);
+
+                            let hadir = stds.length || editingAgenda.hadirCount || 0;
+                            let tidakHadir = 0;
+                            let absentNote = '';
+
+                            if (matchSess && stds.length > 0) {
+                              let h = 0;
+                              let th = 0;
+                              const absentList: string[] = [];
+                              stds.forEach((s) => {
+                                const rec = matchSess.records?.[s.id];
+                                const st = rec?.status || 'H';
+                                if (st === 'H' || st === 'D') {
+                                  h++;
+                                } else {
+                                  th++;
+                                  const label = st === 'S' ? 'Sakit' : st === 'I' ? 'Izin' : 'Alpa';
+                                  absentList.push(`${s.nama} (${label})`);
+                                }
+                              });
+                              hadir = h;
+                              tidakHadir = th;
+                              if (absentList.length > 0) {
+                                absentNote = `Tidak hadir: ${absentList.join(', ')}`;
+                              }
+                            }
+
+                            setEditingAgenda((prev) => {
+                              if (!prev) return null;
+                              return {
+                                ...prev,
+                                tanggal: newDate,
+                                hari: days[d.getDay()] || 'Senin',
+                                materiAjar: matchSess?.topikMateri || prev.materiAjar,
+                                hadirCount: hadir,
+                                tidakHadirCount: tidakHadir,
+                                catatan: absentNote || prev.catatan,
+                              };
+                            });
+                          }}
+                          className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                          Hari
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={editingAgenda.hari || ''}
+                          onChange={(e) => setEditingAgenda({ ...editingAgenda, hari: e.target.value })}
+                          className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Grid Jam Mulai & Jam Selesai */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                          Jam Mulai
+                        </label>
+                        <input
+                          type="time"
+                          value={parseTimeRange(editingAgenda.rentangJam).start}
+                          onChange={(e) => handleStartTimeChange(e.target.value)}
+                          className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                          Jam Selesai
+                        </label>
+                        <input
+                          type="time"
+                          value={parseTimeRange(editingAgenda.rentangJam).end}
+                          onChange={(e) => handleEndTimeChange(e.target.value)}
+                          className="w-full min-h-[44px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Detail Jam Pelajaran & Pilih Cepat */}
+                    <div className="p-3 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">
+                            Jam ke:
+                          </span>
+                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            {editingAgenda.jamKe || '1 - 4'}
                           </span>
                         </div>
-                      );
-                    })}
+
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">Pilih Cepat:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelectPeriods([1, 2, 3, 4])}
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                              isPeriodsActive([1, 2, 3, 4])
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            1-4
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelectPeriods([5, 6, 7, 8])}
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                              isPeriodsActive([5, 6, 7, 8])
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            5-8
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelectPeriods([9, 10, 11, 12])}
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                              isPeriodsActive([9, 10, 11, 12])
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            9-12
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsPeriodsExpanded((prev) => !prev)}
+                            className="px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 transition flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>{isPeriodsExpanded ? 'Tutup Daftar' : '12 Jam'}</span>
+                            {isPeriodsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Grid 2 Kolom 12 Jam Pelajaran */}
+                      {isPeriodsExpanded && (
+                        <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                          {TEACHING_PERIODS.map((period) => {
+                            const isSelected = selectedPeriods.includes(period.no);
+                            return (
+                              <div
+                                key={period.no}
+                                onClick={() => handleTogglePeriod(period.no)}
+                                className={`flex items-center gap-2 p-2 rounded-xl border transition cursor-pointer select-none ${
+                                  isSelected
+                                    ? 'bg-indigo-50/90 dark:bg-indigo-950/50 border-indigo-400 dark:border-indigo-600'
+                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                                }`}
+                              >
+                                <div
+                                  className={`w-4 h-4 rounded-md border flex items-center justify-center transition shrink-0 ${
+                                    isSelected
+                                      ? 'bg-indigo-600 border-indigo-600 text-white'
+                                      : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'
+                                  }`}
+                                >
+                                  {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                </div>
+                                <span
+                                  className={`text-[11px] ${
+                                    isSelected
+                                      ? 'text-indigo-950 dark:text-indigo-200 font-bold'
+                                      : 'text-slate-700 dark:text-slate-300 font-medium'
+                                  }`}
+                                >
+                                  {period.no}. ({period.timeRange})
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

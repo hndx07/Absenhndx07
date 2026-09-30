@@ -56,7 +56,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
   const [selectedClassId, setSelectedClassId] = useState<string>(currentClass.id || 'all');
   const [studentSearch, setStudentSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('no');
+  const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
 
   // Filter sessions by month and year
   const filteredSessions = useMemo(() => {
@@ -80,7 +80,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
     if (studentSearch.trim()) {
       const q = studentSearch.toLowerCase();
       list = list.filter(
-        (std) => std.nama.toLowerCase().includes(q) || std.nisn.includes(q)
+        (std) => std.nama.toLowerCase().includes(q) || (std.nisn || '').includes(q)
       );
     }
     return [...list].sort((a, b) => {

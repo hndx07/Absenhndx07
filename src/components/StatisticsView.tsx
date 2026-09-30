@@ -4,22 +4,25 @@ import { ClassRoom, Student, AttendanceSession, StudentGrade, SavingTransaction,
 import { calculateGradeMetrics } from '../utils/gradeCalculations';
 
 interface StatisticsViewProps {
-  activeClass: ClassRoom | null;
+  activeClass?: ClassRoom | null;
+  currentClass?: ClassRoom | null;
   students: Student[];
   sessions: AttendanceSession[];
   grades: StudentGrade[];
-  savings: SavingTransaction[];
+  savings?: SavingTransaction[];
   teacher: TeacherProfile;
 }
 
 export const StatisticsView: React.FC<StatisticsViewProps> = ({
-  activeClass,
+  activeClass: propActiveClass,
+  currentClass,
   students,
   sessions,
   grades,
-  savings,
+  savings = [],
   teacher,
 }) => {
+  const activeClass = propActiveClass || currentClass || null;
   const totalStudents = students.length;
   const maleCount = students.filter((s) => s.gender === 'L').length;
   const femaleCount = students.filter((s) => s.gender === 'P').length;

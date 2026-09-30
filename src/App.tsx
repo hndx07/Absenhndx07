@@ -21,6 +21,7 @@ import {
   Eye,
   EyeOff,
   Download,
+  CheckCircle2,
 } from 'lucide-react';
 import { SCHOOL_CONFIG } from './config/schoolConfig';
 
@@ -203,6 +204,8 @@ export default function App() {
 
   // 4. UI States with safe persistence
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [refreshSuccessToast, setRefreshSuccessToast] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
   const [activeTab, setActiveTabState] = useState<NavTab>(() =>
     UiStatePersistence.get<NavTab>('activeTab', 'attendance')
@@ -220,14 +223,49 @@ export default function App() {
     setIsSideNavOpen((prev) => !prev);
   };
 
-  // Load all user data from Supabase
-  const loadUserData = useCallback(async (targetClassId?: string) => {
-    setIsLoadingData(true);
+  // Load user data: Cache-First + Background Revalidation Strategy
+  const loadUserData = useCallback(async (targetClassId?: string, force = false) => {
     setDataError(null);
 
+    // 1. Baca SafeCache terlebih dahulu (jika tidak force) untuk tampilan instan tanpa membebani server
+    const cachedTeacher = !force ? SafeCache.get<TeacherProfile>('teacher_profile') : null;
+    const cachedClasses = !force ? SafeCache.get<ClassRoom[]>('all_classes') : null;
+    const cachedAgendas = !force ? SafeCache.get<TeachingAgenda[]>('all_agendas') : null;
+
+    if (cachedTeacher) setTeacher(cachedTeacher);
+    if (cachedClasses && cachedClasses.length > 0) setClasses(cachedClasses);
+    if (cachedAgendas) setAgendas(cachedAgendas);
+
+    let currentClassId = targetClassId || activeClassId || cachedTeacher?.activeClassId || '';
+    if (!currentClassId && cachedClasses && cachedClasses.length > 0) {
+      currentClassId = cachedClasses[0].id;
+    }
+    if (currentClassId) {
+      setActiveClassId(currentClassId);
+    }
+
+    const cachedClassData =
+      !force && currentClassId ? SafeCache.get<any>(`class_data_${currentClassId}`) : null;
+
+    if (cachedClassData) {
+      setStudents(cachedClassData.students || []);
+      setAttendance(cachedClassData.attendance || []);
+      setGrades(cachedClassData.grades || []);
+      setGradeColumns(cachedClassData.gradeColumns || []);
+      setSavings(cachedClassData.savings || []);
+    }
+
+    // Jika seluruh data ada di cache dan tidak expired (TTL aktif), lewati panggilan network ke Supabase
+    if (!force && cachedTeacher && cachedClasses && cachedAgendas && (cachedClassData || !currentClassId)) {
+      return;
+    }
+
+    // Jika cache kosong, expired, atau user melakukan manual refresh (force = true)
+    setIsLoadingData(true);
+
     try {
-      // 1. Fetch / initialize teacher profile
-      let profile = await getTeacherProfile();
+      // 1. Fetch profil guru dari Supabase Cloud
+      let profile = await getTeacherProfile(force);
       if (!profile) {
         profile = await createOrUpdateTeacherProfile({
           namaGuru: 'Guru SMK Muhammadiyah Bawang',
@@ -238,14 +276,17 @@ export default function App() {
         });
       }
       setTeacher(profile);
+      SafeCache.set('teacher_profile', profile);
 
-      // 2. Fetch classes (live from Supabase)
+      // 2. Fetch classes dari Supabase
       const loadedClasses = await getClasses();
       setClasses(loadedClasses);
       SafeCache.set('all_classes', loadedClasses);
 
-      // Determine active class
-      let currentClassId = targetClassId || activeClassId || profile.activeClassId || '';
+      // Tentukan kelas aktif
+      if (!currentClassId && profile.activeClassId) {
+        currentClassId = profile.activeClassId;
+      }
       if (!currentClassId && loadedClasses.length > 0) {
         currentClassId = loadedClasses[0].id;
       }
@@ -253,12 +294,12 @@ export default function App() {
         setActiveClassId(currentClassId);
       }
 
-      // 3. Fetch all teaching agendas (Decoupled from active class: User requirement 1, 2, 3)
+      // 3. Fetch agenda mengajar
       const loadedAgendas = await getTeachingAgendas();
       setAgendas(loadedAgendas);
       SafeCache.set('all_agendas', loadedAgendas);
 
-      // 4. Fetch class-specific records
+      // 4. Fetch data spesifik per kelas
       if (currentClassId) {
         const [
           loadedStudents,
@@ -305,6 +346,38 @@ export default function App() {
     }
   }, [activeClassId]);
 
+  // Handler Refresh Manual (Bypass cache dengan force = true)
+  const handleManualRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await loadUserData(activeClassId, true);
+      setRefreshSuccessToast('Data diperbarui dari cloud Supabase');
+      setTimeout(() => setRefreshSuccessToast(null), 3000);
+    } catch (err: any) {
+      alert(`Gagal memuat ulang data: ${err?.message || 'Koneksi error'}`);
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  };
+
+  // Handler Simpan Profil Guru Nyata ke Cloud
+  const handleSaveTeacherProfile = async (formData: TeacherProfile): Promise<void> => {
+    try {
+      const saved = await createOrUpdateTeacherProfile(formData);
+      // Re-fetch untuk menjamin konsistensi dari database cloud
+      const refreshed = await getTeacherProfile(true);
+      const finalTeacher = refreshed || saved;
+      setTeacher(finalTeacher);
+      SafeCache.set('teacher_profile', finalTeacher);
+      try {
+        localStorage.setItem('muhiba_teacher_profile', JSON.stringify(finalTeacher));
+      } catch {}
+    } catch (err: any) {
+      console.error('Failed to save teacher profile:', err);
+      throw err;
+    }
+  };
+
   // Check auth session on startup & subscribe to auth changes
   useEffect(() => {
     let isMounted = true;
@@ -340,11 +413,14 @@ export default function App() {
         setSession(newSession);
         setIsAuthChecking(false);
 
-        if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           if (newSession) {
             loadUserData();
           }
+        } else if (event === 'TOKEN_REFRESHED') {
+          // Token refreshed: Jangan reload data jika session masih valid dan cache masih fresh
         } else if (event === 'SIGNED_OUT') {
+          SafeCache.clear();
           setTeacher(null);
           setClasses([]);
           setStudents([]);
@@ -383,10 +459,10 @@ export default function App() {
       setGrades(cached.grades || []);
       setGradeColumns(cached.gradeColumns || []);
       setSavings(cached.savings || []);
-    } else {
-      setIsLoadingData(true);
+      return; // Cache-first: data sudah tersedia instan, hindari query berulang
     }
 
+    setIsLoadingData(true);
     try {
       const [
         loadedStudents,
@@ -546,11 +622,13 @@ export default function App() {
   const handleSaveSaving = async (txData: SavingTransaction) => {
     const saved = await saveSavingTransaction(txData);
     setSavings((prev) => [saved, ...prev.filter((s) => s.id !== saved.id)]);
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
   };
 
   const handleDeleteSaving = async (txId: string) => {
     await deleteSavingTransaction(txId);
     setSavings((prev) => prev.filter((s) => s.id !== txId));
+    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
   };
 
   // Download JSON backup
@@ -837,6 +915,18 @@ export default function App() {
                     </span>
                   </div>
 
+                  {/* Tombol Manual Refresh Data Cloud */}
+                  <button
+                    type="button"
+                    disabled={isManualRefreshing || isLoadingData}
+                    onClick={handleManualRefresh}
+                    className="w-full p-2.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 shadow-2xs"
+                    title="Muat ulang seluruh data langsung dari database Cloud Supabase"
+                  >
+                    <RefreshCw className={`w-4 h-4 text-emerald-700 ${isManualRefreshing || isLoadingData ? 'animate-spin' : ''}`} />
+                    <span>{isManualRefreshing || isLoadingData ? 'Memperbarui Data...' : 'Refresh Data dari Cloud'}</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -1004,10 +1094,12 @@ export default function App() {
 
             {activeTab === 'statistics' && (
               <StatisticsView
+                activeClass={activeClass}
                 currentClass={activeClass}
                 students={students}
                 sessions={attendance}
                 grades={grades}
+                savings={savings}
                 teacher={activeTeacher}
               />
             )}
@@ -1074,14 +1166,23 @@ export default function App() {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         teacher={activeTeacher}
-        onUpdateTeacher={(upd) => setTeacher(upd)}
+        onSaveTeacher={handleSaveTeacherProfile}
+        onUpdateTeacher={handleSaveTeacherProfile}
         onLogout={() => {
           signOutSupabase();
           setSession(null);
         }}
-        onDataMigrated={() => loadUserData(activeClassId)}
+        onDataMigrated={() => loadUserData(activeClassId, true)}
         onDownloadBackup={handleDownloadBackup}
       />
+
+      {/* Toast Notifikasi Berhasil Refresh */}
+      {refreshSuccessToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#009B62] text-white px-4 py-2.5 rounded-2xl shadow-xl border border-white/20 text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-100" />
+          <span>{refreshSuccessToast}</span>
+        </div>
+      )}
     </div>
   );
 }

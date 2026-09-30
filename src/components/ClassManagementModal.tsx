@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, Edit2, GraduationCap, Check, AlertTriangle } from 'lucide-react';
 import { ClassRoom } from '../types';
-import { SCHOOL_CONFIG } from '../config/schoolConfig';
+import { SCHOOL_CONFIG, JURUSAN_OPTIONS } from '../config/schoolConfig';
 import { getClassDependencyCounts } from '../services/data';
 
 interface ClassManagementModalProps {
@@ -292,14 +292,22 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Jurusan / Program Keahlian
+                    Jurusan / Program Keahlian *
                   </label>
-                  <input
-                    type="text"
-                    value={editingClass?.jurusan || ''}
+                  <select
+                    value={editingClass?.jurusan || 'Teknik Jaringan Komputer dan Telekomunikasi'}
                     onChange={(e) => setEditingClass({ ...editingClass, jurusan: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#009B62]"
-                  />
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#009B62] bg-white font-medium"
+                  >
+                    {JURUSAN_OPTIONS.map((j) => (
+                      <option key={j} value={j}>
+                        {j}
+                      </option>
+                    ))}
+                    {editingClass?.jurusan && !JURUSAN_OPTIONS.includes(editingClass.jurusan as any) && (
+                      <option value={editingClass.jurusan}>{editingClass.jurusan}</option>
+                    )}
+                  </select>
                 </div>
               </div>
 
