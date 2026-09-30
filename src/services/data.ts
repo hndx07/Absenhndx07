@@ -95,7 +95,7 @@ export async function createOrUpdateTeacherProfile(
     nama_sekolah: profile.namaSekolah ?? existing?.nama_sekolah ?? SCHOOL_CONFIG.namaSekolah,
     mata_pelajaran_utama:
       profile.mataPelajaranUtama ?? existing?.mata_pelajaran_utama ?? 'Konsentrasi Keahlian TKJ',
-    tahunAjaran: profile.tahunAjaran ?? existing?.tahun_ajaran ?? '2025/2026',
+    tahun_ajaran: profile.tahunAjaran ?? existing?.tahun_ajaran ?? '2025/2026',
     semester: profile.semester ?? existing?.semester ?? 'Genap',
     email: user.email || profile.email || existing?.email || '',
     avatar_url: profile.avatarUrl ?? existing?.avatar_url ?? '',
@@ -176,7 +176,6 @@ export async function createClass(cls: ClassRoom): Promise<ClassRoom> {
       id: cls.id,
       user_id: user.id,
       nama_kelas: cls.namaKelas,
-      mataPelajaran: cls.mataPelajaran,
       mata_pelajaran: cls.mataPelajaran,
       kkm: cls.kkm,
       jurusan: cls.jurusan,

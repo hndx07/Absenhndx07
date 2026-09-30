@@ -105,31 +105,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
   return (
     <div className="relative min-h-screen bg-slate-900 flex flex-col justify-between p-4 sm:p-6 text-slate-100 selection:bg-indigo-500 selection:text-white overflow-hidden">
-      {/* Background Looping Video with Light Blue Gradient Overlay (Opacity 20% so video stays clearly visible) */}
+      {/* Background Container with Image 44857.png */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        {/* Base Light Blue Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600" />
-
-        {/* Clear Looping Video (Tidak tertutup, berjalan otomatis dan looping) */}
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-cover pointer-events-none scale-105"
-        >
-          <source src="/login-bg.mp4" type="video/mp4" />
-        </video>
-
-        {/* Warna Biru Muda Gradient dengan Opacity 20% (Tidak menutup videonya) */}
-        <div
-          className="absolute inset-0 bg-gradient-to-br from-sky-300 via-sky-400 to-blue-500 mix-blend-color pointer-events-none"
-          style={{ opacity: 0.2 }}
+        <img
+          src={SCHOOL_CONFIG.bgImageUrl}
+          alt="Background SMK Muhiba"
+          className="w-full h-full object-cover object-center pointer-events-none scale-105"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.bgImageFallback;
+          }}
         />
         {/* Soft subtle tint so login form and text stay perfectly crisp */}
-        <div
-          className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-slate-950/40 pointer-events-none"
-        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/60 to-slate-950/75 pointer-events-none" />
       </div>
 
       {/* Top Navbar Minimal */}
