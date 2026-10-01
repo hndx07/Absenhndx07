@@ -101,14 +101,14 @@ type NavTab =
   | 'school_map';
 
 const NAV_ITEMS = [
-  { id: 'attendance', label: 'Presensi Siswa', icon: CalendarCheck, desc: 'Input kehadiran harian siswa' },
+  { id: 'attendance', label: 'Presensi Murid', icon: CalendarCheck, desc: 'Input kehadiran harian murid' },
   { id: 'recap', label: 'Rekap Absensi', icon: FileCheck, desc: 'Rekap bulanan, cetak & ekspor Excel' },
   { id: 'grades', label: 'Penilaian & KKM', icon: Award, desc: 'Asesmen sumatif & formatif' },
-  { id: 'students', label: 'Data Peserta Didik', icon: Users, desc: 'Kelola siswa & impor Excel' },
-  { id: 'agendas', label: 'Buku Jurnal Guru', icon: BookMarked, desc: 'Catatan agenda kegiatan KBM' },
+  { id: 'students', label: 'Data Murid', icon: Users, desc: 'Kelola murid & impor Excel' },
+  { id: 'agendas', label: 'Buku Jurnal Pendidik', icon: BookMarked, desc: 'Catatan agenda kegiatan KBM' },
   { id: 'savings', label: 'Tabungan & Kas', icon: Wallet, desc: 'Buku kas & tabungan kelas' },
   { id: 'statistics', label: 'Statistik & Resume', icon: BarChart3, desc: 'Grafik & ringkasan analitik' },
-  { id: 'parent_report', label: 'Laporan WhatsApp Wali', icon: MessageSquare, desc: 'Kirim rekap ke orang tua' },
+  { id: 'parent_report', label: 'Laporan WhatsApp Wali', icon: MessageSquare, desc: 'Kirim rekap ke orang tua / wali' },
   { id: 'school_map', label: 'Peta Kampus', icon: MapPin, desc: 'Profil & lokasi SMK Muhiba' },
 ];
 
@@ -543,13 +543,23 @@ export default function App() {
       const created = await createStudent(std);
       setStudents((prev) => [...prev, created]);
     }
-    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+    if (activeClassId) {
+      SafeCache.invalidate(`class_data_${activeClassId}`);
+      SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
+      SafeCache.invalidate(`pub_share_grade_share_${activeClassId}`);
+      SafeCache.invalidate(`pub_share_sav_share_${activeClassId}`);
+    }
   };
 
   const handleDeleteStudent = async (stdId: string) => {
     await deleteStudent(stdId);
     setStudents((prev) => prev.filter((s) => s.id !== stdId));
-    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+    if (activeClassId) {
+      SafeCache.invalidate(`class_data_${activeClassId}`);
+      SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
+      SafeCache.invalidate(`pub_share_grade_share_${activeClassId}`);
+      SafeCache.invalidate(`pub_share_sav_share_${activeClassId}`);
+    }
   };
 
   const handleBatchAddStudents = async (newStds: Student[]) => {
@@ -562,7 +572,12 @@ export default function App() {
       return [...prev, ...filtered];
     });
 
-    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+    if (activeClassId) {
+      SafeCache.invalidate(`class_data_${activeClassId}`);
+      SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
+      SafeCache.invalidate(`pub_share_grade_share_${activeClassId}`);
+      SafeCache.invalidate(`pub_share_sav_share_${activeClassId}`);
+    }
 
     // 2. Persist to Supabase if configured and online
     try {
@@ -1120,29 +1135,29 @@ export default function App() {
       </main>
 
       {/* Footer inheriting Muhammadiyah Visual Identity (Matches Header Colors) */}
-      <footer className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] border-t border-[#008276]/40 mt-12 py-8 text-center text-white shadow-lg transition-colors">
+      <footer className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] border-t border-[#008276] mt-12 py-8 text-center text-white shadow-lg transition-colors">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p className="font-black text-sm sm:text-base text-white tracking-wide uppercase drop-shadow-xs">
             &copy; {SCHOOL_CONFIG.namaSekolah} &bull; BATANG, JAWA TENGAH
           </p>
-          <p className="text-xs sm:text-sm font-semibold text-emerald-100">
+          <p className="text-xs sm:text-sm font-semibold text-white">
             {SCHOOL_CONFIG.alamat} &bull; Portal Tautan Resmi:{' '}
             <a
               href={SCHOOL_CONFIG.websiteUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-white underline decoration-white/80 font-bold hover:text-white hover:decoration-white transition"
+              className="text-white underline decoration-white font-bold hover:text-white hover:decoration-white transition"
             >
               {SCHOOL_CONFIG.website}
             </a>
           </p>
-          <p className="text-xs sm:text-sm font-bold text-emerald-100">
-            Sistem Informasi Presensi, Penilaian & Jurnal Guru &bull; Dikembangkan oleh{' '}
-            <span className="font-mono font-black text-emerald-950 bg-white/95 px-2 py-0.5 rounded-md border border-white/50">
+          <p className="text-xs sm:text-sm font-bold text-white">
+            Sistem Informasi Presensi, Penilaian & Jurnal Pendidik &bull; Dikembangkan oleh{' '}
+            <span className="font-mono font-black text-emerald-950 bg-white px-2 py-0.5 rounded-md border border-white">
               @hndx07
             </span>
           </p>
-          <p className="text-xs font-semibold text-emerald-100/90 pt-0.5">
+          <p className="text-xs font-semibold text-white pt-0.5">
             Backend Resmi 100% PostgreSQL & Auth Supabase Cloud (Row Level Security Aktif)
           </p>
         </div>

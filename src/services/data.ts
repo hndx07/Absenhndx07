@@ -306,15 +306,13 @@ export async function getStudents(classId?: string): Promise<Student[]> {
 
 export async function createStudent(std: Student): Promise<Student> {
   const supabase = getSupabaseClient();
-  const user = await getAuthUser();
-  if (!user) throw new Error('User belum login');
+  const id = std.id || `std_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
   const { data, error } = await supabase
     .from('students')
     .insert({
-      id: std.id,
+      id,
       class_id: std.classId,
-      user_id: user.id,
       no: std.no,
       nisn: std.nisn || '',
       nama: std.nama,
@@ -377,14 +375,40 @@ export async function updateStudent(std: Student): Promise<Student> {
 }
 
 export async function saveStudent(std: Student): Promise<Student> {
-  if (std.id && !std.id.startsWith('temp_') && !std.id.startsWith('std_new_')) {
-    try {
-      return await updateStudent(std);
-    } catch {
-      return await createStudent(std);
-    }
+  const supabase = getSupabaseClient();
+  const id = std.id || `std_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const payload = {
+    id,
+    class_id: std.classId,
+    no: std.no,
+    nisn: std.nisn || '',
+    nama: std.nama,
+    gender: std.gender,
+    catatan_umum: std.catatanUmum || '',
+    no_hp_orang_tua: std.noHpOrangTua || '',
+  };
+
+  const { data, error } = await supabase
+    .from('students')
+    .upsert(payload, { onConflict: 'id' })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error saving student:', error);
+    throw error;
   }
-  return createStudent(std);
+
+  return {
+    id: data.id,
+    classId: data.class_id,
+    no: Number(data.no),
+    nisn: data.nisn || '',
+    nama: data.nama,
+    gender: data.gender,
+    catatanUmum: data.catatan_umum,
+    noHpOrangTua: data.no_hp_orang_tua,
+  };
 }
 
 export async function deleteStudent(studentId: string): Promise<void> {
@@ -883,22 +907,32 @@ export async function deleteSavingTransaction(txId: string): Promise<void> {
 // ============================================================================
 
 export async function createOrUpdatePublicShare(record: PublicShareRecord): Promise<void> {
-  SafeCache.set(`pub_share_${record.id}`, record.payload, 24 * 60 * 60 * 1000);
+  const content = record.payload || record.data || {};
+  const fullPayload = {
+    ...content,
+    shareType: record.type,
+    shareTitle: record.title,
+    classId: record.classId,
+    created_at: record.createdAt || record.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  SafeCache.set(`pub_share_${record.id}`, fullPayload, 24 * 60 * 60 * 1000);
   try {
-    localStorage.setItem(`pub_share_${record.id}`, JSON.stringify(record.payload));
+    localStorage.setItem(`pub_share_${record.id}`, JSON.stringify(fullPayload));
   } catch {}
 
   const supabase = getSafeSupabaseClient();
   const user = await getAuthUser();
-  if (supabase && user) {
+  if (supabase) {
     try {
       const payloadRow = {
         id: record.id,
-        user_id: user.id,
+        user_id: user?.id || null,
         class_id: record.classId,
         type: record.type,
         title: record.title,
-        payload: record.payload,
+        payload: fullPayload,
         updated_at: new Date().toISOString(),
       };
       await supabase.from('public_shares').upsert(payloadRow, { onConflict: 'id' });
@@ -909,19 +943,7 @@ export async function createOrUpdatePublicShare(record: PublicShareRecord): Prom
 }
 
 export async function getPublicShare(shareId: string): Promise<any | null> {
-  const cached = SafeCache.get<any>(`pub_share_${shareId}`);
-  if (cached) return cached;
-
-  let localStored: any = null;
-  try {
-    const raw = localStorage.getItem(`pub_share_${shareId}`);
-    if (raw) {
-      localStored = JSON.parse(raw);
-    }
-  } catch (err) {
-    console.warn('Could not read public share from localStorage', err);
-  }
-
+  // 1. Check Supabase first for real-time fresh data
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
@@ -951,7 +973,18 @@ export async function getPublicShare(shareId: string): Promise<any | null> {
     }
   }
 
-  return localStored || null;
+  // 2. Fallback to cache and localStorage
+  const cached = SafeCache.get<any>(`pub_share_${shareId}`);
+  if (cached) return cached;
+
+  try {
+    const raw = localStorage.getItem(`pub_share_${shareId}`);
+    if (raw) return JSON.parse(raw);
+  } catch (err) {
+    console.warn('Could not read public share from localStorage', err);
+  }
+
+  return null;
 }
 
 // ============================================================================

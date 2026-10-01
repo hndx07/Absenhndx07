@@ -26,6 +26,7 @@ import {
   ArrowUpDown,
   ArrowUpAZ,
   ArrowDownZA,
+  MessageSquare,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import {
@@ -37,7 +38,7 @@ import {
   PublicShareRecord,
 } from '../types';
 import { exportAttendanceToExcel, exportAttendanceToPDF } from '../utils/exportUtils';
-import { createOrUpdatePublicShare } from '../services/data';
+import { createOrUpdatePublicShare, getStudents, getAttendanceSessions } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface AttendanceViewProps {
@@ -86,6 +87,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const [shareQrUrl, setShareQrUrl] = useState('');
   const [shareLink, setShareLink] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isRefreshingShare, setIsRefreshingShare] = useState(false);
+
+  // WhatsApp Report States
+  const [isWaReportModalOpen, setIsWaReportModalOpen] = useState(false);
+  const [waReportText, setWaReportText] = useState('');
+  const [waCopied, setWaCopied] = useState(false);
 
   // Cloud Real-time Save States
   const [isSavingToCloud, setIsSavingToCloud] = useState(false);
@@ -275,35 +282,135 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const totalInSession = classStudents.length || 1;
   const attendanceRate = Math.round(((countH + countD) / totalInSession) * 100);
 
-  // Generate public share link
+  // WhatsApp Report Generator for active attendance session
+  const handleOpenWaReport = () => {
+    if (!currentSession) {
+      alert('Pilih atau buat pertemuan presensi terlebih dahulu.');
+      return;
+    }
+
+    const records = currentSession.records || {};
+    const hadirList: Student[] = [];
+    const tidakHadirList: { student: Student; status: AttendanceStatus; catatan?: string }[] = [];
+
+    classStudents.forEach((std) => {
+      const rec = records[std.id];
+      const st = rec?.status;
+      if (st === 'H') {
+        hadirList.push(std);
+      } else if (st === 'S' || st === 'I' || st === 'A' || st === 'D') {
+        tidakHadirList.push({ student: std, status: st, catatan: rec?.catatan });
+      }
+    });
+
+    const statusMap: Record<AttendanceStatus, string> = {
+      H: 'Hadir',
+      S: 'Sakit',
+      I: 'Izin',
+      A: 'Alpa',
+      D: 'Dispensasi',
+    };
+
+    const lines: string[] = [
+      `*LAPORAN PRESENSI PEMBELAJARAN*`,
+      `Sekolah: ${SCHOOL_CONFIG.namaSekolah}`,
+      `Kelas: ${currentClass.namaKelas}`,
+      `Mata Pelajaran: ${currentClass.mataPelajaran}`,
+      `Pendidik: ${teacher.namaGuru}`,
+      `Hari/Tanggal: ${currentSession.tanggal}`,
+      `Pertemuan Ke: ${currentSession.pertemuanKe}`,
+    ];
+
+    if (currentSession.topikMateri && currentSession.topikMateri.trim() !== '' && currentSession.topikMateri !== 'Tanpa topik materi') {
+      lines.push(`Materi/Topik: ${currentSession.topikMateri}`);
+    }
+
+    lines.push('');
+    lines.push(`*Ringkasan Kehadiran:*`);
+    lines.push(`✓ Hadir: ${hadirList.length} murid`);
+    lines.push(`✗ Tidak Berangkat: ${tidakHadirList.length} murid`);
+
+    if (tidakHadirList.length > 0) {
+      lines.push('');
+      lines.push(`*Rincian Murid Tidak Berangkat:*`);
+      tidakHadirList.forEach(({ student, status, catatan }) => {
+        const ket = catatan && catatan.trim() ? ` (${catatan.trim()})` : '';
+        lines.push(`✗ ${student.nama} - [${statusMap[status]}]${ket}`);
+      });
+    } else {
+      lines.push('');
+      lines.push(`✓ Semua murid hadir lengkap.`);
+    }
+
+    lines.push('');
+    lines.push(`Website Resmi: ${SCHOOL_CONFIG.website}`);
+
+    setWaReportText(lines.join('\n'));
+    setWaCopied(false);
+    setIsWaReportModalOpen(true);
+  };
+
+  const handleCopyWaReport = () => {
+    navigator.clipboard.writeText(waReportText);
+    setWaCopied(true);
+    setTimeout(() => setWaCopied(false), 2000);
+  };
+
+  const handleSendToWhatsApp = () => {
+    const encoded = encodeURIComponent(waReportText);
+    window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+  };
+
+  // Generate public share link - Refresh State Terkini Sebelum Generate
   const handleOpenShare = async () => {
+    setIsRefreshingShare(true);
     const shareId = `att_share_${currentClass.id}`;
     const baseUrl = window.location.origin + window.location.pathname;
     const fullLink = `${baseUrl}?absen_share=${shareId}`;
     setShareLink(fullLink);
 
-    // Save record in local storage and supabase
-    const shareRecord: PublicShareRecord = {
-      id: shareId,
-      type: 'absen',
-      classId: currentClass.id,
-      title: `Presensi Siswa Kelas ${currentClass.namaKelas} - SMK Muhammadiyah Bawang`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      data: {
-        className: currentClass.namaKelas,
-        subject: currentClass.mataPelajaran,
-        teacher: teacher.namaGuru,
-        school: teacher.namaSekolah,
-        students: classStudents,
-        sessions: classSessions,
-      },
-    };
-
     try {
+      // 1. Refresh data murid dan sesi terbaru dari database cloud
+      const [freshStudents, freshSessions] = await Promise.all([
+        getStudents(currentClass.id).catch(() => classStudents),
+        getAttendanceSessions(currentClass.id).catch(() => classSessions),
+      ]);
+
+      const effectiveStudents = freshStudents && freshStudents.length > 0 ? freshStudents : classStudents;
+      const effectiveSessions = freshSessions && freshSessions.length > 0 ? freshSessions : classSessions;
+
+      // 2. Susun payload dari data terbaru
+      const shareRecord: PublicShareRecord = {
+        id: shareId,
+        type: 'absen',
+        classId: currentClass.id,
+        title: `Presensi Murid Kelas ${currentClass.namaKelas} - ${SCHOOL_CONFIG.namaSekolah}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        data: {
+          className: currentClass.namaKelas,
+          subject: currentClass.mataPelajaran,
+          teacher: teacher.namaGuru,
+          school: teacher.namaSekolah,
+          students: effectiveStudents,
+          sessions: effectiveSessions,
+        },
+        payload: {
+          className: currentClass.namaKelas,
+          subject: currentClass.mataPelajaran,
+          teacher: teacher.namaGuru,
+          school: teacher.namaSekolah,
+          students: effectiveStudents,
+          sessions: effectiveSessions,
+        },
+      };
+
+      // 3. Tulis ke public_shares dan SafeCache
       await createOrUpdatePublicShare(shareRecord);
     } catch (err) {
       console.warn('Could not sync share to cloud', err);
+    } finally {
+      setIsRefreshingShare(false);
     }
 
     try {
@@ -613,6 +720,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     <Save className="w-3.5 h-3.5" />
                   )}
                   <span>Simpan ke Cloud</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenWaReport}
+                  className="px-3.5 py-1.5 bg-emerald-800/80 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer border border-emerald-300/40"
+                  title="Generate teks laporan absensi siap kirim ke WhatsApp / copy-paste"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>Salin Laporan WA</span>
                 </button>
               </div>
 

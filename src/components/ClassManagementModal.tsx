@@ -41,7 +41,7 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
       namaKelas: '',
       mataPelajaran: '',
       kkm: 75,
-      jurusan: 'Teknik Jaringan Komputer dan Telekomunikasi',
+      jurusan: 'TJKT',
       keterangan: 'Tahun Ajaran 2025/2026',
       createdAt: new Date().toISOString().split('T')[0],
     });
@@ -295,7 +295,7 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
                     Jurusan / Program Keahlian *
                   </label>
                   <select
-                    value={editingClass?.jurusan || 'Teknik Jaringan Komputer dan Telekomunikasi'}
+                    value={editingClass?.jurusan || 'TJKT'}
                     onChange={(e) => setEditingClass({ ...editingClass, jurusan: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#009B62] bg-white font-medium"
                   >
