@@ -764,7 +764,7 @@ export default function App() {
                     </span>
                   </div>
                   <span className="text-xs text-emerald-100 font-medium">
-                    Sistem Presensi, Penilaian & Jurnal Guru
+                    Sistem Presensi, Penilaian & Jurnal Pendidik
                   </span>
                 </div>
               </div>
@@ -831,7 +831,7 @@ export default function App() {
                       SMK Muhammadiyah Bawang
                     </p>
                     <p className="text-[11px] text-emerald-100 truncate">
-                      Sistem Guru & Presensi
+                      Sistem Pendidik & Presensi
                     </p>
                   </div>
                 </div>
@@ -957,7 +957,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Drawer Footer: Profil Guru & Akun */}
+              {/* Drawer Footer: Profil Pendidik & Akun */}
               <div className="p-3 border-t border-slate-100 bg-slate-50/80 space-y-2">
                 <button
                   type="button"
@@ -966,7 +966,7 @@ export default function App() {
                     setIsProfileModalOpen(true);
                   }}
                   className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-white hover:bg-slate-100 text-left transition border border-slate-200/80 cursor-pointer shadow-2xs"
-                  title="Buka Pengaturan Profil Guru"
+                  title="Buka Pengaturan Profil Pendidik"
                 >
                   <div className="flex items-center gap-2.5 truncate">
                     <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#009B62] to-[#292E82] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
@@ -1026,7 +1026,7 @@ export default function App() {
                 <div>
                   <h3 className="font-bold text-base">Selamat Datang di Sistem Absensi & Nilai!</h3>
                   <p className="text-xs text-indigo-700 mt-1">
-                    Anda belum memiliki kelas yang terdaftar di akun ini. Silakan buat kelas pertama Anda untuk mulai mengelola presensi dan nilai siswa.
+                    Anda belum memiliki kelas yang terdaftar di akun ini. Silakan buat kelas pertama Anda untuk mulai mengelola presensi dan nilai murid.
                   </p>
                 </div>
                 <button

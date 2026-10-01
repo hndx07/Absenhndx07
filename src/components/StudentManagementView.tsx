@@ -123,7 +123,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   const handleSubmitStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent?.nama?.trim()) {
-      alert('Nama siswa wajib diisi!');
+      alert('Nama murid wajib diisi!');
       return;
     }
     setIsSavingStudent(true);
@@ -135,7 +135,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
         second: '2-digit',
       }) + ' WIB';
       setLastSyncTime(timeStr);
-      setSyncStatusMsg(`Data siswa ${editingStudent.nama} berhasil disimpan ke Cloud Supabase!`);
+      setSyncStatusMsg(`Data murid ${editingStudent.nama} berhasil disimpan ke Cloud Supabase!`);
       setTimeout(() => setSyncStatusMsg(null), 4000);
       setIsModalOpen(false);
       setEditingStudent(null);
@@ -159,7 +159,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
         second: '2-digit',
       }) + ' WIB';
       setLastSyncTime(timeStr);
-      setSyncStatusMsg(`Seluruh ${classStudents.length} data siswa kelas ${currentClass.namaKelas} berhasil disimpan ke Cloud Supabase!`);
+      setSyncStatusMsg(`Seluruh ${classStudents.length} data murid kelas ${currentClass.namaKelas} berhasil disimpan ke Cloud Supabase!`);
       setTimeout(() => setSyncStatusMsg(null), 4000);
     } catch (err: any) {
       alert(`Gagal menyimpan ke cloud: ${err.message || 'Koneksi terputus'}`);
@@ -331,7 +331,9 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
       if (
         !nama ||
         lowerNama === 'nama' ||
+        lowerNama === 'nama murid' ||
         lowerNama === 'nama siswa' ||
+        lowerNama === 'nama peserta didik' ||
         lowerNama === 'nama lengkap' ||
         lowerNama.includes('template') ||
         lowerNama.includes('petunjuk') ||
@@ -362,7 +364,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
 
       if (!nama || nama.length < 2) {
         status = 'invalid';
-        reason = 'Nama siswa terlalu pendek atau kosong';
+        reason = 'Nama murid terlalu pendek atau kosong';
       } else if (nisn && existingNisns.has(nisn)) {
         status = 'duplicate';
         reason = `NISN ${nisn} sudah terdaftar di sistem`;
@@ -395,7 +397,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     });
 
     if (previews.length === 0) {
-      alert('Tidak ditemukan baris data siswa yang valid di berkas ini. Pastikan format tabel memiliki kolom Nama Siswa.');
+      alert('Tidak ditemukan baris data murid yang valid di berkas ini. Pastikan format tabel memiliki kolom Nama Murid.');
       return;
     }
 
@@ -480,7 +482,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     const toImport = parsedRows.filter((r) => selectedRowNums.has(r.rowNum));
 
     if (toImport.length === 0) {
-      alert('Pilih setidaknya 1 baris siswa yang siap diimpor.');
+      alert('Pilih setidaknya 1 baris murid yang siap diimpor.');
       return;
     }
 
@@ -504,10 +506,10 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
       setSelectedRowNums(new Set());
       setImportFileName('');
       setImportRawText('');
-      alert(`Berhasil mengimpor ${newStudents.length} siswa ke kelas ${currentClass.namaKelas}! Data sudah masuk dan langsung aktif di aplikasi.`);
+      alert(`Berhasil mengimpor ${newStudents.length} murid ke kelas ${currentClass.namaKelas}! Data sudah masuk dan langsung aktif di aplikasi.`);
     } catch (err) {
       console.error('Commit import error:', err);
-      alert('Data siswa telah diproses ke aplikasi.');
+      alert('Data murid telah diproses ke aplikasi.');
     } finally {
       setIsImporting(false);
     }
@@ -532,21 +534,21 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
             <span className="text-xs font-semibold text-slate-600">{currentClass.mataPelajaran}</span>
           </div>
           <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
-            Data Peserta Didik
+            Data Murid
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Total {classStudents.length} siswa terdaftar ({classStudents.filter((s) => s.gender === 'L').length} Laki-laki, {classStudents.filter((s) => s.gender === 'P').length} Perempuan) &bull; {SCHOOL_CONFIG.namaSekolah}
+            Total {classStudents.length} murid terdaftar ({classStudents.filter((s) => s.gender === 'L').length} Laki-laki, {classStudents.filter((s) => s.gender === 'P').length} Perempuan) &bull; {SCHOOL_CONFIG.namaSekolah}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Tombol Simpan & Sinkronkan Data Siswa ke Cloud */}
+          {/* Tombol Simpan & Sinkronkan Data Murid ke Cloud */}
           <button
             type="button"
             onClick={handleSyncAllStudents}
             disabled={isSavingStudent || classStudents.length === 0}
             className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer disabled:opacity-50"
-            title="Simpan dan sinkronkan seluruh data siswa kelas ini ke Cloud Supabase secara real-time"
+            title="Simpan dan sinkronkan seluruh data murid kelas ini ke Cloud Supabase secara real-time"
           >
             {isSavingStudent ? (
               <>
@@ -556,7 +558,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
             ) : (
               <>
                 <Cloud className="w-4 h-4" />
-                <span>Simpan Siswa ke Cloud</span>
+                <span>Simpan Murid ke Cloud</span>
               </>
             )}
           </button>
@@ -566,7 +568,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
             <button
               onClick={() => exportStudentsToExcel(currentClass, classStudents, teacher, classes)}
               className="px-3 py-1.5 hover:bg-emerald-600 hover:text-white text-emerald-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
-              title="Ekspor daftar siswa kelas ini ke format Excel"
+              title="Ekspor daftar murid kelas ini ke format Excel"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 hover:text-white" />
               Ekspor Kelas Ini
@@ -575,9 +577,9 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
             <button
               onClick={() => exportStudentsToExcel(null, students, teacher, classes)}
               className="px-3 py-1.5 hover:bg-emerald-600 hover:text-white text-emerald-800 rounded-xl text-xs font-bold transition flex items-center gap-1"
-              title="Ekspor seluruh siswa semua kelas ke format Excel"
+              title="Ekspor seluruh murid semua kelas ke format Excel"
             >
-              Semua Siswa
+              Semua Murid
             </button>
           </div>
 
@@ -601,7 +603,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
             className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
           >
             <UserPlus className="w-4 h-4" />
-            Tambah Siswa
+            Tambah Murid
           </button>
         </div>
       </div>
@@ -628,7 +630,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Cari nama siswa atau NISN..."
+              placeholder="Cari nama murid atau NISN..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-white rounded-2xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 shadow-xs"
@@ -645,7 +647,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
-              title="Urutkan berdasarkan nomor urut siswa"
+              title="Urutkan berdasarkan nomor urut murid"
             >
               <span>No Urut</span>
             </button>
@@ -679,7 +681,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
         </div>
 
         <p className="text-xs text-slate-500 font-medium">
-          Menampilkan {filtered.length} dari {classStudents.length} siswa {sortOrder === 'name-asc' ? '(A-Z)' : sortOrder === 'name-desc' ? '(Z-A)' : ''}
+          Menampilkan {filtered.length} dari {classStudents.length} murid {sortOrder === 'name-asc' ? '(A-Z)' : sortOrder === 'name-desc' ? '(Z-A)' : ''}
         </p>
       </div>
 
@@ -703,10 +705,10 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                 <th
                   onClick={() => setSortOrder((prev) => (prev === 'name-asc' ? 'name-desc' : 'name-asc'))}
                   className="py-3.5 px-4 min-w-[200px] cursor-pointer hover:bg-slate-100 transition select-none"
-                  title="Klik untuk sortir nama siswa secara alfabetis (A-Z / Z-A)"
+                  title="Klik untuk sortir nama murid secara alfabetis (A-Z / Z-A)"
                 >
                   <div className="flex items-center gap-1.5">
-                    <span>Nama Lengkap Siswa</span>
+                    <span>Nama Lengkap Murid</span>
                     {sortOrder === 'name-asc' ? (
                       <span className="flex items-center text-[10px] text-indigo-600 font-mono font-bold bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-200">
                         <ArrowUpAZ className="w-3.5 h-3.5 mr-0.5" /> A-Z
@@ -731,7 +733,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
                     <Users className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                    Belum ada data siswa di kelas ini atau tidak cocok dengan pencarian.
+                    Belum ada data murid di kelas ini atau tidak cocok dengan pencarian.
                   </td>
                 </tr>
               ) : (
@@ -780,14 +782,14 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                         <button
                           onClick={() => handleOpenEdit(student)}
                           className="p-1.5 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-xl transition"
-                          title="Edit Data Siswa"
+                          title="Edit Data Murid"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setDeletingStudent(student)}
                           className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-xl transition"
-                          title="Hapus Data Siswa"
+                          title="Hapus Data Murid"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -807,7 +809,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-bold text-slate-900 text-base">
-                {editingStudent.nama ? 'Edit Data Siswa' : 'Tambah Siswa Baru'}
+                {editingStudent.nama ? 'Edit Data Murid' : 'Tambah Murid Baru'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -836,7 +838,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                 </div>
                 <div className="col-span-2">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    NISN (Nomor Induk Siswa)
+                    NISN (Nomor Induk Murid / Siswa Nasional)
                   </label>
                   <input
                     type="text"
@@ -852,7 +854,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  Nama Lengkap Siswa *
+                  Nama Lengkap Murid *
                 </label>
                 <input
                   type="text"
@@ -901,7 +903,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  Catatan Siswa
+                  Catatan Murid
                 </label>
                 <input
                   type="text"
@@ -935,7 +937,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                   ) : (
                     <>
                       <Cloud className="w-4 h-4" />
-                      <span>Simpan Siswa ke Cloud</span>
+                      <span>Simpan Murid ke Cloud</span>
                     </>
                   )}
                 </button>
@@ -945,7 +947,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
         </div>
       )}
 
-      {/* Modal Konfirmasi Hapus Siswa */}
+      {/* Modal Konfirmasi Hapus Murid */}
       {deletingStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4">
@@ -955,10 +957,10 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
 
             <div className="text-center">
               <h3 className="text-base font-bold text-slate-900">
-                Konfirmasi Hapus Siswa
+                Konfirmasi Hapus Murid
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Apakah Anda yakin ingin menghapus data siswa:
+                Apakah Anda yakin ingin menghapus data murid:
               </p>
               <div className="mt-3 p-3 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs">
                 <p><strong>Nama:</strong> {deletingStudent.nama}</p>
@@ -966,7 +968,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                 <p><strong>Kelas:</strong> {currentClass.namaKelas}</p>
               </div>
               <p className="text-[11px] text-rose-600 mt-2 font-medium">
-                Tindakan ini akan menghapus siswa ini dari kelas. Data historis presensi lama tetap terjaga.
+                Tindakan ini akan menghapus murid ini dari kelas. Data historis presensi lama tetap terjaga.
               </p>
             </div>
 
@@ -983,7 +985,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                 onClick={handleConfirmDelete}
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow-sm"
               >
-                Ya, Hapus Siswa Ini
+                Ya, Hapus Murid Ini
               </button>
             </div>
           </div>
@@ -1000,7 +1002,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                 <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
                 <div>
                   <h3 className="font-bold text-sm sm:text-base">
-                    Impor Data Siswa dari Excel / Spreadsheet
+                    Impor Data Murid dari Excel / Spreadsheet
                   </h3>
                   <p className="text-[11px] text-slate-300">
                     Kelas: {currentClass.namaKelas} &bull; Anti-duplikasi otomatis aktif
@@ -1023,7 +1025,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                     Format Kolom yang Didukung:
                   </p>
                   <p className="text-[11px] text-slate-500">
-                    NISN, Nama Siswa / Nama Lengkap, Jenis Kelamin (L/P), No HP Ortu, Catatan
+                    NISN, Nama Murid / Nama Lengkap, Jenis Kelamin (L/P), No HP Ortu, Catatan
                   </p>
                 </div>
 
@@ -1149,7 +1151,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                         Siap Diimpor
                       </span>
                       <span className="text-xl font-black font-mono text-emerald-800 mt-0.5 block">
-                        {validCount} siswa
+                        {validCount} murid
                       </span>
                     </div>
 
@@ -1177,7 +1179,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                     <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-xs font-bold text-slate-800">
-                          Pratinjau Data Siswa ({selectedRowNums.size} dipilih dari {totalParsed} baris)
+                          Pratinjau Data Murid ({selectedRowNums.size} dipilih dari {totalParsed} baris)
                         </p>
                         <p className="text-[11px] text-slate-500">
                           Centang baris yang ingin dimasukkan ke data kelas {currentClass.namaKelas}
@@ -1218,8 +1220,8 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                                 type="checkbox"
                                 checked={parsedRows.length > 0 && selectedRowNums.size === parsedRows.length}
                                 onChange={(e) => {
-                                  if (e.target.checked) selectAllRows();
-                                  else deselectAllRows();
+                                   if (e.target.checked) selectAllRows();
+                                   else deselectAllRows();
                                 }}
                                 className="rounded text-indigo-600 focus:ring-indigo-500"
                                 title="Pilih / Batal Pilih Semua"
@@ -1228,7 +1230,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                             <th className="p-2.5 text-center w-10">No</th>
                             <th className="p-2.5 w-32">Status</th>
                             <th className="p-2.5 w-28">NISN</th>
-                            <th className="p-2.5 min-w-[170px]">Nama Lengkap Siswa</th>
+                            <th className="p-2.5 min-w-[170px]">Nama Lengkap Murid</th>
                             <th className="p-2.5 text-center w-14">L/P</th>
                             <th className="p-2.5 w-32">No HP Ortu</th>
                             <th className="p-2.5">Keterangan / Alasan</th>
@@ -1323,8 +1325,8 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
             <div className="px-6 py-4 bg-slate-50 border-t flex flex-col sm:flex-row items-center justify-between gap-3">
               <span className="text-xs text-slate-500">
                 {selectedRowNums.size > 0
-                  ? `${selectedRowNums.size} siswa terpilih siap dimasukkan ke database kelas`
-                  : 'Pilih minimal satu baris siswa untuk dimasukkan ke data aplikasi'}
+                  ? `${selectedRowNums.size} murid terpilih siap dimasukkan ke database kelas`
+                  : 'Pilih minimal satu baris murid untuk dimasukkan ke data aplikasi'}
               </span>
 
               <div className="flex items-center gap-2">
@@ -1348,7 +1350,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                   <Cloud className="w-4 h-4" />
                   {isImporting
                     ? 'Menyimpan ke Cloud Supabase...'
-                    : `Simpan ${selectedRowNums.size} Siswa ke Cloud`}
+                    : `Simpan ${selectedRowNums.size} Murid ke Cloud`}
                 </button>
               </div>
             </div>

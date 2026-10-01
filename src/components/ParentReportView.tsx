@@ -74,12 +74,12 @@ export const ParentReportView: React.FC<ParentReportViewProps> = ({
     const studentGrade = grades.find((g) => g.studentId === std.id && g.classId === currentClass.id);
     const avgF = studentGrade?.formatif1 ? studentGrade.formatif1 : 80;
 
-    return `*LAPORAN PRESENSI PESERTA DIDIK*
+    return `*LAPORAN PRESENSI MURID*
 *SMK MUHAMMADIYAH BAWANG - BATANG*
 Tahun Ajaran ${teacher.tahunAjaran} (${teacher.semester})
 
 Kepada Yth. Bapak/Ibu Wali Murid dari:
-Nama Siswa: *${std.nama}*
+Nama Murid: *${std.nama}*
 Kelas: *${currentClass.namaKelas}*
 Mata Pelajaran: *${currentClass.mataPelajaran}*
 
@@ -88,12 +88,12 @@ Bersama ini kami informasikan rekap harian pembelajaran:
 📖 Materi: ${targetSession?.topikMateri || 'Pembelajaran Kejuruan Terstruktur'}
 📌 Status Kehadiran: *${statusText}*
 
-Catatan Guru:
+Catatan Pendidik:
 ${std.catatanUmum || 'Ananda senantiasa mengikuti kegiatan pembelajaran dengan baik dan santun.'}
 
 Salam takzim,
 *${teacher.namaGuru}*
-Guru Mata Pelajaran SMK Muhammadiyah Bawang
+Pendidik Mata Pelajaran SMK Muhammadiyah Bawang
 _Pendidikan Vokasi Unggul & Berkarakter Islami_`;
   };
 
@@ -107,7 +107,7 @@ _Pendidikan Vokasi Unggul & Berkarakter Islami_`;
   const handleSendWhatsApp = (std: Student) => {
     const phone = std.noHpOrangTua?.replace(/[^0-9]/g, '');
     if (!phone) {
-      alert('Nomor HP Orang Tua belum terdaftar untuk siswa ini!');
+      alert('Nomor HP Orang Tua belum terdaftar untuk murid ini!');
       return;
     }
     const cleanPhone = phone.startsWith('0') ? `62${phone.slice(1)}` : phone;
@@ -131,7 +131,7 @@ _Pendidikan Vokasi Unggul & Berkarakter Islami_`;
             Laporan Presensi & Kehadiran ke Orang Tua
           </h2>
           <p className="text-xs text-slate-500">
-            Kirimkan laporan resmi perkembangan presensi harian siswa langsung ke nomor WhatsApp orang tua
+            Kirimkan laporan resmi perkembangan presensi harian murid langsung ke nomor WhatsApp orang tua
           </p>
         </div>
 
@@ -155,7 +155,7 @@ _Pendidikan Vokasi Unggul & Berkarakter Islami_`;
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Cari nama siswa..."
+              placeholder="Cari nama murid..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-white rounded-2xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 shadow-sm"

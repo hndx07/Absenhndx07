@@ -256,7 +256,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   };
 
   const handleDeleteSessionConfirm = (sess: AttendanceSession) => {
-    if (confirm(`Yakin ingin menghapus sesi Pertemuan Ke-${sess.pertemuanKe} (${sess.tanggal})? Seluruh rekaman presensi siswa pada sesi ini akan dihapus permanen.`)) {
+    if (confirm(`Yakin ingin menghapus sesi Pertemuan Ke-${sess.pertemuanKe} (${sess.tanggal})? Seluruh rekaman presensi murid pada sesi ini akan dihapus permanen.`)) {
       onDeleteSession(sess.id);
       if (activeSessionId === sess.id) {
         const remaining = classSessions.filter((s) => s.id !== sess.id);
@@ -456,7 +456,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               <span className="text-xs font-semibold text-slate-600">{currentClass.mataPelajaran}</span>
             </div>
             <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
-              Buku Presensi & Kehadiran Siswa
+              Buku Presensi & Kehadiran Murid
             </h2>
             <p className="text-xs text-slate-500">
               SMK Muhammadiyah Bawang &bull; Tahun Ajaran {teacher.tahunAjaran} ({teacher.semester})
@@ -474,7 +474,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 ring-2 ring-emerald-400 animate-pulse'
                   : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
               } disabled:opacity-50`}
-              title="Simpan data presensi siswa ke cloud Supabase secara real-time"
+              title="Simpan data presensi murid ke cloud Supabase secara real-time"
             >
               {isSavingToCloud ? (
                 <>
@@ -767,7 +767,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 {attendanceRate}%
               </span>
               <span className="text-xs text-slate-500 font-medium">
-                ({countH + countD}/{classStudents.length} Siswa)
+                ({countH + countD}/{classStudents.length} Murid)
               </span>
             </div>
             <div className="w-full bg-slate-100 h-2 rounded-full mt-3 overflow-hidden">
@@ -808,7 +808,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden space-y-3 p-4">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-2">
             <h3 className="font-bold text-slate-800 text-sm">
-              Daftar Kehadiran Siswa
+              Daftar Kehadiran Murid
             </h3>
             
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -816,7 +816,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Cari siswa..."
+                  placeholder="Cari murid..."
                   value={filterQuery}
                   onChange={(e) => setFilterQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -878,7 +878,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                     title="Klik untuk sortir alfabetis A-Z / Z-A"
                   >
                     <div className="flex items-center gap-1.5">
-                      <span>Nama Peserta Didik</span>
+                      <span>Nama Murid</span>
                       {sortOrder === 'name-asc' ? (
                         <span className="flex items-center text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-mono">
                           <ArrowUpAZ className="w-3 h-3 mr-0.5" /> A-Z
@@ -1237,10 +1237,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
             <div>
               <h3 className="font-bold text-slate-900 text-lg">
-                Tautan Publik Kehadiran Siswa
+                Tautan Publik Kehadiran Murid
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Wali murid dan siswa dapat memantau kehadiran secara real-time tanpa perlu akun login.
+                Wali murid dan murid dapat memantau kehadiran secara real-time tanpa perlu akun login.
               </p>
             </div>
 

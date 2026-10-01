@@ -29,6 +29,7 @@ import {
   UserX,
   AlertCircle,
   HelpCircle,
+  Printer,
 } from 'lucide-react';
 import { TeachingAgenda, ClassRoom, TeacherProfile, Student, AttendanceSession } from '../types';
 import { exportAgendasToExcel, exportToWordDocument, exportAgendaToPDF } from '../utils/exportUtils';
@@ -605,9 +606,30 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
       .join('');
 
     const contentHtml = `
-      <h3 style="text-align:center; margin-bottom: 4px;">BUKU JURNAL & AGENDA MENGAJAR GURU</h3>
+      <div style="text-align: center; border-bottom: 3px double #000; padding-bottom: 8px; margin-bottom: 16px;">
+        <table style="width: 100%; border: none; border-collapse: collapse; margin-bottom: 4px;">
+          <tr>
+            <td style="width: 100px; text-align: center; border: none; vertical-align: middle;">
+              <img src="${SCHOOL_CONFIG.logoUrl}" width="90" height="90" style="object-fit: contain;" alt="Logo" />
+            </td>
+            <td style="text-align: center; border: none; vertical-align: middle;">
+              <h4 style="margin: 0; font-size: 11pt; font-weight: bold; letter-spacing: 0.5px;">MAJLIS PENDIDIKAN DASAR DAN MENENGAH</h4>
+              <h4 style="margin: 2px 0; font-size: 11pt; font-weight: bold; letter-spacing: 0.5px;">DAERAH MUHAMMADIYAH BATANG</h4>
+              <h2 style="margin: 3px 0; font-size: 16pt; font-weight: bold;">SMK MUHAMMADIYAH BAWANG</h2>
+              <p style="margin: 2px 0; font-size: 10pt; font-weight: bold; letter-spacing: 3px;">T E R A K R E D I T A S I &ldquo;A&rdquo;</p>
+              <p style="margin: 2px 0; font-size: 9pt;">Jl. Bawang-Sukorejo Km 01 Ds. Jlamprang Kec. Bawang Kab. Batang.</p>
+              <p style="margin: 2px 0; font-size: 9pt;">Email : smkmuhbawang@gmail.com | Website : www.smkmuhiba.sch.id</p>
+              <p style="margin: 2px 0; font-size: 9pt;">Kode Pos. 51274 Telp. (0285) 4486909 Fax. (0285) 4486899</p>
+            </td>
+            <td style="width: 100px; border: none;"></td>
+          </tr>
+        </table>
+        <div style="border-bottom: 3px solid #000; margin-bottom: 2px;"></div>
+        <div style="border-bottom: 1px solid #000;"></div>
+      </div>
+      <h3 style="text-align:center; margin-bottom: 4px;">BUKU JURNAL & AGENDA MENGAJAR PENDIDIK</h3>
       <p style="text-align:center; margin: 0 0 15px 0;">
-        Guru: <strong>${teacher.namaGuru}</strong> (NBM/NIP: ${teacher.nbm || teacher.nip || '-'}) | 
+        Pendidik: <strong>${teacher.namaGuru}</strong> (NBM/NIP: ${teacher.nbm || teacher.nip || '-'}) | 
         Kelas: <strong>${classNameHeader}</strong> | Mapel: <strong>${mapelHeader}</strong> | 
         Tahun Ajaran: ${teacher.tahunAjaran} (${teacher.semester})
       </p>
@@ -657,10 +679,10 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
             </span>
           </div>
           <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-1.5">
-            Buku Jurnal / Agenda Mengajar Guru
+            Buku Jurnal / Agenda Mengajar Pendidik
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Pencatatan tatap muka, materi TP Kurikulum Merdeka, dan dinamika kelas guru {SCHOOL_CONFIG.namaSekolah}
+            Pencatatan tatap muka, materi TP Kurikulum Merdeka, dan dinamika kelas pendidik {SCHOOL_CONFIG.namaSekolah}
           </p>
         </div>
 
@@ -938,7 +960,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                 <tr className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   <th className="py-3 px-3 text-center w-12">No</th>
                   <th className="py-3 px-3 w-28">Tanggal</th>
-                  <th className="py-3 px-3 min-w-[130px]">Guru</th>
+                  <th className="py-3 px-3 min-w-[130px]">Pendidik</th>
                   <th className="py-3 px-3 min-w-[140px]">Mapel</th>
                   <th className="py-3 px-3 min-w-[110px]">Kelas</th>
                   <th className="py-3 px-3 text-center w-28">Pertemuan / Jam</th>
@@ -1527,14 +1549,14 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Catatan keaktifan siswa, kendala perangkat lab, atau tindak lanjut..."
+                  placeholder="Catatan keaktifan murid, kendala perangkat lab, atau tindak lanjut..."
                   value={editingAgenda.catatan || ''}
                   onChange={(e) => setEditingAgenda({ ...editingAgenda, catatan: e.target.value })}
                   className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
-              {/* SEKSI INTEGRASI PRESENSI SISWA DENGAN KELAS */}
+              {/* SEKSI INTEGRASI PRESENSI MURID DENGAN KELAS */}
               <div className="bg-slate-50 dark:bg-slate-850 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5">
                   <div className="flex items-center gap-2">
@@ -1543,7 +1565,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                       Integrasi Presensi Kelas
                     </span>
                     <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold">
-                      {targetClassStudents.length} Siswa
+                      {targetClassStudents.length} Murid
                     </span>
                   </div>
 
@@ -1562,7 +1584,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                 {/* Kartu Ringkasan Kehadiran */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                   <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                    <span className="text-[10px] text-slate-400 block font-bold">TOTAL SISWA</span>
+                    <span className="text-[10px] text-slate-400 block font-bold">TOTAL MURID</span>
                     <span className="text-sm font-extrabold text-slate-900 dark:text-white font-mono">
                       {targetClassStudents.length}
                     </span>
@@ -1587,11 +1609,11 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                   </div>
                 </div>
 
-                {/* Daftar Siswa yang Tidak Hadir */}
+                {/* Daftar Murid yang Tidak Hadir */}
                 {attendanceBreakdown.absentStudents.length > 0 && (
                   <div className="p-2.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 text-xs">
                     <span className="font-bold text-rose-800 dark:text-rose-300 text-[11px] block mb-1">
-                      Siswa tidak hadir ({attendanceBreakdown.absentStudents.length}):
+                      Murid tidak hadir ({attendanceBreakdown.absentStudents.length}):
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       {attendanceBreakdown.absentStudents.map((abs, i) => (
@@ -1612,7 +1634,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                     type="button"
                     onClick={handleSyncFromAttendance}
                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                    title="Tarik data hadir & tidak hadir dari presensi siswa kelas ini"
+                    title="Tarik data hadir & tidak hadir dari presensi murid kelas ini"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     Sinkronkan Hadir & Tidak Hadir dari Presensi
@@ -1691,12 +1713,12 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in">
           <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto max-h-[92vh]">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white border-b border-slate-800">
+            <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white border-b border-slate-800 no-print">
               <div className="flex items-center gap-2.5">
                 <Eye className="w-5 h-5 text-indigo-400" />
                 <div>
                   <h3 className="font-bold text-sm sm:text-base">
-                    Pratinjau Dokumen PDF Agenda Mengajar
+                    Dokumen Siap Cetak & PDF Agenda Mengajar
                   </h3>
                   <p className="text-[11px] text-slate-400">
                     {filterClassId === 'all' ? 'Seluruh Kelas' : selectedClassObj?.namaKelas} &bull; T.A. {teacher.tahunAjaran} ({teacher.semester})
@@ -1704,6 +1726,14 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Cetak Dokumen
+                </button>
                 <button
                   type="button"
                   onClick={() => exportAgendaToPDF(filteredAgendas, selectedClassObj, teacher, classesMap)}
@@ -1725,30 +1755,66 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
             {/* A4 Paper Simulation Canvas */}
             <div className="p-4 sm:p-8 overflow-y-auto bg-slate-100 dark:bg-slate-950 flex-1">
               <div className="bg-white mx-auto p-6 sm:p-10 shadow-lg rounded-xl border border-slate-200 text-slate-900 max-w-[210mm] font-serif leading-relaxed text-xs">
-                {/* Kop Sekolah */}
-                <div className="text-center border-b-2 border-slate-900 pb-3 mb-4">
-                  <p className="font-bold text-[11px] tracking-wide text-slate-700 uppercase">
-                    MAJELIS PENDIDIKAN DASAR MENENGAH DAN PENDIDIKAN NONFORMAL
-                  </p>
-                  <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight uppercase my-0.5">
-                    {SCHOOL_CONFIG.namaSekolah}
-                  </h1>
-                  <p className="text-[10px] text-slate-600">
-                    Alamat: {SCHOOL_CONFIG.alamat} &bull; Website: {SCHOOL_CONFIG.website} &bull; Telp: {SCHOOL_CONFIG.telepon}
-                  </p>
+                {/* Kop Surat Resmi Dokumen Siap Cetak (Sesuai Format SMK Muhammadiyah Bawang) */}
+                <div className="pb-1 mb-4">
+                  <div className="flex items-center justify-between gap-3 sm:gap-4 pb-2">
+                    {/* Logo SMK Muhiba (Dari Header) */}
+                    <div className="w-20 sm:w-24 shrink-0 flex items-center justify-center">
+                      <img
+                        src={SCHOOL_CONFIG.logoUrl}
+                        alt="Logo SMK Muhammadiyah Bawang"
+                        className="w-16 h-16 sm:w-20 sm:h-20 object-contain"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
+                        }}
+                      />
+                    </div>
+
+                    {/* Teks Kop Surat */}
+                    <div className="flex-1 text-center font-serif text-slate-900">
+                      <h3 className="font-bold text-xs sm:text-sm tracking-wide uppercase leading-tight">
+                        MAJLIS PENDIDIKAN DASAR DAN MENENGAH
+                      </h3>
+                      <h4 className="font-bold text-xs sm:text-sm tracking-wide uppercase leading-tight mt-0.5">
+                        DAERAH MUHAMMADIYAH BATANG
+                      </h4>
+                      <h1 className="text-base sm:text-xl md:text-2xl font-black tracking-wide uppercase my-1 leading-tight text-slate-950">
+                        SMK MUHAMMADIYAH BAWANG
+                      </h1>
+                      <p className="font-black text-[11px] sm:text-xs tracking-[0.25em] sm:tracking-[0.3em] uppercase leading-tight my-1">
+                        T E R A K R E D I T A S I &ldquo;A&rdquo;
+                      </p>
+                      <p className="text-[10px] sm:text-[11px] leading-tight text-slate-800">
+                        Jl. Bawang-Sukorejo Km 01 Ds. Jlamprang Kec. Bawang Kab. Batang.
+                      </p>
+                      <p className="text-[10px] sm:text-[11px] leading-tight text-slate-800 mt-0.5">
+                        Email : <span className="underline text-blue-800">smkmuhbawang@gmail.com</span> Website : <span className="underline text-blue-800">www.smkmuhiba.sch.id</span>
+                      </p>
+                      <p className="text-[10px] sm:text-[11px] leading-tight text-slate-800 mt-0.5">
+                        Kode Pos. 51274 Telp. (0285) 4486909 Fax. (0285) 4486899
+                      </p>
+                    </div>
+
+                    {/* Spacer Penyeimbang Agar Tengah */}
+                    <div className="w-20 sm:w-24 shrink-0 hidden sm:block"></div>
+                  </div>
+
+                  {/* Garis Ganda Kop Surat Resmi: Garis Tebal Atas + Garis Tipis Bawah */}
+                  <div className="border-b-[3px] border-black"></div>
+                  <div className="border-b border-black mt-[2px]"></div>
                 </div>
 
                 {/* Document Title */}
                 <div className="text-center mb-5">
                   <h2 className="text-sm font-bold uppercase tracking-wider underline">
-                    BUKU JURNAL / AGENDA MENGAJAR GURU
+                    BUKU JURNAL / AGENDA MENGAJAR PENDIDIK
                   </h2>
                 </div>
 
-                {/* Guru & Rombel Info */}
+                {/* Pendidik & Rombel Info */}
                 <div className="grid grid-cols-2 gap-4 text-xs mb-5 font-sans bg-slate-50 p-3 rounded-lg border border-slate-200">
                   <div className="space-y-1">
-                    <p><span className="text-slate-500 inline-block w-28">Nama Guru:</span> <strong>{teacher.namaGuru}</strong></p>
+                    <p><span className="text-slate-500 inline-block w-28">Nama Pendidik:</span> <strong>{teacher.namaGuru}</strong></p>
                     <p><span className="text-slate-500 inline-block w-28">NBM / NIP:</span> {teacher.nbm || teacher.nip || '-'}</p>
                     <p><span className="text-slate-500 inline-block w-28">Mata Pelajaran:</span> {filterClassId === 'all' ? teacher.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
                   </div>
@@ -1817,7 +1883,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                     <p className="text-slate-600">
                       Bawang, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>
-                    <p className="text-slate-600 mt-0.5">Guru Pengampu Mata Pelajaran,</p>
+                    <p className="text-slate-600 mt-0.5">Pendidik Pengampu Mata Pelajaran,</p>
                     <div className="h-16 flex items-end justify-center">
                       <p className="font-bold underline text-slate-900">{teacher.namaGuru}</p>
                     </div>
@@ -1830,7 +1896,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="px-6 py-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between no-print">
               <span className="text-xs text-slate-500 dark:text-slate-400">
                 Format resmi sesuai standar kurikulum {SCHOOL_CONFIG.namaSekolah}
               </span>
@@ -1841,6 +1907,14 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                   className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl cursor-pointer"
                 >
                   Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4" />
+                  Cetak Dokumen
                 </button>
                 <button
                   type="button"

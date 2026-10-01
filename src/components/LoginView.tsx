@@ -187,7 +187,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </div>
               <div>
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                  Masuk Akun Guru
+                  Masuk Akun Pendidik
                 </h2>
                 <p className="text-xs text-slate-600 font-medium mt-1">
                   SMK Muhammadiyah Bawang &bull; Presensi & Penilaian

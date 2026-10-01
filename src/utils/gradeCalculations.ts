@@ -14,16 +14,16 @@ export function getKurikulumMerdekaAssessment(
   arg3?: number | string,
   arg4?: string
 ): MerdekaAssessmentResult {
-  let nama = 'Peserta didik';
+  let nama = 'Murid';
   let kkm = 75;
   let mataPelajaran = '';
 
   if (typeof arg2 === 'number') {
     kkm = arg2;
     mataPelajaran = typeof arg3 === 'string' ? arg3 : '';
-    nama = arg4 || 'Peserta didik';
+    nama = arg4 || 'Murid';
   } else {
-    nama = typeof arg2 === 'string' ? arg2 : 'Peserta didik';
+    nama = typeof arg2 === 'string' ? arg2 : 'Murid';
     kkm = typeof arg3 === 'number' ? arg3 : 75;
     mataPelajaran = arg4 || '';
   }
@@ -94,7 +94,7 @@ export interface ComputedScoreResult {
 
 export function calculateGradeMetrics(
   grade?: Partial<StudentGrade> | null,
-  studentName = 'Peserta didik',
+  studentName = 'Murid',
   kkm = 75
 ): ComputedScoreResult {
   if (!grade) {

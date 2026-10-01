@@ -436,7 +436,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
 
     setLocalGrades(updatedMap);
     recordsToSave.forEach((rec) => onSaveGrade(rec));
-    alert(`Deskripsi Kurikulum Merdeka berhasil diterapkan otomatis ke ${recordsToSave.length} siswa!`);
+    alert(`Deskripsi Kurikulum Merdeka berhasil diterapkan otomatis ke ${recordsToSave.length} murid!`);
   };
 
   const handleSaveColumns = () => {
@@ -458,7 +458,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
         id: shareId,
         type: 'nilai',
         classId: currentClass.id,
-        title: `Rekapitulasi Nilai Siswa Kelas ${currentClass.namaKelas} - ${currentClass.mataPelajaran}`,
+        title: `Rekapitulasi Nilai Murid Kelas ${currentClass.namaKelas} - ${currentClass.mataPelajaran}`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         data: {
@@ -490,7 +490,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
 
     for (let i = 0; i < Math.min(6, rawData.length); i++) {
       const row = rawData[i].map((c) => String(c || '').toLowerCase().trim());
-      const namaIdx = row.findIndex((c) => c.includes('nama') || c.includes('siswa'));
+      const namaIdx = row.findIndex((c) => c.includes('nama') || c.includes('siswa') || c.includes('murid'));
       if (namaIdx !== -1) {
         headerRowIdx = i;
         colMap.nama = namaIdx;
@@ -576,14 +576,14 @@ export const GradesView: React.FC<GradesViewProps> = ({
 
       if (!matchedStudent) {
         status = 'not_found';
-        reason = `Siswa "${nama}" tidak ditemukan di daftar kelas ${currentClass.namaKelas}`;
+        reason = `Murid "${nama}" tidak ditemukan di daftar kelas ${currentClass.namaKelas}`;
       } else if (seenStudentIds.has(matchedStudent.id)) {
         status = 'duplicate';
-        reason = `Data siswa "${matchedStudent.nama}" muncul ganda dalam file Excel ini (dilewati)`;
+        reason = `Data murid "${matchedStudent.nama}" muncul ganda dalam file Excel ini (dilewati)`;
       } else if (existingGradesByStudentId.has(matchedStudent.id)) {
         if (overwriteMode === 'skip') {
           status = 'duplicate';
-          reason = `Nilai siswa "${matchedStudent.nama}" sudah ada di database (mode: lewati aktif)`;
+          reason = `Nilai murid "${matchedStudent.nama}" sudah ada di database (mode: lewati aktif)`;
         } else {
           status = 'valid';
           reason = `Akan memperbarui nilai yang sudah ada`;
@@ -669,7 +669,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
     setIsImportOpen(false);
     setParsedGradeRows([]);
     setImportFileName('');
-    alert(`Berhasil mengimpor dan memperbarui nilai ${validRows.length} siswa ke cloud!`);
+    alert(`Berhasil mengimpor dan memperbarui nilai ${validRows.length} murid ke cloud!`);
   };
 
   // Metrics calculation - HANYA siswa yang sudah memiliki nilai terinput
@@ -799,7 +799,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
             </div>
 
             <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
-              Buku Penilaian Siswa (Kurikulum Merdeka)
+              Buku Penilaian Murid (Kurikulum Merdeka)
             </h2>
             <p className="text-xs text-slate-500">
               Pengisian nilai instan tanpa jeda &bull; Otomatis tersinkronisasi aman ke database Supabase
@@ -817,7 +817,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                   ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 ring-2 ring-emerald-400 animate-pulse'
                   : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
               } disabled:opacity-50`}
-              title="Simpan seluruh nilai peserta didik ke database cloud Supabase secara real-time"
+              title="Simpan seluruh nilai murid ke database cloud Supabase secara real-time"
             >
               {syncStatus === 'saving' ? (
                 <>
@@ -848,12 +848,12 @@ export const GradesView: React.FC<GradesViewProps> = ({
               Atur Kolom TP
             </button>
 
-            {/* Auto Apply Deskripsi Kurikulum Merdeka ke Seluruh Siswa */}
+            {/* Auto Apply Deskripsi Kurikulum Merdeka ke Seluruh Murid */}
             <button
               type="button"
               onClick={handleApplyMerdekaDescriptionsAll}
               className="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-              title="Isi deskripsi capaian kompetensi otomatis sesuai capaian nilai Kurikulum Merdeka ke seluruh siswa"
+              title="Isi deskripsi capaian kompetensi otomatis sesuai capaian nilai Kurikulum Merdeka ke seluruh murid"
             >
               <Sparkles className="w-4 h-4 text-indigo-600" />
               <span>Deskripsi Merdeka Otomatis</span>
@@ -920,8 +920,8 @@ export const GradesView: React.FC<GradesViewProps> = ({
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-slate-400">Ketuntasan KKM:</span>
-              <span className="font-mono font-black text-emerald-700 text-sm bg-emerald-50 px-2 py-0.5 rounded-lg" title="Ketuntasan dihitung hanya dari siswa yang sudah memiliki nilai">
-                {passedCount} / {studentsWithScores.length} Siswa Terinput ({passedPercentage}%)
+              <span className="font-mono font-black text-emerald-700 text-sm bg-emerald-50 px-2 py-0.5 rounded-lg" title="Ketuntasan dihitung hanya dari murid yang sudah memiliki nilai">
+                {passedCount} / {studentsWithScores.length} Murid Terinput ({passedPercentage}%)
               </span>
             </div>
           </div>
@@ -935,7 +935,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Cari nama atau NISN siswa..."
+              placeholder="Cari nama atau NISN murid..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-white rounded-2xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 shadow-xs"
@@ -952,7 +952,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
-              title="Urutkan berdasarkan nomor urut siswa"
+              title="Urutkan berdasarkan nomor urut murid"
             >
               <span>No Urut</span>
             </button>
@@ -986,7 +986,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
         </div>
 
         <p className="text-xs text-slate-500">
-          Menampilkan {filteredStudents.length} dari {classStudents.length} siswa ({studentsWithScores.length} memiliki nilai) {sortOrder === 'name-asc' ? '(A-Z)' : sortOrder === 'name-desc' ? '(Z-A)' : ''}
+          Menampilkan {filteredStudents.length} dari {classStudents.length} murid ({studentsWithScores.length} memiliki nilai) {sortOrder === 'name-asc' ? '(A-Z)' : sortOrder === 'name-desc' ? '(Z-A)' : ''}
         </p>
       </div>
 
@@ -1009,10 +1009,10 @@ export const GradesView: React.FC<GradesViewProps> = ({
                 <th
                   onClick={() => setSortOrder((prev) => (prev === 'name-asc' ? 'name-desc' : 'name-asc'))}
                   className="py-3 px-3 min-w-[180px] sticky left-10 bg-[#008276] text-white z-10 border-r border-[#008276]/40 cursor-pointer hover:opacity-90 select-none"
-                  title="Klik untuk sortir nama siswa secara alfabetis (A-Z / Z-A)"
+                  title="Klik untuk sortir nama murid secara alfabetis (A-Z / Z-A)"
                 >
                   <div className="flex items-center gap-1.5">
-                    <span>Nama Siswa</span>
+                    <span>Nama Murid</span>
                     {sortOrder === 'name-asc' ? (
                       <span className="flex items-center text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-mono">
                         <ArrowUpAZ className="w-3 h-3 mr-0.5" /> A-Z
@@ -1050,7 +1050,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                 <tr>
                   <td colSpan={7 + activeColumnsCount} className="py-12 text-center text-slate-400">
                     <Award className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-                    Belum ada siswa di kelas ini atau tidak cocok dengan pencarian.
+                    Belum ada murid di kelas ini atau tidak cocok dengan pencarian.
                   </td>
                 </tr>
               ) : (
@@ -1263,14 +1263,14 @@ export const GradesView: React.FC<GradesViewProps> = ({
                   {columnSummary.sas.avg}
                 </td>
                 <td className="py-2 px-2 text-center font-bold text-emerald-800 border-r bg-emerald-50/60">-</td>
-                <td className="py-2 px-2 text-center font-black text-indigo-900 border-r bg-indigo-50/60" title="Rata-rata nilai akhir siswa">
+                <td className="py-2 px-2 text-center font-black text-indigo-900 border-r bg-indigo-50/60" title="Rata-rata nilai akhir murid">
                   {averageClassScore || '-'}
                 </td>
                 <td className="py-2 px-2 text-center font-bold text-slate-600 border-r text-[10px]">
                   KKM {currentClass.kkm}
                 </td>
                 <td className="py-2 px-3 text-slate-500 text-[10px] font-sans">
-                  {passedCount} dari {studentsWithScores.length} siswa tuntas KKM
+                  {passedCount} dari {studentsWithScores.length} murid tuntas KKM
                 </td>
               </tr>
             </tfoot>
@@ -1282,7 +1282,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
               <Cloud className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>
                 {syncStatus === 'saved'
-                  ? 'Semua nilai siswa tersimpan aman di database Cloud PostgreSQL Supabase.'
+                  ? 'Semua nilai murid tersimpan aman di database Cloud PostgreSQL Supabase.'
                   : syncStatus === 'saving'
                   ? 'Sedang menyimpan ke cloud...'
                   : syncStatus === 'error'
@@ -1327,7 +1327,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                 <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
                 <div>
                   <h3 className="font-bold text-sm sm:text-base">
-                    Impor Nilai Siswa dari Excel
+                    Impor Nilai Murid dari Excel
                   </h3>
                   <p className="text-[11px] text-slate-300">
                     Kelas: {currentClass.namaKelas} &bull; Mapel: {currentClass.mataPelajaran} &bull; KKM: {currentClass.kkm}
@@ -1422,7 +1422,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                   {importFileName ? importFileName : 'Klik atau seret file Excel Nilai (.xlsx, .xls, .csv) ke sini'}
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
-                  Mendukung kolom TP 1..10, STS, SAS, dan Catatan Siswa
+                  Mendukung kolom TP 1..10, STS, SAS, dan Catatan Murid
                 </p>
               </div>
 
@@ -1440,7 +1440,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                     <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200">
                       <span className="text-[10px] font-bold text-emerald-700 uppercase">Siap Diimpor</span>
                       <span className="text-xl font-black font-mono text-emerald-800 block mt-0.5">
-                        {parsedGradeRows.filter((r) => r.status === 'valid').length} siswa
+                        {parsedGradeRows.filter((r) => r.status === 'valid').length} murid
                       </span>
                     </div>
 
@@ -1463,7 +1463,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                   <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
                     <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                       <p className="text-xs font-bold text-slate-700">
-                        Pratinjau Nilai Siswa
+                        Pratinjau Nilai Murid
                       </p>
                       <span className="text-[11px] text-slate-500">
                         {parsedGradeRows.filter((r) => r.status === 'valid').length} baris valid
@@ -1477,7 +1477,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                             <th className="p-2.5 text-center w-10">No</th>
                             <th className="p-2.5 w-24">Status</th>
                             <th className="p-2.5 w-28">NISN</th>
-                            <th className="p-2.5 min-w-[150px]">Nama Siswa</th>
+                            <th className="p-2.5 min-w-[150px]">Nama Murid</th>
                             <th className="p-2.5 text-center w-14">STS</th>
                             <th className="p-2.5 text-center w-14">SAS</th>
                             <th className="p-2.5">Keterangan</th>
@@ -1534,7 +1534,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
             <div className="px-6 py-4 bg-slate-50 border-t flex items-center justify-between">
               <span className="text-xs text-slate-500">
                 {parsedGradeRows.filter((r) => r.status === 'valid').length > 0
-                  ? `${parsedGradeRows.filter((r) => r.status === 'valid').length} nilai siswa siap diterapkan`
+                  ? `${parsedGradeRows.filter((r) => r.status === 'valid').length} nilai murid siap diterapkan`
                   : 'Unggah berkas untuk memvalidasi nilai'}
               </span>
 
@@ -1636,7 +1636,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
               </div>
               <h3 className="font-bold text-slate-900 text-lg">Tautan Publik Nilai Aktif</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Siswa dan orang tua dapat membuka tautan ini tanpa login untuk melihat transparansi buku nilai secara aman dan read-only.
+                Murid dan orang tua dapat membuka tautan ini tanpa login untuk melihat transparansi buku nilai secara aman dan read-only.
               </p>
             </div>
 

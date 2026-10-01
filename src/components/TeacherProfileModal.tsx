@@ -66,7 +66,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
       }, 700);
     } catch (err: any) {
       console.error('Error saving teacher profile:', err);
-      alert(`Gagal menyimpan profil guru ke cloud: ${err?.message || 'Terjadi kesalahan jaringan atau server.'}`);
+      alert(`Gagal menyimpan profil pendidik ke cloud: ${err?.message || 'Terjadi kesalahan jaringan atau server.'}`);
     } finally {
       setIsSaving(false);
     }
@@ -82,7 +82,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
               <User className="w-5 h-5 text-emerald-100" />
             </div>
             <div>
-              <h3 className="font-bold text-lg leading-tight text-white">Profil Guru & Lembaga</h3>
+              <h3 className="font-bold text-lg leading-tight text-white">Profil Pendidik & Lembaga</h3>
               <p className="text-xs text-emerald-100">
                 Informasi identitas pengampu di {SCHOOL_CONFIG.namaSekolah}
               </p>

@@ -188,7 +188,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
     const dataRows = studentRecap.map((r) => ({
       No: r.noUrut,
       NISN: r.student.nisn,
-      'Nama Siswa': r.student.nama,
+      'Nama Murid': r.student.nama,
       'L/P': r.student.gender,
       Kelas: r.className,
       'Hadir (H)': r.hadir,
@@ -208,9 +208,9 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
     XLSX.utils.sheet_add_aoa(
       ws,
       [
-        [`REKAPITULASI PRESENSI SISWA - ${SCHOOL_CONFIG.namaSekolah.toUpperCase()}`],
+        [`REKAPITULASI PRESENSI MURID - ${SCHOOL_CONFIG.namaSekolah.toUpperCase()}`],
         [`Periode: ${monthLabel} ${selectedYear} | Rombel: ${classLabel}`],
-        [`Guru Pengampu: ${teacher.namaGuru} (NBM/NIP: ${teacher.nbm || teacher.nip || '-'})`],
+        [`Pendidik Pengampu: ${teacher.namaGuru} (NBM/NIP: ${teacher.nbm || teacher.nip || '-'})`],
         [`Website: ${SCHOOL_CONFIG.website} | Alamat: ${SCHOOL_CONFIG.alamat}`],
         [],
       ],
@@ -248,7 +248,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
             Rekapitulasi Absensi Bulanan
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            {SCHOOL_CONFIG.namaSekolah} &bull; Website: {SCHOOL_CONFIG.website} &bull; Guru: {teacher.namaGuru}
+            {SCHOOL_CONFIG.namaSekolah} &bull; Website: {SCHOOL_CONFIG.website} &bull; Pendidik: {teacher.namaGuru}
           </p>
         </div>
 
@@ -354,10 +354,10 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
             </select>
           </div>
 
-          {/* Cari Siswa & Sortir */}
+          {/* Cari Murid & Sortir */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              Cari & Sortir Siswa
+              Cari & Sortir Murid
             </label>
             <div className="flex items-center gap-1.5">
               <div className="relative flex-1">
@@ -462,7 +462,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
           <div className="flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-emerald-100" />
             <h3 className="font-bold text-white text-sm">
-              Daftar Rekap Kehadiran Peserta Didik ({studentRecap.length} Siswa)
+              Daftar Rekap Kehadiran Murid ({studentRecap.length} Murid)
             </h3>
           </div>
           <span className="text-xs text-emerald-100 font-mono">
@@ -497,7 +497,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
                     title="Klik untuk sortir alfabetis A-Z / Z-A"
                   >
                     <div className="flex items-center gap-1.5">
-                      <span>Nama Siswa</span>
+                      <span>Nama Murid</span>
                       {sortOrder === 'name-asc' ? (
                         <span className="flex items-center text-[10px] bg-white/20 px-1.5 py-0.5 rounded text-white font-mono">
                           <ArrowUpAZ className="w-3 h-3 mr-0.5" /> A-Z

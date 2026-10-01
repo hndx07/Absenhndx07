@@ -38,7 +38,7 @@ export function exportStudentsToExcel(
     return {
       No: idx + 1,
       NISN: s.nisn || '-',
-      'Nama Lengkap Siswa': s.nama,
+      'Nama Lengkap Murid': s.nama,
       'Jenis Kelamin': s.gender === 'L' ? 'Laki-laki' : 'Perempuan',
       Kelas: cls?.namaKelas || classRoom?.namaKelas || '-',
       'Mata Pelajaran': cls?.mataPelajaran || classRoom?.mataPelajaran || '-',
@@ -49,8 +49,8 @@ export function exportStudentsToExcel(
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Daftar Siswa');
-  const fname = `Data_Siswa_${classRoom ? classRoom.namaKelas.replace(/\s+/g, '_') : 'Semua'}_${Date.now()}.xlsx`;
+  XLSX.utils.book_append_sheet(wb, ws, 'Daftar Murid');
+  const fname = `Data_Murid_${classRoom ? classRoom.namaKelas.replace(/\s+/g, '_') : 'Semua'}_${Date.now()}.xlsx`;
   XLSX.writeFile(wb, fname);
 }
 
@@ -59,7 +59,7 @@ export function downloadStudentTemplateExcel(classRoom?: ClassRoom) {
     {
       No: 1,
       NISN: '0012345678',
-      'Nama Siswa': 'Ahmad Fauzi',
+      'Nama Murid': 'Ahmad Fauzi',
       'L/P': 'L',
       'No HP Ortu': '081234567890',
       Catatan: 'Aktif dalam pembelajaran',
@@ -67,7 +67,7 @@ export function downloadStudentTemplateExcel(classRoom?: ClassRoom) {
     {
       No: 2,
       NISN: '0012345679',
-      'Nama Siswa': 'Budi Santoso',
+      'Nama Murid': 'Budi Santoso',
       'L/P': 'L',
       'No HP Ortu': '081234567891',
       Catatan: '',
@@ -75,7 +75,7 @@ export function downloadStudentTemplateExcel(classRoom?: ClassRoom) {
     {
       No: 3,
       NISN: '0012345680',
-      'Nama Siswa': 'Citra Lestari',
+      'Nama Murid': 'Citra Lestari',
       'L/P': 'P',
       'No HP Ortu': '081234567892',
       Catatan: '',
@@ -84,9 +84,9 @@ export function downloadStudentTemplateExcel(classRoom?: ClassRoom) {
 
   const ws = XLSX.utils.json_to_sheet(sampleRows);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Template Siswa');
+  XLSX.utils.book_append_sheet(wb, ws, 'Template Murid');
   const className = classRoom?.namaKelas ? classRoom.namaKelas.replace(/\s+/g, '_') : 'Umum';
-  XLSX.writeFile(wb, `Template_Data_Siswa_${className}.xlsx`);
+  XLSX.writeFile(wb, `Template_Data_Murid_${className}.xlsx`);
 }
 
 export function exportAttendanceToExcel(
@@ -107,7 +107,7 @@ export function exportAttendanceToExcel(
     return {
       No: idx + 1,
       NISN: s.nisn || '-',
-      'Nama Lengkap Siswa': s.nama,
+      'Nama Lengkap Murid': s.nama,
       'Jenis Kelamin': s.gender,
       'Status Kehadiran': statusMap[rec?.status || 'H'] || 'Hadir',
       'Catatan / Alasan': rec?.catatan || '-',
@@ -131,7 +131,7 @@ export function exportAttendanceToPDF(
   doc.setFontSize(14);
   doc.text(SCHOOL_CONFIG.namaSekolah, 14, 15);
   doc.setFontSize(11);
-  doc.text(`Presensi Harian Siswa - Pertemuan Ke-${session.pertemuanKe}`, 14, 22);
+  doc.text(`Presensi Harian Murid - Pertemuan Ke-${session.pertemuanKe}`, 14, 22);
   doc.setFontSize(9);
   doc.text(
     `Kelas: ${classRoom.namaKelas} | Tanggal: ${session.tanggal} | Topik: ${session.topikMateri || '-'}`,
@@ -161,7 +161,7 @@ export function exportAttendanceToPDF(
 
   autoTable(doc, {
     startY: 32,
-    head: [['No', 'NISN', 'Nama Siswa', 'L/P', 'Status', 'Catatan']],
+    head: [['No', 'NISN', 'Nama Murid', 'L/P', 'Status', 'Catatan']],
     body: tableRows,
     theme: 'grid',
     headStyles: { fillColor: [0, 155, 98], textColor: 255, fontStyle: 'bold' },
@@ -339,13 +339,13 @@ export function exportMonthlyRecapToPDF(
   doc.setFontSize(14);
   doc.text(SCHOOL_CONFIG.namaSekolah, 14, 15);
   doc.setFontSize(11);
-  doc.text(`Rekap Presensi Siswa - Bulan ${monthName} ${year}`, 14, 22);
+  doc.text(`Rekap Presensi Murid - Bulan ${monthName} ${year}`, 14, 22);
   doc.setFontSize(9);
-  doc.text(`Kelas: ${classNameStr} | Guru: ${teacherNameStr}`, 14, 28);
+  doc.text(`Kelas: ${classNameStr} | Pendidik: ${teacherNameStr}`, 14, 28);
 
   autoTable(doc, {
     startY: 32,
-    head: [['No', 'NISN', 'Nama Siswa', 'L/P', 'H', 'S', 'I', 'A', 'D', 'Kehadiran']],
+    head: [['No', 'NISN', 'Nama Murid', 'L/P', 'H', 'S', 'I', 'A', 'D', 'Kehadiran']],
     body: tableRows,
     theme: 'grid',
     headStyles: { fillColor: [0, 155, 98], textColor: 255, fontStyle: 'bold' },
@@ -377,7 +377,7 @@ export function exportGradesToExcel(
     const rowObj: Record<string, any> = {
       No: idx + 1,
       NISN: std.nisn || '-',
-      'Nama Siswa': std.nama,
+      'Nama Murid': std.nama,
     };
 
     for (let i = 0; i < activeColumnsCount; i++) {
@@ -414,15 +414,15 @@ export function exportGradesToPDF(
     teacherParam ||
     (gradeColumnsOrTeacher && 'namaGuru' in gradeColumnsOrTeacher
       ? (gradeColumnsOrTeacher as TeacherProfile)
-      : ({ namaGuru: 'Guru Pengampu' } as TeacherProfile));
+      : ({ namaGuru: 'Pendidik Pengampu' } as TeacherProfile));
 
   const doc = new jsPDF('landscape');
   doc.setFontSize(14);
   doc.text(SCHOOL_CONFIG.namaSekolah, 14, 15);
   doc.setFontSize(11);
-  doc.text(`Daftar Nilai Siswa (Kurikulum Merdeka) - ${classRoom.namaKelas}`, 14, 22);
+  doc.text(`Daftar Nilai Murid (Kurikulum Merdeka) - ${classRoom.namaKelas}`, 14, 22);
   doc.setFontSize(9);
-  doc.text(`Mata Pelajaran: ${classRoom.mataPelajaran} | KKM: ${classRoom.kkm} | Guru: ${teacher.namaGuru}`, 14, 28);
+  doc.text(`Mata Pelajaran: ${classRoom.mataPelajaran} | KKM: ${classRoom.kkm} | Pendidik: ${teacher.namaGuru}`, 14, 28);
 
   const tableRows = students.map((std, idx) => {
     const g = grades.find((item) => item.studentId === std.id);
@@ -442,7 +442,7 @@ export function exportGradesToPDF(
 
   autoTable(doc, {
     startY: 32,
-    head: [['No', 'NISN', 'Nama Siswa', 'Rata Formatif', 'STS', 'SAS', 'Nilai Akhir', 'Predikat', 'Status']],
+    head: [['No', 'NISN', 'Nama Murid', 'Rata Formatif', 'STS', 'SAS', 'Nilai Akhir', 'Predikat', 'Status']],
     body: tableRows,
     theme: 'grid',
     headStyles: { fillColor: [0, 155, 98], textColor: 255, fontStyle: 'bold' },
@@ -466,7 +466,7 @@ export function downloadGradesTemplateExcel(
     const rowObj: Record<string, any> = {
       No: idx + 1,
       NISN: std.nisn || '',
-      'Nama Siswa': std.nama,
+      'Nama Murid': std.nama,
     };
     for (let i = 1; i <= activeCount; i++) {
       rowObj[`Formatif_${i}`] = '';
@@ -523,9 +523,9 @@ export function exportAgendaToPDF(
   doc.setFontSize(14);
   doc.text(SCHOOL_CONFIG.namaSekolah, 14, 15);
   doc.setFontSize(11);
-  doc.text(`Jurnal & Agenda Mengajar Guru`, 14, 22);
+  doc.text(`Jurnal & Agenda Mengajar Pendidik`, 14, 22);
   doc.setFontSize(9);
-  doc.text(`Guru: ${teacher.namaGuru} | Semester: ${teacher.semester} | T.A: ${teacher.tahunAjaran}`, 14, 28);
+  doc.text(`Pendidik: ${teacher.namaGuru} | Semester: ${teacher.semester} | T.A: ${teacher.tahunAjaran}`, 14, 28);
 
   const tableRows = agendas.map((ag, idx) => [
     idx + 1,
@@ -546,7 +546,7 @@ export function exportAgendaToPDF(
     styles: { fontSize: 8 },
   });
 
-  doc.save(`Agenda_Mengajar_Guru_${Date.now()}.pdf`);
+  doc.save(`Agenda_Mengajar_Pendidik_${Date.now()}.pdf`);
 }
 
 export function exportToWordDocument(fileName: string, htmlContent: string) {
@@ -588,8 +588,8 @@ export function exportSavingsToExcel(
     return {
       No: idx + 1,
       Tanggal: tx.tanggal,
-      Kategori: tx.isClassCash ? 'Kas Kelas' : 'Tabungan Siswa',
-      'Nama Siswa': tx.isClassCash ? '-' : (std?.nama || '-'),
+      Kategori: tx.isClassCash ? 'Kas Kelas' : 'Tabungan Murid',
+      'Nama Murid': tx.isClassCash ? '-' : (std?.nama || '-'),
       Tipe: tx.tipe === 'masuk' ? 'Pemasukan' : 'Pengeluaran',
       Nominal: tx.jumlah,
       Keterangan: tx.keterangan || '-',

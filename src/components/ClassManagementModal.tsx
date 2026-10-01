@@ -124,13 +124,13 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
                   </p>
                   <ul className="text-xs font-semibold text-amber-900 list-disc list-inside space-y-0.5 mt-1">
                     {deleteWarning.studentsCount > 0 && (
-                      <li>{deleteWarning.studentsCount} data siswa</li>
+                      <li>{deleteWarning.studentsCount} data murid</li>
                     )}
                     {deleteWarning.attendanceCount > 0 && (
                       <li>{deleteWarning.attendanceCount} sesi pertemuan absensi</li>
                     )}
                     {deleteWarning.gradesCount > 0 && (
-                      <li>{deleteWarning.gradesCount} catatan penilaian siswa</li>
+                      <li>{deleteWarning.gradesCount} catatan penilaian murid</li>
                     )}
                   </ul>
                   <p className="text-[11px] text-amber-700 pt-1">
