@@ -312,17 +312,20 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     };
 
     const lines: string[] = [
-      `*LAPORAN PRESENSI PEMBELAJARAN*`,
-      `Sekolah: ${SCHOOL_CONFIG.namaSekolah}`,
-      `Kelas: ${currentClass.namaKelas}`,
-      `Mata Pelajaran: ${currentClass.mataPelajaran}`,
-      `Pendidik: ${teacher.namaGuru}`,
-      `Hari/Tanggal: ${currentSession.tanggal}`,
-      `Pertemuan Ke: ${currentSession.pertemuanKe}`,
+      `Assalamu’alaikum Warahmatullahi Wabarakatuh,`,
+      `Bapak/Ibu Orang Tua / Wali Murid dan rekan-rekan sekalian yang kami hormati,`,
+      ``,
+      `Berikut kami sampaikan *LAPORAN PRESENSI PEMBELAJARAN*:`,
+      `• Sekolah: ${SCHOOL_CONFIG.namaSekolah}`,
+      `• Kelas: ${currentClass.namaKelas}`,
+      `• Mata Pelajaran: ${currentClass.mataPelajaran}`,
+      `• Pendidik: ${teacher.namaGuru}`,
+      `• Hari/Tanggal: ${currentSession.tanggal}`,
+      `• Pertemuan Ke: ${currentSession.pertemuanKe}`,
     ];
 
     if (currentSession.topikMateri && currentSession.topikMateri.trim() !== '' && currentSession.topikMateri !== 'Tanpa topik materi') {
-      lines.push(`Materi/Topik: ${currentSession.topikMateri}`);
+      lines.push(`• Materi/Topik: ${currentSession.topikMateri.trim()}`);
     }
 
     lines.push('');
@@ -339,10 +342,15 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       });
     } else {
       lines.push('');
-      lines.push(`✓ Semua murid hadir lengkap.`);
+      lines.push(`✓ Alhamdulillah seluruh murid hadir lengkap.`);
     }
 
     lines.push('');
+    lines.push(`Demikian laporan kehadiran ini kami sampaikan sebagai bentuk keterbukaan informasi. Atas perhatian dan kerja samanya, kami ucapkan terima kasih.`);
+    lines.push(`Wassalamu’alaikum Warahmatullahi Wabarakatuh.`);
+    lines.push('');
+    lines.push(`Hormat kami,`);
+    lines.push(`*${teacher.namaGuru}*`);
     lines.push(`Website Resmi: ${SCHOOL_CONFIG.website}`);
 
     setWaReportText(lines.join('\n'));

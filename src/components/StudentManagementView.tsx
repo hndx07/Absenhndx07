@@ -761,15 +761,25 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-xs font-mono text-slate-600">
                       {student.noHpOrangTua ? (
-                        <a
-                          href={`https://wa.me/${student.noHpOrangTua.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 hover:underline"
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                          {student.noHpOrangTua}
-                        </a>
+                        (() => {
+                          const p = student.noHpOrangTua.replace(/\D/g, '');
+                          const cleanPhone = p.startsWith('0') ? `62${p.slice(1)}` : p;
+                          const greeting = encodeURIComponent(
+                            `Assalamu’alaikum Warahmatullahi Wabarakatuh.\nSelamat pagi/siang Bapak/Ibu Wali dari ananda *${student.nama}*.\nSaya *${teacher?.namaGuru || 'Pendidik'}* dari *${SCHOOL_CONFIG.namaSekolah}*.`
+                          );
+                          return (
+                            <a
+                              href={`https://wa.me/${cleanPhone}?text=${greeting}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 hover:underline"
+                              title="Kirim pesan WhatsApp santun ke Orang Tua"
+                            >
+                              <Phone className="w-3.5 h-3.5" />
+                              {student.noHpOrangTua}
+                            </a>
+                          );
+                        })()
                       ) : (
                         <span className="text-slate-300">-</span>
                       )}

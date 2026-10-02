@@ -14,6 +14,7 @@ import {
   ArrowDownZA,
 } from 'lucide-react';
 import { ClassRoom, Student, AttendanceSession, StudentGrade, TeacherProfile } from '../types';
+import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface ParentReportViewProps {
   currentClass: ClassRoom;
@@ -62,39 +63,89 @@ export const ParentReportView: React.FC<ParentReportViewProps> = ({
 
   const generateWhatsAppMessage = (std: Student) => {
     const statusRecord = targetSession?.records?.[std.id];
-    const statusText =
-      statusRecord?.status === 'H'
-        ? 'HADIR (Tepat Waktu)'
-        : statusRecord?.status === 'S'
-        ? `SAKIT (${statusRecord.catatan || 'Surat menyusul'})`
-        : statusRecord?.status === 'I'
-        ? `IZIN (${statusRecord.catatan || 'Keterangan izin'})`
-        : 'ALFA (Tanpa Keterangan)';
+    const rawStatus = statusRecord?.status || 'H';
+    const catatan = statusRecord?.catatan?.trim();
 
-    const studentGrade = grades.find((g) => g.studentId === std.id && g.classId === currentClass.id);
-    const avgF = studentGrade?.formatif1 ? studentGrade.formatif1 : 80;
+    let statusLine = '';
+    if (rawStatus === 'H') {
+      statusLine = '✅ *HADIR*\n_Alhamdulillah ananda hadir tepat waktu dan mengikuti seluruh kegiatan pembelajaran dengan baik serta tertib._';
+    } else if (rawStatus === 'S') {
+      const ket = catatan ? ` - Keterangan: ${catatan}` : '';
+      statusLine = `⚠️ *SAKIT*${ket}\n_Doa kami bersama semoga ananda lekas diberikan kesembuhan, diangkat penyakitnya, serta dapat kembali beraktivitas dan belajar bersama kita. Aamiin._`;
+    } else if (rawStatus === 'I') {
+      const ket = catatan ? ` - Keterangan: ${catatan}` : ' - Keterangan telah dikonfirmasi keluarga';
+      statusLine = `ℹ️ *IZIN* (${ket})\n_Terima kasih atas konfirmasi izin yang telah disampaikan kepada pihak sekolah._`;
+    } else if (rawStatus === 'D') {
+      const ket = catatan ? ` - Keterangan: ${catatan}` : '';
+      statusLine = `📋 *DISPENSASI*${ket}\n_Ananda sedang mewakili atau melaksanakan tugas resmi kegiatan madrasah/sekolah._`;
+    } else {
+      const ket = catatan ? ` (${catatan})` : '';
+      statusLine = `❌ *BELUM HADIR / TANPA KETERANGAN*${ket}\n_Mohon bantuan konfirmasi dari Bapak/Ibu terkait keberadaan ananda demi keselamatan, ketertiban, dan kelancaran proses belajarnya._`;
+    }
 
-    return `*LAPORAN PRESENSI MURID*
-*SMK MUHAMMADIYAH BAWANG - BATANG*
-Tahun Ajaran ${teacher.tahunAjaran} (${teacher.semester})
+    const tanggalFormatted = (() => {
+      const dStr = targetSession?.tanggal || selectedDate;
+      try {
+        const d = new Date(dStr);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('id-ID', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          });
+        }
+      } catch {}
+      return dStr;
+    })();
 
-Kepada Yth. Bapak/Ibu Wali Murid dari:
-Nama Murid: *${std.nama}*
-Kelas: *${currentClass.namaKelas}*
-Mata Pelajaran: *${currentClass.mataPelajaran}*
+    const materiFormatted =
+      targetSession?.topikMateri &&
+      targetSession.topikMateri.trim() !== '' &&
+      targetSession.topikMateri !== 'Tanpa topik materi'
+        ? targetSession.topikMateri.trim()
+        : 'Pembelajaran Kejuruan & Karakter Terstruktur';
 
-Bersama ini kami informasikan rekap harian pembelajaran:
-📅 Tanggal: ${targetSession?.tanggal || selectedDate}
-📖 Materi: ${targetSession?.topikMateri || 'Pembelajaran Kejuruan Terstruktur'}
-📌 Status Kehadiran: *${statusText}*
+    const catatanPendidik = std.catatanUmum?.trim()
+      ? std.catatanUmum.trim()
+      : 'Ananda senantiasa menunjukkan sikap yang baik, santun, dan tertib selama proses pembelajaran.';
 
-Catatan Pendidik:
-${std.catatanUmum || 'Ananda senantiasa mengikuti kegiatan pembelajaran dengan baik dan santun.'}
+    return `Assalamu’alaikum Warahmatullahi Wabarakatuh.
 
-Salam takzim,
+Selamat pagi/siang, Bapak/Ibu Orang Tua / Wali Murid yang kami hormati.
+
+Semoga Bapak/Ibu beserta keluarga senantiasa berada dalam lindungan Allah SWT, diberikan limpahan kesehatan, dan kemudahan dalam segala urusan.
+
+Dengan hormat, kami dari *${SCHOOL_CONFIG.namaSekolah}* bermaksud menyampaikan laporan harian presensi dan perkembangan belajar ananda:
+
+📋 *DATA MURID & PEMBELAJARAN*
+• *Nama Murid* : ${std.nama}
+• *NISN* : ${std.nisn || '-'}
+• *Kelas / Rombel* : ${currentClass.namaKelas}
+• *Mata Pelajaran* : ${currentClass.mataPelajaran}
+• *Tahun Ajaran* : ${teacher.tahunAjaran} (${teacher.semester})
+• *Hari / Tanggal* : ${tanggalFormatted}
+• *Pertemuan Ke* : ${targetSession?.pertemuanKe || 1}
+• *Materi Pokok* : ${materiFormatted}
+
+📌 *STATUS KEHADIRAN ANANDA:*
+${statusLine}
+
+📝 *Catatan Perkembangan Pendidik:*
+"${catatanPendidik}"
+
+Demikian laporan ini kami sampaikan sebagai bentuk keterbukaan informasi serta jalinan komunikasi yang baik antara pihak sekolah dengan Bapak/Ibu demi kemajuan pendidikan dan akhlak ananda tercinta.
+
+Atas perhatian, bimbingan, serta kerja sama yang senantiasa terjalin harmonis, kami haturkan terima kasih yang tulus.
+
+Jazakumullahu Khairan Katsiran.
+Wassalamu’alaikum Warahmatullahi Wabarakatuh.
+
+Salam hormat & takzim kami,
 *${teacher.namaGuru}*
-Pendidik Mata Pelajaran SMK Muhammadiyah Bawang
-_Pendidikan Vokasi Unggul & Berkarakter Islami_`;
+Pendidik Mata Pelajaran ${currentClass.mataPelajaran}
+*${SCHOOL_CONFIG.namaSekolah}*
+🌐 ${SCHOOL_CONFIG.website}`;
   };
 
   const handleCopyText = (std: Student) => {
