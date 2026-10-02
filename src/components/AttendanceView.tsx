@@ -27,6 +27,12 @@ import {
   ArrowUpAZ,
   ArrowDownZA,
   MessageSquare,
+  Send,
+  Eye,
+  EyeOff,
+  Phone,
+  UserCheck,
+  MessageCircle,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import {
@@ -91,8 +97,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
   // WhatsApp Report States
   const [isWaReportModalOpen, setIsWaReportModalOpen] = useState(false);
+  const [waReportMode, setWaReportMode] = useState<'group' | 'personal'>('group');
+  const [selectedStudentForWa, setSelectedStudentForWa] = useState<Student | null>(null);
   const [waReportText, setWaReportText] = useState('');
   const [waCopied, setWaCopied] = useState(false);
+  const [isWaPreviewExpanded, setIsWaPreviewExpanded] = useState(false);
+  const [waInlineCopied, setWaInlineCopied] = useState(false);
 
   // Cloud Real-time Save States
   const [isSavingToCloud, setIsSavingToCloud] = useState(false);
@@ -282,91 +292,241 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   const totalInSession = classStudents.length || 1;
   const attendanceRate = Math.round(((countH + countD) / totalInSession) * 100);
 
-  // WhatsApp Report Generator for active attendance session
-  const handleOpenWaReport = () => {
-    if (!currentSession) {
-      alert('Pilih atau buat pertemuan presensi terlebih dahulu.');
-      return;
-    }
-
-    const records = currentSession.records || {};
+  // WhatsApp Report Generator for Group / Wali Murid
+  const generateGroupWaReportText = (session: AttendanceSession): string => {
+    const records = session.records || {};
     const hadirList: Student[] = [];
-    const tidakHadirList: { student: Student; status: AttendanceStatus; catatan?: string }[] = [];
+    const sakitList: { student: Student; catatan?: string }[] = [];
+    const izinList: { student: Student; catatan?: string }[] = [];
+    const alpaList: { student: Student; catatan?: string }[] = [];
+    const dispenList: { student: Student; catatan?: string }[] = [];
 
     classStudents.forEach((std) => {
       const rec = records[std.id];
       const st = rec?.status;
-      if (st === 'H') {
-        hadirList.push(std);
-      } else if (st === 'S' || st === 'I' || st === 'A' || st === 'D') {
-        tidakHadirList.push({ student: std, status: st, catatan: rec?.catatan });
-      }
+      if (st === 'H') hadirList.push(std);
+      else if (st === 'S') sakitList.push({ student: std, catatan: rec?.catatan });
+      else if (st === 'I') izinList.push({ student: std, catatan: rec?.catatan });
+      else if (st === 'A') alpaList.push({ student: std, catatan: rec?.catatan });
+      else if (st === 'D') dispenList.push({ student: std, catatan: rec?.catatan });
     });
 
-    const statusMap: Record<AttendanceStatus, string> = {
-      H: 'Hadir',
-      S: 'Sakit',
-      I: 'Izin',
-      A: 'Alpa',
-      D: 'Dispensasi',
-    };
+    const tidakHadirCount = sakitList.length + izinList.length + alpaList.length + dispenList.length;
 
-    const lines: string[] = [
-      `Assalamu’alaikum Warahmatullahi Wabarakatuh,`,
-      `Bapak/Ibu Orang Tua / Wali Murid dan rekan-rekan sekalian yang kami hormati,`,
-      ``,
-      `Berikut kami sampaikan *LAPORAN PRESENSI PEMBELAJARAN*:`,
-      `• Sekolah: ${SCHOOL_CONFIG.namaSekolah}`,
-      `• Kelas: ${currentClass.namaKelas}`,
-      `• Mata Pelajaran: ${currentClass.mataPelajaran}`,
-      `• Pendidik: ${teacher.namaGuru}`,
-      `• Hari/Tanggal: ${currentSession.tanggal}`,
-      `• Pertemuan Ke: ${currentSession.pertemuanKe}`,
-    ];
+    const tanggalFormatted = (() => {
+      try {
+        const d = new Date(session.tanggal);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('id-ID', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          });
+        }
+      } catch {}
+      return session.tanggal;
+    })();
 
-    if (currentSession.topikMateri && currentSession.topikMateri.trim() !== '' && currentSession.topikMateri !== 'Tanpa topik materi') {
-      lines.push(`• Materi/Topik: ${currentSession.topikMateri.trim()}`);
+    const materiFormatted =
+      session.topikMateri && session.topikMateri.trim() !== '' && session.topikMateri !== 'Tanpa topik materi'
+        ? session.topikMateri.trim()
+        : 'Pembelajaran Kejuruan & Karakter Terstruktur';
+
+    let rincianTidakBerangkat = '';
+    if (tidakHadirCount > 0) {
+      const parts: string[] = [];
+      if (sakitList.length > 0) {
+        parts.push(`*Sakit (${sakitList.length} murid):*`);
+        sakitList.forEach(({ student, catatan }) => {
+          const ket = catatan ? ` (${catatan})` : '';
+          parts.push(`  • ${student.nama}${ket} - _Semoga lekas sembuh_`);
+        });
+      }
+      if (izinList.length > 0) {
+        parts.push(`*Izin (${izinList.length} murid):*`);
+        izinList.forEach(({ student, catatan }) => {
+          const ket = catatan ? ` (${catatan})` : '';
+          parts.push(`  • ${student.nama}${ket}`);
+        });
+      }
+      if (alpaList.length > 0) {
+        parts.push(`*Belum Hadir / Tanpa Keterangan (${alpaList.length} murid):*`);
+        alpaList.forEach(({ student, catatan }) => {
+          const ket = catatan ? ` (${catatan})` : '';
+          parts.push(`  • ${student.nama}${ket} - _Mohon bantuan konfirmasi_`);
+        });
+      }
+      if (dispenList.length > 0) {
+        parts.push(`*Dispensasi Tugas Sekolah (${dispenList.length} murid):*`);
+        dispenList.forEach(({ student, catatan }) => {
+          const ket = catatan ? ` (${catatan})` : '';
+          parts.push(`  • ${student.nama}${ket}`);
+        });
+      }
+      rincianTidakBerangkat = parts.join('\n');
     }
 
-    lines.push('');
-    lines.push(`*Ringkasan Kehadiran:*`);
-    lines.push(`✓ Hadir: ${hadirList.length} murid`);
-    lines.push(`✗ Tidak Berangkat: ${tidakHadirList.length} murid`);
+    return `Assalamu’alaikum Warahmatullahi Wabarakatuh.
+Yth. Bapak/Ibu Orang Tua / Wali Murid Kelas *${currentClass.namaKelas}*,
 
-    if (tidakHadirList.length > 0) {
-      lines.push('');
-      lines.push(`*Rincian Murid Tidak Berangkat:*`);
-      tidakHadirList.forEach(({ student, status, catatan }) => {
-        const ket = catatan && catatan.trim() ? ` (${catatan.trim()})` : '';
-        lines.push(`✗ ${student.nama} - [${statusMap[status]}]${ket}`);
-      });
+Semoga Bapak/Ibu beserta seluruh keluarga senantiasa berada dalam lindungan Allah SWT, diberikan limpahan kesehatan, dan kemudahan dalam segala urusan.
+
+Dengan hormat, kami dari *${SCHOOL_CONFIG.namaSekolah}* menyampaikan laporan rekapitulasi presensi harian Kegiatan Belajar Mengajar (KBM):
+
+📋 *INFORMASI KBM & KELAS*
+• *Sekolah* : ${SCHOOL_CONFIG.namaSekolah}
+• *Kelas / Rombel* : ${currentClass.namaKelas}
+• *Mata Pelajaran* : ${currentClass.mataPelajaran}
+• *Pendidik Pengampu* : ${teacher.namaGuru}
+• *Hari / Tanggal* : ${tanggalFormatted}
+• *Pertemuan Ke* : ${session.pertemuanKe}
+• *Materi Pokok* : ${materiFormatted}
+
+📊 *RINGKASAN KEHADIRAN*
+• Total Murid : ${classStudents.length} murid
+✓ Hadir : ${hadirList.length} murid
+✗ Berhalangan Hadir : ${tidakHadirCount} murid
+
+${
+  tidakHadirCount > 0
+    ? `📌 *RINCIAN ANANDA YANG BERHALANGAN HADIR:*\n${rincianTidakBerangkat}\n`
+    : `_Alhamdulillah, seluruh murid hadir lengkap dan mengikuti KBM dengan tertib._\n`
+}
+Demikian laporan kehadiran ini kami sampaikan sebagai bentuk transparansi serta sinergi antara pihak madrasah/sekolah dengan Bapak/Ibu wali murid.
+
+Atas perhatian, bimbingan, dan kerja sama yang senantiasa terjalin harmonis, kami haturkan terima kasih yang sebesar-besarnya.
+
+Jazakumullahu Khairan Katsiran.
+Wassalamu’alaikum Warahmatullahi Wabarakatuh.
+
+Salam hormat & takzim,
+*${teacher.namaGuru}*
+Pendidik ${currentClass.mataPelajaran}
+*${SCHOOL_CONFIG.namaSekolah}*
+🌐 ${SCHOOL_CONFIG.website}`;
+  };
+
+  // WhatsApp Report Generator for Individual Student (Japri Orang Tua)
+  const generatePersonalWaReportText = (std: Student, session: AttendanceSession): string => {
+    const record = session.records?.[std.id];
+    const status = record?.status || 'H';
+    const catatan = record?.catatan?.trim();
+
+    const tanggalFormatted = (() => {
+      try {
+        const d = new Date(session.tanggal);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('id-ID', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          });
+        }
+      } catch {}
+      return session.tanggal;
+    })();
+
+    const materiFormatted =
+      session.topikMateri && session.topikMateri.trim() !== '' && session.topikMateri !== 'Tanpa topik materi'
+        ? session.topikMateri.trim()
+        : 'Pembelajaran Kejuruan & Karakter Terstruktur';
+
+    let statusLine = '';
+    if (status === 'H') {
+      statusLine = '✅ *HADIR*\n_Alhamdulillah ananda hadir tepat waktu dan mengikuti kegiatan pembelajaran dengan baik serta tertib._';
+    } else if (status === 'S') {
+      statusLine = `⚠️ *SAKIT*${catatan ? ` (Keterangan: ${catatan})` : ''}\n_Doa kami bersama semoga ananda segera diberikan kesembuhan, diangkat penyakitnya, dan dapat beraktivitas kembali bersama kita. Aamiin._`;
+    } else if (status === 'I') {
+      statusLine = `ℹ️ *IZIN*${catatan ? ` (Keterangan: ${catatan})` : ''}\n_Terima kasih atas konfirmasi yang telah disampaikan kepada pihak sekolah._`;
+    } else if (status === 'D') {
+      statusLine = `📋 *DISPENSASI*${catatan ? ` (${catatan})` : ''}\n_Ananda sedang menjalankan penugasan resmi kegiatan madrasah/sekolah._`;
     } else {
-      lines.push('');
-      lines.push(`✓ Alhamdulillah seluruh murid hadir lengkap.`);
+      statusLine = `❌ *BELUM HADIR / TANPA KETERANGAN*${catatan ? ` (${catatan})` : ''}\n_Mohon bantuan konfirmasi dari Bapak/Ibu terkait kondisi/keberadaan ananda demi keselamatan dan ketertiban belajar bersama._`;
     }
 
-    lines.push('');
-    lines.push(`Demikian laporan kehadiran ini kami sampaikan sebagai bentuk keterbukaan informasi. Atas perhatian dan kerja samanya, kami ucapkan terima kasih.`);
-    lines.push(`Wassalamu’alaikum Warahmatullahi Wabarakatuh.`);
-    lines.push('');
-    lines.push(`Hormat kami,`);
-    lines.push(`*${teacher.namaGuru}*`);
-    lines.push(`Website Resmi: ${SCHOOL_CONFIG.website}`);
+    const catatanPendidik = std.catatanUmum?.trim()
+      ? std.catatanUmum.trim()
+      : 'Ananda senantiasa menunjukkan sikap yang baik, santun, dan tertib selama proses pembelajaran.';
 
-    setWaReportText(lines.join('\n'));
+    return `Assalamu’alaikum Warahmatullahi Wabarakatuh.
+Selamat pagi/siang, Bapak/Ibu Orang Tua / Wali dari ananda *${std.nama}*.
+
+Semoga Bapak/Ibu beserta keluarga senantiasa dalam keadaan sehat walafiat serta dalam lindungan Allah SWT.
+
+Dengan hormat, kami dari *${SCHOOL_CONFIG.namaSekolah}* menyampaikan informasi presensi ananda pada Kegiatan Belajar Mengajar (KBM) hari ini:
+
+📋 *DATA MURID & PEMBELAJARAN*
+• *Nama Murid* : ${std.nama}
+• *NISN* : ${std.nisn || '-'}
+• *Kelas / Rombel* : ${currentClass.namaKelas}
+• *Mata Pelajaran* : ${currentClass.mataPelajaran}
+• *Hari / Tanggal* : ${tanggalFormatted}
+• *Pertemuan Ke* : ${session.pertemuanKe}
+• *Materi Pokok* : ${materiFormatted}
+
+📌 *STATUS KEHADIRAN ANANDA:*
+${statusLine}
+
+📝 *Catatan Perkembangan Pendidik:*
+"${catatanPendidik}"
+
+Demikian informasi ini kami sampaikan demi kebaikan dan pemantauan belajar ananda bersama.
+Atas perhatian dan kerja sama Bapak/Ibu yang baik, kami haturkan terima kasih.
+
+Jazakumullahu Khairan Katsiran.
+Wassalamu’alaikum Warahmatullahi Wabarakatuh.
+
+Salam hormat & takzim,
+*${teacher.namaGuru}*
+Pendidik ${currentClass.mataPelajaran}
+*${SCHOOL_CONFIG.namaSekolah}*
+🌐 ${SCHOOL_CONFIG.website}`;
+  };
+
+  const handleOpenWaReport = (mode: 'group' | 'personal' = 'group', student?: Student) => {
+    if (!currentSession) {
+      alert('Pilih atau buat pertemuan presensi terlebih dahulu.');
+      return;
+    }
+    const targetStudent = student || selectedStudentForWa || classStudents[0] || null;
+    setWaReportMode(mode);
+    if (student) {
+      setSelectedStudentForWa(student);
+    } else if (!selectedStudentForWa && classStudents.length > 0) {
+      // Prioritize student who is not present
+      const firstAbsent = classStudents.find((s) => currentSession.records?.[s.id]?.status !== 'H');
+      setSelectedStudentForWa(firstAbsent || classStudents[0]);
+    }
+
+    const text =
+      mode === 'personal' && targetStudent
+        ? generatePersonalWaReportText(targetStudent, currentSession)
+        : generateGroupWaReportText(currentSession);
+
+    setWaReportText(text);
     setWaCopied(false);
     setIsWaReportModalOpen(true);
   };
 
-  const handleCopyWaReport = () => {
-    navigator.clipboard.writeText(waReportText);
+  const handleCopyWaReport = (textToCopy?: string) => {
+    const text = textToCopy || waReportText;
+    navigator.clipboard.writeText(text);
     setWaCopied(true);
     setTimeout(() => setWaCopied(false), 2000);
   };
 
-  const handleSendToWhatsApp = () => {
-    const encoded = encodeURIComponent(waReportText);
-    window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+  const handleSendToWhatsApp = (textToSend?: string, phoneOverride?: string) => {
+    const rawText = textToSend || waReportText;
+    const encoded = encodeURIComponent(rawText);
+    const phone = phoneOverride?.replace(/\D/g, '');
+    if (phone) {
+      const cleanPhone = phone.startsWith('0') ? `62${phone.slice(1)}` : phone;
+      window.open(`https://wa.me/${cleanPhone}?text=${encoded}`, '_blank');
+    } else {
+      window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+    }
   };
 
   // Generate public share link - Refresh State Terkini Sebelum Generate
@@ -732,7 +892,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
                 <button
                   type="button"
-                  onClick={handleOpenWaReport}
+                  onClick={() => handleOpenWaReport('group')}
                   className="px-3.5 py-1.5 bg-emerald-800/80 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer border border-emerald-300/40"
                   title="Generate teks laporan absensi siap kirim ke WhatsApp / copy-paste"
                 >
@@ -808,6 +968,89 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               <span className="text-[10px] font-bold text-purple-600">Dispen</span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Pratinjau Teks WhatsApp Laporan Orang Tua (Pada Bagian Input Absen) */}
+      {currentSession && (
+        <div className="bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/90 dark:border-emerald-800/60 rounded-3xl p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <MessageSquare className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-bold text-xs sm:text-sm text-emerald-950 dark:text-emerald-100">
+                    Pratinjau Teks WhatsApp Laporan Orang Tua
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-200/70 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 text-[10px] font-bold">
+                    Tersinkron Otomatis
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-800/80 dark:text-emerald-300/80">
+                  Teks laporan tertata rapi sesuai tata krama & etika kesopanan Indonesia. Otomatis diperbarui saat absensi diisi.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setIsWaPreviewExpanded(!isWaPreviewExpanded)}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-emerald-50 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title={isWaPreviewExpanded ? 'Sembunyikan pratinjau teks' : 'Tampilkan teks laporan lengkap'}
+              >
+                {isWaPreviewExpanded ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                <span>{isWaPreviewExpanded ? 'Tutup Pratinjau' : 'Buka Pratinjau Teks'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const txt = generateGroupWaReportText(currentSession);
+                  handleCopyWaReport(txt);
+                  setWaInlineCopied(true);
+                  setTimeout(() => setWaInlineCopied(false), 2000);
+                }}
+                className="px-3.5 py-1.5 bg-white dark:bg-slate-800 hover:bg-emerald-50 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Salin teks laporan ke clipboard"
+              >
+                {waInlineCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{waInlineCopied ? 'Tersalin!' : 'Salin Laporan WA'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenWaReport('group')}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer"
+                title="Buka dialog lengkap dengan opsi kirim per murid"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Kirim WA & Opsi Japri</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Pratinjau Teks WhatsApp (Bisa dibuka/ditutup) */}
+          {isWaPreviewExpanded && (
+            <div className="pt-2 animate-in fade-in space-y-3">
+              <div className="bg-[#e5ddd5]/70 dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-emerald-200/80 dark:border-slate-800">
+                <div className="bg-white dark:bg-slate-850 p-4 rounded-xl shadow-xs border border-slate-200/80 dark:border-slate-750 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      Teks Laporan Presensi KBM (Siap Kirim ke Grup Wali Murid)
+                    </span>
+                    <span className="font-mono">{currentSession.tanggal}</span>
+                  </div>
+                  <div className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-slate-800 dark:text-slate-200 select-all max-h-80 overflow-y-auto p-1">
+                    {generateGroupWaReportText(currentSession)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -903,6 +1146,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                   <th className="py-3 px-3 text-center w-14 text-white">L/P</th>
                   <th className="py-3 px-3 text-center min-w-[200px] text-white">Status Kehadiran</th>
                   <th className="py-3 px-3 text-white">Keterangan / Alasan</th>
+                  <th className="py-3 px-3 text-center w-20 text-white">WA Ortu</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -974,6 +1218,21 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
                           onChange={(e) => handleUpdateRecord(std.id, status || 'H', e.target.value)}
                           className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-[#009B62] bg-white"
                         />
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenWaReport('personal', std)}
+                          className="px-2 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer shadow-2xs"
+                          title={
+                            std.noHpOrangTua
+                              ? `Pratinjau / Kirim pesan WA santun ke orang tua ${std.nama} (${std.noHpOrangTua})`
+                              : `Pratinjau pesan WA santun untuk orang tua ${std.nama}`
+                          }
+                        >
+                          <MessageSquare className="w-3 h-3 text-emerald-600" />
+                          <span>WA</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -1290,6 +1549,173 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               >
                 Tutup
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Dialog WhatsApp Report with Full Preview & Mode Switcher */}
+      {isWaReportModalOpen && currentSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-xs overflow-y-auto animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-emerald-100" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base leading-tight">
+                    Pratinjau Teks WhatsApp Laporan Orang Tua
+                  </h3>
+                  <p className="text-[11px] text-emerald-100">
+                    {currentClass.namaKelas} &bull; Pertemuan Ke-{currentSession.pertemuanKe} ({currentSession.tanggal})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWaReportModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Mode Switcher Tabs */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 bg-slate-200/80 dark:bg-slate-800 p-1 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWaReportMode('group');
+                    const text = generateGroupWaReportText(currentSession);
+                    setWaReportText(text);
+                    setWaCopied(false);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    waReportMode === 'group'
+                      ? 'bg-white dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Rekap KBM Kelas (Grup Ortu)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWaReportMode('personal');
+                    const targetStd = selectedStudentForWa || classStudents[0];
+                    if (targetStd) {
+                      setSelectedStudentForWa(targetStd);
+                      const text = generatePersonalWaReportText(targetStd, currentSession);
+                      setWaReportText(text);
+                    }
+                    setWaCopied(false);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    waReportMode === 'personal'
+                      ? 'bg-white dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  Laporan Personal Murid (Japri)
+                </button>
+              </div>
+
+              {waReportMode === 'personal' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-slate-500 shrink-0">Pilih Murid:</span>
+                  <select
+                    value={selectedStudentForWa?.id || ''}
+                    onChange={(e) => {
+                      const std = classStudents.find((s) => s.id === e.target.value);
+                      if (std) {
+                        setSelectedStudentForWa(std);
+                        setWaReportText(generatePersonalWaReportText(std, currentSession));
+                        setWaCopied(false);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  >
+                    {classStudents.map((std) => {
+                      const st = currentSession.records?.[std.id]?.status || 'H';
+                      const stLabel = st === 'H' ? 'Hadir' : st === 'S' ? 'Sakit' : st === 'I' ? 'Izin' : st === 'A' ? 'Alfa' : 'Dispen';
+                      return (
+                        <option key={std.id} value={std.id}>
+                          {std.no}. {std.nama} [{stLabel}]
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Content Preview Canvas (WhatsApp Mockup Style) */}
+            <div className="p-4 sm:p-6 overflow-y-auto bg-slate-100 dark:bg-slate-950 flex-1 space-y-4">
+              <div className="bg-[#e5ddd5] dark:bg-slate-900 p-3 sm:p-4 rounded-3xl border border-slate-300/70 dark:border-slate-800">
+                <div className="bg-white dark:bg-slate-850 p-4 sm:p-5 rounded-2xl rounded-tl-xs shadow-sm max-w-xl mx-auto space-y-3 border border-slate-200/80 dark:border-slate-750">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      Pratinjau Pesan WhatsApp (Format Santun Indonesia)
+                    </span>
+                    <span>T.A. {teacher.tahunAjaran}</span>
+                  </div>
+
+                  <div className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-slate-800 dark:text-slate-200 select-all">
+                    {waReportText}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="px-6 py-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                {waReportMode === 'personal' && selectedStudentForWa ? (
+                  <span>
+                    No. WA Orang Tua: <strong className="font-mono text-slate-800 dark:text-slate-200">{selectedStudentForWa.noHpOrangTua || 'Belum diisi'}</strong>
+                  </span>
+                ) : (
+                  <span>Laporan rekapitulasi KBM siap dikirim ke grup wali murid / orang tua</span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCopyWaReport()}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-750 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  {waCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{waCopied ? 'Tersalin!' : 'Salin Teks'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (waReportMode === 'personal' && selectedStudentForWa?.noHpOrangTua) {
+                      handleSendToWhatsApp(waReportText, selectedStudentForWa.noHpOrangTua);
+                    } else {
+                      handleSendToWhatsApp(waReportText);
+                    }
+                  }}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Kirim ke WhatsApp</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsWaReportModalOpen(false)}
+                  className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
         </div>
