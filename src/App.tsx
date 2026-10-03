@@ -87,6 +87,9 @@ import { StatisticsView } from './components/StatisticsView';
 import { ParentReportView } from './components/ParentReportView';
 import { SchoolMapView } from './components/SchoolMapView';
 import { MonthlyAttendanceRecapView } from './components/MonthlyAttendanceRecapView';
+import { SmoothScrollToTop } from './components/SmoothScrollToTop';
+import { ScrollProgressBar } from './components/ScrollProgressBar';
+import { smoothScrollToTop } from './utils/smoothScroll';
 
 type NavTab =
 
@@ -213,6 +216,7 @@ export default function App() {
   const setActiveTab = (tab: NavTab) => {
     setActiveTabState(tab);
     UiStatePersistence.set('activeTab', tab);
+    smoothScrollToTop(400);
   };
 
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
@@ -728,7 +732,10 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-indigo-500 selection:text-white relative">
+      {/* Scroll Reading Progress Bar with Smooth Animation */}
+      <ScrollProgressBar />
+
       {/* Top Main Navigation Header - Muhammadiyah Visual Identity Gradient (#009B62 Green to #292E82 Deep Blue) */}
       <header className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white border-b border-[#008276]/40 sticky top-0 z-40 shadow-lg backdrop-blur-md transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -802,6 +809,33 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* Sub-bar Horizontal Tabs dengan Smooth Horizontal Scroll */}
+      <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-16 sm:top-20 z-30 shadow-2xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center gap-1.5 overflow-x-auto py-2 sm:py-2.5 smooth-scroll scroll-smooth-all">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveTab(item.id as NavTab)}
+                  className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
+                    isActive
+                      ? 'bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white shadow-md transform scale-[1.02]'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </nav>
 
       {/* Side Navigation Drawer (Navbar Kesamping) */}
       {isSideNavOpen && (
@@ -1198,6 +1232,9 @@ export default function App() {
           <span>{refreshSuccessToast}</span>
         </div>
       )}
+
+      {/* Floating Animated Smooth Scroll To Top Button with Circular Progress Ring */}
+      <SmoothScrollToTop showPercent threshold={200} />
     </div>
   );
 }

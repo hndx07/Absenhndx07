@@ -37,6 +37,7 @@ import {
 import { exportGradesToExcel, downloadGradesTemplateExcel } from '../utils/exportUtils';
 import { createOrUpdatePublicShare } from '../services/data';
 import { getKurikulumMerdekaAssessment } from '../utils/gradeCalculations';
+import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
 
 interface GradesViewProps {
   currentClass: ClassRoom;
@@ -992,7 +993,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
 
       {/* Grades Matrix Table */}
       <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <SmoothHorizontalScroller label="Matriks Penilaian">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white font-bold uppercase tracking-wider shadow-xs">
@@ -1275,8 +1276,9 @@ export const GradesView: React.FC<GradesViewProps> = ({
               </tr>
             </tfoot>
           </table>
+        </SmoothHorizontalScroller>
 
-          {/* Table Footer with Prominent Save Button */}
+        {/* Table Footer with Prominent Save Button */}
           <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <Cloud className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -1315,7 +1317,6 @@ export const GradesView: React.FC<GradesViewProps> = ({
             </button>
           </div>
         </div>
-      </div>
 
       {/* Modal Impor Excel Nilai dengan Validasi & Anti-Duplikasi */}
       {isImportOpen && (

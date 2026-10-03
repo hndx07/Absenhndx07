@@ -19,6 +19,7 @@ import {
 import * as XLSX from 'xlsx';
 import { AttendanceSession, ClassRoom, Student, TeacherProfile, AttendanceStatus } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
+import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
 
 interface MonthlyAttendanceRecapViewProps {
   currentClass: ClassRoom;
@@ -479,7 +480,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <SmoothHorizontalScroller label="Tabel Rekap">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
@@ -607,7 +608,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
                 })}
               </tbody>
             </table>
-          </div>
+          </SmoothHorizontalScroller>
         )}
       </div>
     </div>

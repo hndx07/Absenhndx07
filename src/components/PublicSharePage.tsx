@@ -34,6 +34,8 @@ import { getSafeSupabaseClient } from '../services/supabase';
 import { getPublicShare } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { getKurikulumMerdekaAssessment } from '../utils/gradeCalculations';
+import { SmoothScrollToTop } from './SmoothScrollToTop';
+import { ScrollProgressBar } from './ScrollProgressBar';
 
 interface PublicSharePageProps {
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
@@ -520,6 +522,9 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
 
   return (
     <div className="public-share-page min-h-screen relative bg-slate-50 dark:bg-black text-slate-900 dark:text-white pb-16 transition-colors selection:bg-indigo-500 selection:text-white">
+      {/* Scroll Reading Progress Bar with Smooth Animation */}
+      <ScrollProgressBar />
+
       {/* Background Image Watermark from 44857.png across all preview links with 0.5 opacity */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden flex items-center justify-center">
         {/* Pitch black background in dark mode */}
@@ -2034,6 +2039,9 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           </p>
         </div>
       </footer>
+
+      {/* Floating Animated Smooth Scroll To Top Button with Circular Progress */}
+      <SmoothScrollToTop showPercent threshold={200} />
     </div>
   );
 };

@@ -46,6 +46,7 @@ import {
 import { exportAttendanceToExcel, exportAttendanceToPDF } from '../utils/exportUtils';
 import { createOrUpdatePublicShare, getStudents, getAttendanceSessions } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
+import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
 
 interface AttendanceViewProps {
   currentClass: ClassRoom;
@@ -1112,7 +1113,7 @@ Pendidik ${currentClass.mataPelajaran}
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <SmoothHorizontalScroller label="Tabel Presensi">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white text-[11px] font-bold uppercase tracking-wider shadow-xs">
@@ -1239,8 +1240,9 @@ Pendidik ${currentClass.mataPelajaran}
                 })}
               </tbody>
             </table>
+          </SmoothHorizontalScroller>
 
-            {/* Table Footer with Prominent Save Button */}
+          {/* Table Footer with Prominent Save Button */}
             <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <Cloud className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -1270,8 +1272,7 @@ Pendidik ${currentClass.mataPelajaran}
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Floating Unsaved Changes Notification */}
       {hasUnsavedChanges && (

@@ -10,6 +10,12 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5.5rem;
+    scrollbar-gutter: stable;
+  }
+
   :root {
     /* Muhammadiyah Visual Identity Theme Variables (#009B62 Green to #292E82 Deep Blue) */
     --muh-green: #009B62;
@@ -30,6 +36,7 @@
   }
 
   body {
+    scroll-behavior: smooth;
     background:
       radial-gradient(1000px circle at 15% 15%, rgba(0, 155, 98, 0.05) 0%, transparent 70%),
       radial-gradient(800px circle at 85% 20%, rgba(41, 46, 130, 0.05) 0%, transparent 60%),
@@ -38,6 +45,7 @@
     background-attachment: fixed;
     min-height: 100vh;
     color: #0f172a;
+    overflow-x: hidden;
   }
 
   code, pre, .font-mono {
@@ -45,33 +53,68 @@
   }
 }
 
-/* Card Header & Footer Utility Classes inheriting Muhammadiyah Visual Identity */
-.bg-muh-card-header,
-.card-header-muh,
-.bg-muh-header {
-  background: var(--card-header-bg) !important;
-  color: #ffffff !important;
+/* Global smooth scrolling on all scrollable containers */
+.smooth-scroll,
+.overflow-y-auto,
+.overflow-x-auto,
+main,
+section,
+div,
+table,
+tbody {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
-.bg-muh-footer {
-  background: var(--footer-bg) !important;
-  color: #ffffff !important;
+.scroll-smooth-all {
+  scroll-behavior: smooth !important;
 }
 
-/* Custom smooth scrollbars */
+.scroll-mt-header {
+  scroll-margin-top: 5.5rem;
+}
+
+@keyframes floatSubtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-float-subtle {
+  animation: floatSubtle 3s ease-in-out infinite;
+}
+
+/* Custom smooth modern scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
+  background: rgba(148, 163, 184, 0.35);
   border-radius: 9999px;
+  transition: background-color 0.25s ease;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.6);
+  background: rgba(100, 116, 139, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body,
+  * {
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Touch targets: mobile ergonomics */
