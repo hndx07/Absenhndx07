@@ -125,15 +125,105 @@ tbody {
 }
 
 @media print {
-  body {
-    background: white !important;
-    color: black !important;
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm 12mm 10mm;
   }
-  .no-print {
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide all interactive website chrome, navigations, sidebars, buttons & floating UI */
+  header,
+  nav,
+  footer,
+  aside,
+  button,
+  input,
+  select,
+  .no-print,
+  .no-print-area,
+  .public-share-page > header,
+  .public-share-page > footer,
+  .public-share-page > .fixed,
+  [data-no-print="true"] {
     display: none !important;
   }
+
+  /* Reset box models, drop shadows, and web cards for paper document aesthetics */
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Dedicated formal A4 document container */
+  .print-document {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* When printing student report from modal, ensure modal content fills page cleanly */
+  .print-modal-container {
+    display: block !important;
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Format formal document tables */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  th, td {
+    color: #000000 !important;
+  }
+
   .print-only {
     display: block !important;
+  }
+
+  .print-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
   }
 }
 

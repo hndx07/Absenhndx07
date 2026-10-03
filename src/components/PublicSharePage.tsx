@@ -29,6 +29,7 @@ import {
   ArrowUpAZ,
   ArrowDownZA,
   ArrowUpDown,
+  FileText,
 } from 'lucide-react';
 import { getSafeSupabaseClient } from '../services/supabase';
 import { getPublicShare } from '../services/data';
@@ -36,6 +37,7 @@ import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { getKurikulumMerdekaAssessment } from '../utils/gradeCalculations';
 import { SmoothScrollToTop } from './SmoothScrollToTop';
 import { ScrollProgressBar } from './ScrollProgressBar';
+import { OfficialLetterhead } from './OfficialLetterhead';
 
 interface PublicSharePageProps {
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
@@ -150,6 +152,8 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   // Attendance-specific state & calculations (Request: Show latest by default, provide bilah rekap semua)
   const [absenViewMode, setAbsenViewMode] = useState<'latest' | 'recap'>('latest');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
+  const [isDocumentViewMode, setIsDocumentViewMode] = useState<boolean>(false);
+  const [raporModalTab, setRaporModalTab] = useState<'document' | 'card'>('document');
 
   const sortedSessions = useMemo(() => {
     if (!data?.sessions || !Array.isArray(data.sessions)) return [];
@@ -629,15 +633,45 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+          <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto shrink-0 no-print">
+            {/* View Mode Switcher: Web vs Dokumen Cetak A4 */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setIsDocumentViewMode(false)}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
+                  !isDocumentViewMode
+                    ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Tampilkan Tampilan Web Interaktif"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>Web</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDocumentViewMode(true)}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
+                  isDocumentViewMode
+                    ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Tampilkan Format Dokumen A4 Resmi dengan Kop Surat"
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Dokumen A4</span>
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 rounded-2xl border border-slate-200 dark:border-slate-700 font-bold text-xs transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-              title="Cetak atau Simpan PDF"
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+              title="Cetak Dokumen Resmi A4 atau Simpan ke PDF"
             >
-              <Printer className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              <span>Cetak / Simpan PDF</span>
+              <Printer className="w-4 h-4 text-white" />
+              <span>Cetak Dokumen A4</span>
             </button>
           </div>
         </div>
@@ -1724,141 +1758,365 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
             {/* Modal Detail Rapor Capaian Individu Murid (Read-Only) */}
             {selectedStudentGrade && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-                <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-5">
-                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 space-y-4 my-auto max-h-[94vh] overflow-y-auto print:border-none print:shadow-none print:p-0 print:max-w-none print:max-h-none print:overflow-visible">
+                  {/* Modal Header */}
+                  <div className="flex flex-wrap items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 gap-3 no-print">
                     <div className="flex items-center gap-2.5">
                       <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
                         <Award className="w-5 h-5" />
                       </div>
                       <div>
                         <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                          Rapor Capaian Murid
+                          Rapor Capaian Murid: {selectedStudentGrade.student.nama}
                         </h4>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">
                           {data?.className} &bull; {data?.subject || 'Mata Pelajaran'}
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedStudentGrade(null)}
-                      className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
 
-                  {/* Student Identity Box */}
-                  <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 space-y-1">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-                      Identitas Murid
-                    </span>
-                    <h3 className="text-base font-black text-slate-900 dark:text-white">
-                      {selectedStudentGrade.student.nama}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400 pt-0.5 font-mono">
-                      <span>NISN: {selectedStudentGrade.student.nisn || '-'}</span>
-                      <span>Pendidik: {data?.teacher || data?.teacherName || 'Pendidik Pengampu'}</span>
+                    <div className="flex items-center gap-2">
+                      {/* Tab Switcher inside Modal */}
+                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => setRaporModalTab('document')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                            raporModalTab === 'document'
+                              ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-2xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                          }`}
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Dokumen Cetak A4</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRaporModalTab('card')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                            raporModalTab === 'card'
+                              ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-400 shadow-2xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                          }`}
+                        >
+                          <Award className="w-3.5 h-3.5" />
+                          <span>Ringkasan</span>
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                        title="Cetak Dokumen Rapor A4"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Cetak Rapor A4</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedStudentGrade(null)}
+                        className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+                        title="Tutup"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Rincian Asesmen Individu */}
-                  <div className="space-y-2">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                      Rincian Capaian Asesmen:
-                    </span>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                      {activeGradeColumns.map((col: any) => {
-                        const val = selectedStudentGrade.gradeRecord?.[col.key];
-                        const hasVal = typeof val === 'number' && !isNaN(val);
-                        return (
-                          <div
-                            key={col.key}
-                            className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-750"
-                          >
-                            <span className="text-[10px] text-slate-400 block font-semibold truncate">{col.label}</span>
-                            <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">
-                              {hasVal ? val : '-'}
+                  {/* KONTEN 1: DOKUMEN CETAK A4 (RAPOR RESMI) */}
+                  <div
+                    id="print-rapor-container"
+                    className={`${
+                      raporModalTab === 'document' ? 'block' : 'hidden print:block'
+                    } bg-white text-slate-900 border border-slate-300 p-6 sm:p-10 font-serif leading-relaxed max-w-[210mm] mx-auto shadow-sm rounded-xl print:border-none print:shadow-none print:p-0 print:m-0`}
+                  >
+                    <OfficialLetterhead />
+
+                    {/* Judul Dokumen */}
+                    <div className="text-center my-4">
+                      <h2 className="text-sm sm:text-base font-bold uppercase tracking-wider underline text-slate-950">
+                        LEMBAR LAPORAN CAPAIAN HASIL BELAJAR MURID
+                      </h2>
+                      <p className="text-[11px] font-sans font-semibold tracking-wide uppercase text-slate-700 mt-0.5">
+                        RAPOR ASESMEN FORMATIF & SUMATIF &bull; KURIKULUM MERDEKA
+                      </p>
+                    </div>
+
+                    {/* Identitas Murid & Rombel */}
+                    <div className="border border-black p-3 mb-4 font-sans text-[11px]">
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+                        <div>
+                          <table className="w-full text-left">
+                            <tbody>
+                              <tr>
+                                <td className="w-32 py-0.5 text-slate-700">Nama Murid</td>
+                                <td className="w-3 py-0.5">:</td>
+                                <td className="py-0.5 font-bold text-slate-950">{selectedStudentGrade.student.nama}</td>
+                              </tr>
+                              <tr>
+                                <td className="py-0.5 text-slate-700">NISN</td>
+                                <td className="py-0.5">:</td>
+                                <td className="py-0.5 font-mono">{selectedStudentGrade.student.nisn || '-'}</td>
+                              </tr>
+                              <tr>
+                                <td className="py-0.5 text-slate-700">Kelas / Rombel</td>
+                                <td className="py-0.5">:</td>
+                                <td className="py-0.5 font-bold text-slate-950">{data?.className}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        <div>
+                          <table className="w-full text-left">
+                            <tbody>
+                              <tr>
+                                <td className="w-32 py-0.5 text-slate-700">Mata Pelajaran</td>
+                                <td className="py-0.5">:</td>
+                                <td className="py-0.5 font-bold text-slate-950">{data?.subject || 'Konsentrasi Keahlian'}</td>
+                              </tr>
+                              <tr>
+                                <td className="py-0.5 text-slate-700">Pendidik Pengampu</td>
+                                <td className="py-0.5">:</td>
+                                <td className="py-0.5 font-bold text-slate-950">{data?.teacher || data?.teacherName || 'Pendidik Pengampu'}</td>
+                              </tr>
+                              <tr>
+                                <td className="py-0.5 text-slate-700">Tahun Pelajaran</td>
+                                <td className="py-0.5">:</td>
+                                <td className="py-0.5">{SCHOOL_CONFIG.tahunAjaran} ({SCHOOL_CONFIG.semester})</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tabel Rincian Nilai Capaian */}
+                    <div className="mb-4">
+                      <h3 className="font-sans font-bold text-xs uppercase mb-1.5 text-slate-900">
+                        A. Capaian Asesmen Pembelajaran
+                      </h3>
+                      <table className="w-full border-collapse border border-black text-center text-[11px] font-sans">
+                        <thead>
+                          <tr className="bg-slate-100">
+                            <th className="border border-black p-2 w-8">No</th>
+                            <th className="border border-black p-2 text-left">Komponen Asesmen / Indikator</th>
+                            <th className="border border-black p-2 w-20">KKM / KKTP</th>
+                            <th className="border border-black p-2 w-24">Nilai Capaian</th>
+                            <th className="border border-black p-2 w-24">Predikat</th>
+                            <th className="border border-black p-2">Keterangan Ketuntasan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activeGradeColumns.map((col: any, idx: number) => {
+                            const val = selectedStudentGrade.gradeRecord?.[col.key];
+                            return (
+                              <tr key={col.key}>
+                                <td className="border border-black p-1.5 font-mono">{idx + 1}</td>
+                                <td className="border border-black p-1.5 text-left font-medium">{col.label}</td>
+                                <td className="border border-black p-1.5 font-mono">{data?.kkm || 75}</td>
+                                <td className="border border-black p-1.5 font-mono font-bold">{typeof val === 'number' && !isNaN(val) ? val : '-'}</td>
+                                <td className="border border-black p-1.5 font-semibold">{typeof val === 'number' && !isNaN(val) ? (val >= 88 ? 'A' : val >= (data?.kkm || 75) ? 'B' : 'C') : '-'}</td>
+                                <td className="border border-black p-1.5">{typeof val === 'number' && !isNaN(val) ? (val >= (data?.kkm || 75) ? 'Tuntas' : 'Perlu Bimbingan') : '-'}</td>
+                              </tr>
+                            );
+                          })}
+                          <tr className="bg-slate-50 font-bold">
+                            <td className="border border-black p-1.5" colSpan={2}>Rata-Rata Asesmen Formatif</td>
+                            <td className="border border-black p-1.5 font-mono">{data?.kkm || 75}</td>
+                            <td className="border border-black p-1.5 font-mono">{selectedStudentGrade.avgF !== null ? selectedStudentGrade.avgF : '-'}</td>
+                            <td className="border border-black p-1.5">{selectedStudentGrade.avgF !== null ? (selectedStudentGrade.avgF >= 88 ? 'A' : selectedStudentGrade.avgF >= (data?.kkm || 75) ? 'B' : 'C') : '-'}</td>
+                            <td className="border border-black p-1.5">{selectedStudentGrade.avgF !== null ? (selectedStudentGrade.avgF >= (data?.kkm || 75) ? 'Tuntas' : 'Perlu Bimbingan') : '-'}</td>
+                          </tr>
+                          <tr>
+                            <td className="border border-black p-1.5 font-mono">{activeGradeColumns.length + 1}</td>
+                            <td className="border border-black p-1.5 text-left font-medium">Asesmen Sumatif Tengah Semester (STS)</td>
+                            <td className="border border-black p-1.5 font-mono">{data?.kkm || 75}</td>
+                            <td className="border border-black p-1.5 font-mono font-bold">{selectedStudentGrade.sts !== null ? selectedStudentGrade.sts : '-'}</td>
+                            <td className="border border-black p-1.5 font-semibold">{selectedStudentGrade.sts !== null ? (selectedStudentGrade.sts >= 88 ? 'A' : selectedStudentGrade.sts >= (data?.kkm || 75) ? 'B' : 'C') : '-'}</td>
+                            <td className="border border-black p-1.5">{selectedStudentGrade.sts !== null ? (selectedStudentGrade.sts >= (data?.kkm || 75) ? 'Tuntas' : 'Perlu Bimbingan') : '-'}</td>
+                          </tr>
+                          <tr>
+                            <td className="border border-black p-1.5 font-mono">{activeGradeColumns.length + 2}</td>
+                            <td className="border border-black p-1.5 text-left font-medium">Asesmen Sumatif Akhir Semester (SAS)</td>
+                            <td className="border border-black p-1.5 font-mono">{data?.kkm || 75}</td>
+                            <td className="border border-black p-1.5 font-mono font-bold">{selectedStudentGrade.sas !== null ? selectedStudentGrade.sas : '-'}</td>
+                            <td className="border border-black p-1.5 font-semibold">{selectedStudentGrade.sas !== null ? (selectedStudentGrade.sas >= 88 ? 'A' : selectedStudentGrade.sas >= (data?.kkm || 75) ? 'B' : 'C') : '-'}</td>
+                            <td className="border border-black p-1.5">{selectedStudentGrade.sas !== null ? (selectedStudentGrade.sas >= (data?.kkm || 75) ? 'Tuntas' : 'Perlu Bimbingan') : '-'}</td>
+                          </tr>
+                          <tr className="bg-slate-100 font-black text-xs">
+                            <td className="border border-black p-2 text-center" colSpan={2}>NILAI AKHIR RAPOR (NA)</td>
+                            <td className="border border-black p-2 font-mono">{data?.kkm || 75}</td>
+                            <td className="border border-black p-2 font-mono text-sm">{selectedStudentGrade.hasAnyScore ? selectedStudentGrade.finalScore : '-'}</td>
+                            <td className="border border-black p-2 text-sm">{selectedStudentGrade.predikat}</td>
+                            <td className="border border-black p-2 font-bold">{selectedStudentGrade.isTuntas ? 'TUNTAS KOMPETENSI' : 'BELUM TUNTAS'}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Deskripsi Capaian Pembelajaran */}
+                    <div className="mb-6 font-sans">
+                      <h3 className="font-bold text-xs uppercase mb-1.5 text-slate-900">
+                        B. Deskripsi Capaian Kompetensi
+                      </h3>
+                      <div className="border border-black p-3 text-[11px] leading-relaxed">
+                        <p className="font-semibold text-slate-900 mb-1">
+                          Capaian Kompetensi Peserta Didik:
+                        </p>
+                        <p className="text-slate-800 text-justify">
+                          {selectedStudentGrade.gradeRecord?.catatan || selectedStudentGrade.merdekaDeskripsi || 'Ananda telah menunjukkan usaha belajar yang baik dalam penguasaan tujuan pembelajaran yang ditetapkan.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Kolom Tanda Tangan Resmi Dokumen */}
+                    <div className="mt-8 font-sans text-xs">
+                      <div className="flex justify-end mb-4">
+                        <p>Bawang, {formatIndonesianDate(new Date().toISOString())}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-8 text-center">
+                        <div>
+                          <p className="font-semibold">Mengetahui,</p>
+                          <p className="text-slate-600">Orang Tua / Wali Murid</p>
+                          <div className="h-20"></div>
+                          <p className="font-bold underline">( .................................................... )</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold">Pendidik Mata Pelajaran,</p>
+                          <p className="text-slate-600">{data?.subject || 'Guru Pengampu'}</p>
+                          <div className="h-20"></div>
+                          <p className="font-bold underline">{data?.teacher || data?.teacherName || 'Pendidik Pengampu'}</p>
+                          <p className="text-[11px] text-slate-600">NBM/NIP. -</p>
+                        </div>
+                      </div>
+                      <div className="text-center mt-6">
+                        <p className="font-semibold">Mengetahui,</p>
+                        <p className="font-semibold">Kepala SMK Muhammadiyah Bawang</p>
+                        <div className="h-20"></div>
+                        <p className="font-bold underline">Imam Sopingi, S.Pd.</p>
+                        <p className="text-[11px] text-slate-600">NBM. 1 092 379</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* KONTEN 2: RINGKASAN KARTU (CARD VIEW) */}
+                  {raporModalTab === 'card' && (
+                    <div className="space-y-4 no-print">
+                      {/* Student Identity Box */}
+                      <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 space-y-1">
+                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                          Identitas Murid
+                        </span>
+                        <h3 className="text-base font-black text-slate-900 dark:text-white">
+                          {selectedStudentGrade.student.nama}
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400 pt-0.5 font-mono">
+                          <span>NISN: {selectedStudentGrade.student.nisn || '-'}</span>
+                          <span>Pendidik: {data?.teacher || data?.teacherName || 'Pendidik Pengampu'}</span>
+                        </div>
+                      </div>
+
+                      {/* Rincian Asesmen Individu */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                          Rincian Capaian Asesmen:
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                          {activeGradeColumns.map((col: any) => {
+                            const val = selectedStudentGrade.gradeRecord?.[col.key];
+                            const hasVal = typeof val === 'number' && !isNaN(val);
+                            return (
+                              <div
+                                key={col.key}
+                                className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-750"
+                              >
+                                <span className="text-[10px] text-slate-400 block font-semibold truncate">{col.label}</span>
+                                <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                                  {hasVal ? val : '-'}
+                                </p>
+                              </div>
+                            );
+                          })}
+                          <div className="bg-indigo-50/50 dark:bg-indigo-950/40 p-2.5 rounded-xl border border-indigo-100 dark:border-indigo-900">
+                            <span className="text-[10px] text-indigo-600 dark:text-indigo-400 block font-semibold">Rata Formatif</span>
+                            <p className="font-mono font-bold text-indigo-700 dark:text-indigo-300 text-sm">
+                              {selectedStudentGrade.avgF !== null ? selectedStudentGrade.avgF : '-'}
                             </p>
                           </div>
-                        );
-                      })}
-                      <div className="bg-indigo-50/50 dark:bg-indigo-950/40 p-2.5 rounded-xl border border-indigo-100 dark:border-indigo-900">
-                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400 block font-semibold">Rata Formatif</span>
-                        <p className="font-mono font-bold text-indigo-700 dark:text-indigo-300 text-sm">
-                          {selectedStudentGrade.avgF !== null ? selectedStudentGrade.avgF : '-'}
-                        </p>
+                          <div className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-750">
+                            <span className="text-[10px] text-slate-400 block font-semibold">STS (Tengah Sem.)</span>
+                            <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                              {selectedStudentGrade.sts !== null ? selectedStudentGrade.sts : '-'}
+                            </p>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-750">
+                            <span className="text-[10px] text-slate-400 block font-semibold">SAS (Akhir Sem.)</span>
+                            <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                              {selectedStudentGrade.sas !== null ? selectedStudentGrade.sas : '-'}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-750">
-                        <span className="text-[10px] text-slate-400 block font-semibold">STS (Tengah Sem.)</span>
-                        <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">
-                          {selectedStudentGrade.sts !== null ? selectedStudentGrade.sts : '-'}
-                        </p>
+
+                      {/* Hasil Akhir & Status KKM */}
+                      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white p-4.5 rounded-2xl flex items-center justify-between shadow-lg border border-indigo-400/30">
+                        <div>
+                          <span className="text-[10px] text-indigo-100 uppercase font-bold tracking-wider block">
+                            Nilai Akhir Rapor (Kurikulum Merdeka)
+                          </span>
+                          <div className="flex items-baseline gap-2 mt-0.5">
+                            <span className="text-3xl font-black font-mono drop-shadow-xs">
+                              {selectedStudentGrade.hasAnyScore ? selectedStudentGrade.finalScore : '-'}
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg bg-white/20 text-white text-xs font-mono font-bold border border-white/25 shadow-2xs backdrop-blur-xs">
+                              Predikat: {selectedStudentGrade.predikat} &bull; {selectedStudentGrade.predikatLabel || (selectedStudentGrade.predikat === 'A' ? 'Sangat Baik' : selectedStudentGrade.predikat === 'B' ? 'Baik' : selectedStudentGrade.predikat === 'C' ? 'Cukup' : 'Perlu Bimbingan')}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-[10px] text-indigo-100 uppercase font-bold tracking-wider block mb-1">
+                            Status Ketuntasan (KKM: {data?.kkm || 75})
+                          </span>
+                          {!selectedStudentGrade.hasAnyScore ? (
+                            <span className="px-3 py-1 rounded-xl text-xs font-bold bg-white/15 text-white border border-white/25">
+                              Belum Ada Nilai
+                            </span>
+                          ) : selectedStudentGrade.isTuntas ? (
+                            <span className="px-3 py-1 rounded-xl text-xs font-bold bg-emerald-400 text-emerald-950 shadow-xs border border-emerald-300">
+                              Tuntas Capaian
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 rounded-xl text-xs font-bold bg-rose-400 text-rose-950 shadow-xs border border-rose-300">
+                              Perlu Bimbingan / Remedial
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-100 dark:border-slate-750">
-                        <span className="text-[10px] text-slate-400 block font-semibold">SAS (Akhir Sem.)</span>
-                        <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">
-                          {selectedStudentGrade.sas !== null ? selectedStudentGrade.sas : '-'}
+
+                      {/* Deskripsi Otomatis Capaian Kompetensi Kurikulum Merdeka */}
+                      <div className="bg-indigo-50/70 dark:bg-zinc-900 p-4 rounded-2xl border border-indigo-100 dark:border-zinc-800 space-y-1.5">
+                        <span className="text-[10px] font-bold text-indigo-900 dark:text-indigo-400 uppercase tracking-wider block">
+                          Deskripsi Capaian Kompetensi
+                        </span>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                          {selectedStudentGrade.gradeRecord?.catatan || selectedStudentGrade.merdekaDeskripsi || 'Belum ada catatan capaian kompetensi.'}
                         </p>
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Hasil Akhir & Status KKM - Modern Elegant Blue-to-Purple Gradient */}
-                  <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white p-4.5 rounded-2xl flex items-center justify-between shadow-lg border border-indigo-400/30">
-                    <div>
-                      <span className="text-[10px] text-indigo-100 uppercase font-bold tracking-wider block">
-                        Nilai Akhir Rapor (Kurikulum Merdeka)
-                      </span>
-                      <div className="flex items-baseline gap-2 mt-0.5">
-                        <span className="text-3xl font-black font-mono drop-shadow-xs">
-                          {selectedStudentGrade.hasAnyScore ? selectedStudentGrade.finalScore : '-'}
-                        </span>
-                        <span className="px-2.5 py-1 rounded-lg bg-white/20 text-white text-xs font-mono font-bold border border-white/25 shadow-2xs backdrop-blur-xs">
-                          Predikat: {selectedStudentGrade.predikat} &bull; {selectedStudentGrade.predikatLabel || (selectedStudentGrade.predikat === 'A' ? 'Sangat Baik' : selectedStudentGrade.predikat === 'B' ? 'Baik' : selectedStudentGrade.predikat === 'C' ? 'Cukup' : 'Perlu Bimbingan')}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[10px] text-indigo-100 uppercase font-bold tracking-wider block mb-1">
-                        Status Ketuntasan (KKM: {data?.kkm || 75})
-                      </span>
-                      {!selectedStudentGrade.hasAnyScore ? (
-                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-white/15 text-white border border-white/25">
-                          Belum Ada Nilai
-                        </span>
-                      ) : selectedStudentGrade.isTuntas ? (
-                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-emerald-400 text-emerald-950 shadow-xs border border-emerald-300">
-                          Tuntas Capaian
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 rounded-xl text-xs font-bold bg-rose-400 text-rose-950 shadow-xs border border-rose-300">
-                          Perlu Bimbingan / Remedial
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Deskripsi Otomatis Capaian Kompetensi Kurikulum Merdeka */}
-                  <div className="bg-indigo-50/70 dark:bg-zinc-900 p-4 rounded-2xl border border-indigo-100 dark:border-zinc-800 space-y-1.5">
-                    <span className="text-[10px] font-bold text-indigo-900 dark:text-indigo-400 uppercase tracking-wider block">
-                      Deskripsi Capaian Kompetensi
-                    </span>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                      {selectedStudentGrade.gradeRecord?.catatan || selectedStudentGrade.merdekaDeskripsi || 'Belum ada catatan capaian kompetensi.'}
-                    </p>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 pt-1">
+                  {/* Modal Footer Actions */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 no-print">
                     <button
                       type="button"
                       onClick={() => window.print()}
-                      className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl transition flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/20 cursor-pointer"
+                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-2xl transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
                     >
                       <Printer className="w-3.5 h-3.5" />
-                      Cetak Rapor Murid
+                      Cetak Rapor Murid (A4)
                     </button>
                     <button
                       type="button"

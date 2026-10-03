@@ -810,33 +810,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Sub-bar Horizontal Tabs dengan Smooth Horizontal Scroll */}
-      <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-16 sm:top-20 z-30 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center gap-1.5 overflow-x-auto py-2 sm:py-2.5 smooth-scroll scroll-smooth-all">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveTab(item.id as NavTab)}
-                  className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0 ${
-                    isActive
-                      ? 'bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white shadow-md transform scale-[1.02]'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </nav>
-
       {/* Side Navigation Drawer (Navbar Kesamping) */}
       {isSideNavOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden">
