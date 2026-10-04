@@ -20,6 +20,7 @@ import * as XLSX from 'xlsx';
 import { AttendanceSession, ClassRoom, Student, TeacherProfile, AttendanceStatus } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
+import { OfficialLetterhead } from './OfficialLetterhead';
 
 interface MonthlyAttendanceRecapViewProps {
   currentClass: ClassRoom;
@@ -233,8 +234,37 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
 
   return (
     <div className="space-y-6">
+      {/* Print-Only Official Letterhead & Document Header (A4 Ready) */}
+      <div className="hidden print:block mb-4 text-black font-serif">
+        <OfficialLetterhead />
+        <div className="text-center my-3">
+          <h2 className="text-sm font-bold uppercase tracking-wider underline">
+            REKAPITULASI PRESENSI / KEHADIRAN PESERTA DIDIK BULANAN
+          </h2>
+          <p className="text-[11px] font-sans mt-0.5 font-medium text-slate-700">
+            Tahun Pelajaran {SCHOOL_CONFIG.tahunAjaran} &bull; Semester {SCHOOL_CONFIG.semester}
+          </p>
+        </div>
+
+        {/* Info Identitas Dokumen Resmi */}
+        <div className="border border-black p-2.5 mb-3 text-[11px] font-sans">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+            <div className="space-y-0.5">
+              <p><span className="inline-block w-28 text-slate-700">Satuan Pendidikan:</span> <strong>{SCHOOL_CONFIG.namaSekolah}</strong></p>
+              <p><span className="inline-block w-28 text-slate-700">Kelas / Rombel:</span> <strong>{classLabel}</strong></p>
+              <p><span className="inline-block w-28 text-slate-700">Bulan / Periode:</span> <strong>{monthLabel} {selectedYear}</strong></p>
+            </div>
+            <div className="space-y-0.5">
+              <p><span className="inline-block w-28 text-slate-700">Mata Pelajaran:</span> <strong>{currentClass?.mataPelajaran || teacher.mataPelajaranUtama || 'Seluruh Mata Pelajaran'}</strong></p>
+              <p><span className="inline-block w-28 text-slate-700">Pendidik Pengampu:</span> <strong>{teacher.namaGuru}</strong></p>
+              <p><span className="inline-block w-28 text-slate-700">NBM / NIP:</span> {teacher.nbm || teacher.nip || '-'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Top Banner */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-full">
@@ -272,7 +302,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4 no-print">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
           <Filter className="w-3.5 h-3.5 text-indigo-600" />
           Filter Rekapitulasi Presensi
@@ -610,6 +640,30 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
             </table>
           </SmoothHorizontalScroller>
         )}
+
+        {/* Print-Only Formal Signature Block (Tanpa Nama Kepala Sekolah) */}
+        <div className="hidden print:block mt-8 font-sans text-xs text-black">
+          <div className="flex justify-end mb-4">
+            <p>Bawang, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-8 text-center">
+            <div>
+              <p className="font-semibold">Mengetahui,</p>
+              <p className="font-semibold">Kepala SMK Muhammadiyah Bawang</p>
+              <div className="h-20"></div>
+              <p className="font-bold underline">( .................................................... )</p>
+              <p className="text-[11px] text-slate-600">NBM / NIP. ........................................</p>
+            </div>
+            <div>
+              <p className="font-semibold">Pendidik Pengampu Mata Pelajaran,</p>
+              <div className="h-20"></div>
+              <p className="font-bold underline">{teacher.namaGuru}</p>
+              <p className="text-[11px] text-slate-600 font-mono mt-0.5">
+                NBM / NIP: {teacher.nbm || teacher.nip || '-'}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

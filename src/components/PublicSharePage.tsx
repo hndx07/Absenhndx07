@@ -676,8 +676,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           </div>
         </div>
 
-        {/* Info Card with Real Timestamp */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* 1. TAMPILAN WEB INTERAKTIF (Disembunyikan saat mode Dokumen A4 atau saat cetak) */}
+        {!isDocumentViewMode && (
+          <div className="space-y-6 print:hidden">
+            {/* Info Card with Real Timestamp */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-full text-xs font-bold border border-indigo-100 dark:border-indigo-900">
@@ -1995,8 +1998,8 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                         <p className="font-semibold">Mengetahui,</p>
                         <p className="font-semibold">Kepala SMK Muhammadiyah Bawang</p>
                         <div className="h-20"></div>
-                        <p className="font-bold underline">Imam Sopingi, S.Pd.</p>
-                        <p className="text-[11px] text-slate-600">NBM. 1 092 379</p>
+                        <p className="font-bold underline">( .................................................... )</p>
+                        <p className="text-[11px] text-slate-600">NBM / NIP. ........................................</p>
                       </div>
                     </div>
                   </div>
@@ -2275,6 +2278,335 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
             </div>
           </div>
         )}
+        </div>
+      )}
+
+      {/* 2. DOKUMEN CETAK RESMI A4 (SESUAI STANDAR SMK MUHAMMADIYAH BAWANG) */}
+      <div
+        id="public-document-view"
+        className={`${
+          isDocumentViewMode ? 'block' : 'hidden print:block'
+        } bg-white text-black border border-slate-300 p-6 sm:p-10 font-serif leading-relaxed max-w-[210mm] mx-auto shadow-sm rounded-xl print:border-none print:shadow-none print:p-0 print:m-0 print:max-w-none text-xs`}
+      >
+        {/* Kop Surat Resmi Dokumen Siap Cetak (Serupa dengan Agenda Mengajar) */}
+        <OfficialLetterhead />
+
+        {/* Judul Dokumen Resmi */}
+        <div className="text-center my-4">
+          <h2 className="text-sm sm:text-base font-bold uppercase tracking-wider underline text-black">
+            {effectiveType === 'absen'
+              ? absenViewMode === 'latest'
+                ? 'DAFTAR HADIR / PRESENSI KBM PESERTA DIDIK'
+                : 'REKAPITULASI PRESENSI / KEHADIRAN PESERTA DIDIK'
+              : effectiveType === 'nilai'
+              ? 'LEGER CAPAIAN HASIL ASESMEN PESERTA DIDIK'
+              : effectiveType === 'agenda'
+              ? 'BUKU JURNAL / AGENDA MENGAJAR PENDIDIK'
+              : 'LAPORAN REKAPITULASI KAS & TABUNGAN KELAS'}
+          </h2>
+          <p className="text-[11px] font-sans font-semibold tracking-wide uppercase text-black mt-0.5">
+            {effectiveType === 'absen' && absenViewMode === 'latest' && currentSession
+              ? `Pertemuan Ke-${currentSession.pertemuanKe} • Tanggal: ${formatIndonesianDate(currentSession.tanggal)}`
+              : `Kurikulum Merdeka • Tahun Pelajaran ${SCHOOL_CONFIG.tahunAjaran} (${SCHOOL_CONFIG.semester})`}
+          </p>
+        </div>
+
+        {/* Identitas Dokumen Formal */}
+        <div className="border border-black p-3 mb-4 font-sans text-[11px]">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+            <div>
+              <table className="w-full text-left">
+                <tbody>
+                  <tr>
+                    <td className="w-32 py-0.5 text-black">Satuan Pendidikan</td>
+                    <td className="w-3 py-0.5">:</td>
+                    <td className="py-0.5 font-bold text-black">{SCHOOL_CONFIG.namaSekolah}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 text-black">Kelas / Rombel</td>
+                    <td className="py-0.5">:</td>
+                    <td className="py-0.5 font-bold text-black">{data?.className || '-'}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 text-black">Mata Pelajaran</td>
+                    <td className="py-0.5">:</td>
+                    <td className="py-0.5 font-bold text-black">{data?.subject || 'Muatan Kejuruan'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <table className="w-full text-left">
+                <tbody>
+                  <tr>
+                    <td className="w-32 py-0.5 text-black">Pendidik Pengampu</td>
+                    <td className="py-0.5">:</td>
+                    <td className="py-0.5 font-bold text-black">{data?.teacher || data?.teacherName || 'Pendidik Pengampu'}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 text-black">Tahun Pelajaran</td>
+                    <td className="py-0.5">:</td>
+                    <td className="py-0.5 text-black">{SCHOOL_CONFIG.tahunAjaran} ({SCHOOL_CONFIG.semester})</td>
+                  </tr>
+                  {effectiveType === 'absen' && currentSession && (
+                    <tr>
+                      <td className="py-0.5 text-black">Materi / Topik</td>
+                      <td className="py-0.5">:</td>
+                      <td className="py-0.5 text-black">{currentSession.topikMateri || 'Kegiatan Belajar Mengajar'}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* KONTEN TABEL RESMI BERDASARKAN TIPE */}
+        {/* 1. Tipe Absensi Sesi Terakhir */}
+        {effectiveType === 'absen' && absenViewMode === 'latest' && currentSession && (
+          <div className="mb-4">
+            <table className="w-full border-collapse border border-black text-center text-[11px] font-sans">
+              <thead>
+                <tr className="bg-slate-100 print:bg-slate-100">
+                  <th className="border border-black p-2 w-8">No</th>
+                  <th className="border border-black p-2 w-28 text-center">NISN</th>
+                  <th className="border border-black p-2 text-left">Nama Lengkap Peserta Didik</th>
+                  <th className="border border-black p-2 w-12 text-center">L/P</th>
+                  <th className="border border-black p-2 w-28 text-center">Status Kehadiran</th>
+                  <th className="border border-black p-2 text-left">Catatan / Keterangan</th>
+                  <th className="border border-black p-2 w-16 text-center">Paraf</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedStudents.map((std: any, idx: number) => {
+                  const rec = currentSession.records?.[std.id];
+                  const st = rec?.status || 'H';
+                  const labelStatus =
+                    st === 'H'
+                      ? 'Hadir (H)'
+                      : st === 'S'
+                      ? 'Sakit (S)'
+                      : st === 'I'
+                      ? 'Izin (I)'
+                      : st === 'A'
+                      ? 'Alpa (A)'
+                      : 'Dispen (D)';
+                  return (
+                    <tr key={std.id} className="hover:bg-slate-50">
+                      <td className="border border-black p-1.5 font-mono">{idx + 1}</td>
+                      <td className="border border-black p-1.5 font-mono">{std.nisn || '-'}</td>
+                      <td className="border border-black p-1.5 text-left font-medium">{std.nama}</td>
+                      <td className="border border-black p-1.5 font-mono">{std.gender || '-'}</td>
+                      <td className="border border-black p-1.5 font-bold">{labelStatus}</td>
+                      <td className="border border-black p-1.5 text-left text-[10px]">{rec?.catatan || '-'}</td>
+                      <td className="border border-black p-1.5 text-center text-[10px] font-mono">&#10003;</td>
+                    </tr>
+                  );
+                })}
+                <tr className="bg-slate-100 print:bg-slate-100 font-bold text-[10px]">
+                  <td className="border border-black p-2 text-center" colSpan={4}>
+                    REKAPITULASI SESI PERTEMUAN INI: Total {currentSessionStats.total} Murid
+                  </td>
+                  <td className="border border-black p-2 text-center" colSpan={3}>
+                    Hadir: {currentSessionStats.h} &bull; Sakit: {currentSessionStats.s} &bull; Izin: {currentSessionStats.i} &bull; Alpa: {currentSessionStats.a} &bull; Dispen: {currentSessionStats.d} &bull; Tingkat Kehadiran: {currentSessionStats.rate}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 2. Tipe Absensi Rekapitulasi Kumulatif */}
+        {effectiveType === 'absen' && absenViewMode === 'recap' && (
+          <div className="mb-4">
+            <table className="w-full border-collapse border border-black text-center text-[10px] font-sans">
+              <thead>
+                <tr className="bg-slate-100 print:bg-slate-100">
+                  <th className="border border-black p-1.5 w-7">No</th>
+                  <th className="border border-black p-1.5 w-24">NISN</th>
+                  <th className="border border-black p-1.5 text-left">Nama Peserta Didik</th>
+                  <th className="border border-black p-1.5 w-10">L/P</th>
+                  <th className="border border-black p-1.5 w-10">H</th>
+                  <th className="border border-black p-1.5 w-10">S</th>
+                  <th className="border border-black p-1.5 w-10">I</th>
+                  <th className="border border-black p-1.5 w-10">A</th>
+                  <th className="border border-black p-1.5 w-10">D</th>
+                  <th className="border border-black p-1.5 w-14">Total</th>
+                  <th className="border border-black p-1.5 w-14">% Hadir</th>
+                  <th className="border border-black p-1.5 w-24">Keterangan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedStudents.map((std: any, idx: number) => {
+                  let h = 0, s = 0, i = 0, a = 0, d = 0;
+                  (data.sessions || []).forEach((sess: any) => {
+                    const rec = sess.records?.[std.id];
+                    if (rec?.status === 'H') h++;
+                    else if (rec?.status === 'S') s++;
+                    else if (rec?.status === 'I') i++;
+                    else if (rec?.status === 'A') a++;
+                    else if (rec?.status === 'D') d++;
+                  });
+                  const total = data.sessions?.length || 1;
+                  const pct = Math.round(((h + d) / total) * 100);
+
+                  return (
+                    <tr key={std.id} className="hover:bg-slate-50">
+                      <td className="border border-black p-1.5 font-mono">{idx + 1}</td>
+                      <td className="border border-black p-1.5 font-mono">{std.nisn || '-'}</td>
+                      <td className="border border-black p-1.5 text-left font-medium">{std.nama}</td>
+                      <td className="border border-black p-1.5 font-mono">{std.gender || '-'}</td>
+                      <td className="border border-black p-1.5 font-mono font-bold">{h}</td>
+                      <td className="border border-black p-1.5 font-mono">{s}</td>
+                      <td className="border border-black p-1.5 font-mono">{i}</td>
+                      <td className="border border-black p-1.5 font-mono">{a}</td>
+                      <td className="border border-black p-1.5 font-mono">{d}</td>
+                      <td className="border border-black p-1.5 font-mono font-bold">{h + s + i + a + d}</td>
+                      <td className="border border-black p-1.5 font-mono font-bold">{pct}%</td>
+                      <td className="border border-black p-1.5 text-[10px]">
+                        {pct >= 85 ? 'Sangat Baik' : pct >= 75 ? 'Cukup' : 'Perlu Perhatian'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 3. Tipe Nilai (Leger Nilai Asesmen) */}
+        {effectiveType === 'nilai' && (
+          <div className="mb-4">
+            <table className="w-full border-collapse border border-black text-center text-[10px] font-sans">
+              <thead>
+                <tr className="bg-slate-100 print:bg-slate-100">
+                  <th className="border border-black p-1.5 w-7">No</th>
+                  <th className="border border-black p-1.5 w-24">NISN</th>
+                  <th className="border border-black p-1.5 text-left">Nama Peserta Didik</th>
+                  {activeGradeColumns.map((c: any, i: number) => (
+                    <th key={c.key} className="border border-black p-1.5 w-12" title={c.label}>
+                      F{i + 1}
+                    </th>
+                  ))}
+                  <th className="border border-black p-1.5 w-12 font-bold">Rata F</th>
+                  <th className="border border-black p-1.5 w-12 font-bold">STS</th>
+                  <th className="border border-black p-1.5 w-12 font-bold">SAS</th>
+                  <th className="border border-black p-1.5 w-14 font-black">NA</th>
+                  <th className="border border-black p-1.5 w-12 font-bold">Pred</th>
+                  <th className="border border-black p-1.5 w-24">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {computedGrades.map((g: any, idx: number) => (
+                  <tr key={g.student.id} className="hover:bg-slate-50">
+                    <td className="border border-black p-1 font-mono">{idx + 1}</td>
+                    <td className="border border-black p-1 font-mono">{g.student.nisn || '-'}</td>
+                    <td className="border border-black p-1 text-left font-medium">{g.student.nama}</td>
+                    {activeGradeColumns.map((col: any) => {
+                      const val = g.gradeRecord?.[col.key];
+                      return (
+                        <td key={col.key} className="border border-black p-1 font-mono">
+                          {typeof val === 'number' && !isNaN(val) ? val : '-'}
+                        </td>
+                      );
+                    })}
+                    <td className="border border-black p-1 font-mono font-semibold">{g.avgF !== null ? g.avgF : '-'}</td>
+                    <td className="border border-black p-1 font-mono font-semibold">{g.sts !== null ? g.sts : '-'}</td>
+                    <td className="border border-black p-1 font-mono font-semibold">{g.sas !== null ? g.sas : '-'}</td>
+                    <td className="border border-black p-1 font-mono font-bold">{g.hasAnyScore ? g.finalScore : '-'}</td>
+                    <td className="border border-black p-1 font-semibold">{g.predikat}</td>
+                    <td className="border border-black p-1 font-medium">{g.isTuntas ? 'TUNTAS' : 'REMEDIAL'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 4. Tipe Agenda */}
+        {effectiveType === 'agenda' && (
+          <div className="mb-4">
+            <table className="w-full border-collapse border border-black text-center text-[10px] font-sans">
+              <thead>
+                <tr className="bg-slate-100 print:bg-slate-100">
+                  <th className="border border-black p-1.5 w-7">No</th>
+                  <th className="border border-black p-1.5 w-24">Hari / Tanggal</th>
+                  <th className="border border-black p-1.5 w-16">Jam Ke</th>
+                  <th className="border border-black p-1.5 text-left">Materi Pokok & Capaian Pembelajaran</th>
+                  <th className="border border-black p-1.5 w-16">Hadir</th>
+                  <th className="border border-black p-1.5 w-16">Absen</th>
+                  <th className="border border-black p-1.5 w-16">Paraf</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.agendas || []).map((ag: any, idx: number) => (
+                  <tr key={ag.id || idx}>
+                    <td className="border border-black p-1.5 font-mono">{idx + 1}</td>
+                    <td className="border border-black p-1.5 text-left">{ag.hari}, {ag.tanggal}</td>
+                    <td className="border border-black p-1.5 font-mono">{ag.jamKe}</td>
+                    <td className="border border-black p-1.5 text-left">
+                      <p className="font-semibold">{ag.materiAjar}</p>
+                      {ag.kegiatan && <p className="text-[9px] text-slate-600">{ag.kegiatan}</p>}
+                    </td>
+                    <td className="border border-black p-1.5 font-mono">{ag.hadirCount ?? 0}</td>
+                    <td className="border border-black p-1.5 font-mono">{ag.tidakHadirCount ?? 0}</td>
+                    <td className="border border-black p-1.5 font-mono text-[9px]">&#10003;</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 5. Tipe Tabungan & Kas */}
+        {effectiveType === 'tabungan' && (
+          <div className="mb-4">
+            <table className="w-full border-collapse border border-black text-center text-[11px] font-sans">
+              <thead>
+                <tr className="bg-slate-100 print:bg-slate-100">
+                  <th className="border border-black p-2 w-8">No</th>
+                  <th className="border border-black p-2 text-left">Nama Peserta Didik</th>
+                  <th className="border border-black p-2 w-40 text-right">Saldo Tabungan (Rp)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedStudents.map((std: any, idx: number) => (
+                  <tr key={std.id}>
+                    <td className="border border-black p-1.5 font-mono">{idx + 1}</td>
+                    <td className="border border-black p-1.5 text-left font-medium">{std.nama}</td>
+                    <td className="border border-black p-1.5 text-right font-mono font-bold">
+                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(std.saldo || 0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tanda Tangan Resmi Dokumen (Tanpa Nama Kepala Sekolah) */}
+        <div className="mt-8 font-sans text-xs">
+          <div className="flex justify-end mb-4">
+            <p>Bawang, {formatIndonesianDate(new Date().toISOString())}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-8 text-center">
+            <div>
+              <p className="font-semibold">Mengetahui,</p>
+              <p className="font-semibold">Kepala SMK Muhammadiyah Bawang</p>
+              <div className="h-20"></div>
+              <p className="font-bold underline">( .................................................... )</p>
+              <p className="text-[11px] text-slate-600">NBM / NIP. ........................................</p>
+            </div>
+            <div>
+              <p className="font-semibold">Pendidik Pengampu Mata Pelajaran,</p>
+              <p className="text-slate-600">{data?.subject || 'Guru Pengampu'}</p>
+              <div className="h-20"></div>
+              <p className="font-bold underline">{data?.teacher || data?.teacherName || 'Pendidik Pengampu'}</p>
+              <p className="text-[11px] text-slate-600">NBM/NIP. -</p>
+            </div>
+          </div>
+        </div>
+      </div>
       </main>
 
       {/* Official Footer matching Header Color Identity - No Opacity */}

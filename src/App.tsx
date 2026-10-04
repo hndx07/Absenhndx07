@@ -745,7 +745,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={toggleSideNav}
-                className="p-2 sm:p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition border border-white/20 shadow-xs flex items-center justify-center shrink-0 cursor-pointer"
+                className="p-2 sm:p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition border border-white/20 shadow-xs flex items-center justify-center shrink-0 cursor-pointer lg:hidden"
                 title="Buka Menu Navigasi Samping"
                 aria-label="Buka Menu Navigasi Samping"
               >
@@ -810,9 +810,9 @@ export default function App() {
         </div>
       </header>
 
-      {/* Side Navigation Drawer (Navbar Kesamping) */}
+      {/* Side Navigation Drawer (Navbar Kesamping untuk Mobile) */}
       {isSideNavOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
+        <div className="fixed inset-0 z-50 overflow-hidden lg:hidden">
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200 cursor-pointer"
@@ -851,8 +851,6 @@ export default function App() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-
-
 
               {/* Class Info Box inside Drawer */}
               <div className="p-4 bg-emerald-50/60 border-b border-emerald-100">
@@ -996,8 +994,134 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+      {/* Main Layout Wrapper: Bilah Samping (Sidebar) & Main Content Area */}
+      <div className="flex-1 flex w-full max-w-7xl mx-auto gap-4 items-start px-2 sm:px-4">
+        {/* Desktop Permanent Bilah Samping (Sidebar) - Satu-Satunya Tempat Navigasi Tanpa Double Button */}
+        <aside className="hidden lg:flex w-72 flex-col shrink-0 bg-white text-slate-900 shadow-sm border border-slate-200/80 rounded-3xl sticky top-24 my-6 overflow-hidden max-h-[calc(100vh-7.5rem)] no-print">
+          {/* Class Info Box */}
+          <div className="p-4 bg-emerald-50/60 border-b border-emerald-100">
+            <div className="flex items-center justify-between gap-2">
+              <div className="truncate">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-700 block">
+                  Kelas Aktif
+                </span>
+                <p className="font-extrabold text-sm text-slate-900 truncate">
+                  {activeClass.namaKelas}
+                </p>
+                <p className="text-[11px] text-slate-500 truncate">
+                  {activeClass.jurusan}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsClassModalOpen(true)}
+                className="px-2.5 py-1.5 rounded-lg bg-[#009B62] text-white text-[11px] font-bold hover:bg-[#008276] transition shrink-0 cursor-pointer"
+              >
+                Ganti
+              </button>
+            </div>
+          </div>
+
+          {/* Navigation Items in Desktop Sidebar */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveTab(item.id as NavTab)}
+                  className={`w-full text-left p-3 rounded-2xl transition flex items-start gap-3 cursor-pointer ${
+                    isActive
+                      ? 'bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white shadow-md font-bold'
+                      : 'hover:bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  <div className={`p-2 rounded-xl shrink-0 ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-bold leading-tight ${isActive ? 'text-white' : 'text-slate-900'}`}>
+                      {item.label}
+                    </p>
+                    <p className={`text-[10px] mt-0.5 truncate ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>
+                      {item.desc}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+
+            {/* Penanda Warna Cloud Supabase Aktif & Refresh / Backup */}
+            <div className="pt-2 border-t border-slate-100 my-2 space-y-2">
+              <div className="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  </span>
+                  <div>
+                    <p className="text-xs font-bold text-emerald-900">Cloud Supabase Aktif</p>
+                    <p className="text-[10px] text-emerald-700/80">PostgreSQL & RLS</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/70 text-emerald-800">
+                  Aktif
+                </span>
+              </div>
+
+              <button
+                type="button"
+                disabled={isManualRefreshing || isLoadingData}
+                onClick={handleManualRefresh}
+                className="w-full p-2.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 shadow-2xs"
+                title="Muat ulang seluruh data langsung dari database Cloud Supabase"
+              >
+                <RefreshCw className={`w-4 h-4 text-emerald-700 ${isManualRefreshing || isLoadingData ? 'animate-spin' : ''}`} />
+                <span>{isManualRefreshing || isLoadingData ? 'Memperbarui...' : 'Refresh Data Cloud'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadBackup}
+                className="w-full p-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                title="Download File Backup JSON Seluruh Data"
+              >
+                <Download className="w-4 h-4 text-emerald-700" />
+                <span>Download Backup (JSON)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Drawer Footer: Profil Pendidik & Akun */}
+          <div className="p-3 border-t border-slate-100 bg-slate-50/80">
+            <button
+              type="button"
+              onClick={() => setIsProfileModalOpen(true)}
+              className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-white hover:bg-slate-100 text-left transition border border-slate-200/80 cursor-pointer shadow-2xs"
+              title="Buka Pengaturan Profil Pendidik"
+            >
+              <div className="flex items-center gap-2.5 truncate">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#009B62] to-[#292E82] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                  {activeTeacher.namaGuru.charAt(0)}
+                </div>
+                <div className="truncate">
+                  <p className="text-xs font-bold text-slate-900 truncate">
+                    {activeTeacher.namaGuru}
+                  </p>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    {activeTeacher.email}
+                  </p>
+                </div>
+              </div>
+              <Settings className="w-4 h-4 text-slate-400 shrink-0" />
+            </button>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 min-w-0 py-6">
         {/* Error state if Supabase connection fails */}
         {dataError && (
           <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center justify-between gap-3 animate-in fade-in">
@@ -1140,6 +1264,7 @@ export default function App() {
           </>
         )}
       </main>
+      </div>
 
       {/* Footer inheriting Muhammadiyah Visual Identity (Matches Header Colors) */}
       <footer className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] border-t border-[#008276] mt-12 py-8 text-center text-white shadow-lg transition-colors">
