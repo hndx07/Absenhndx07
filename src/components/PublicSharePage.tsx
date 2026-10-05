@@ -30,7 +30,10 @@ import {
   ArrowDownZA,
   ArrowUpDown,
   FileText,
+  Download,
+  FileSpreadsheet,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { getSafeSupabaseClient } from '../services/supabase';
 import { getPublicShare } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
@@ -524,6 +527,89 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     );
   }
 
+  // Unduh Berkas Excel Khusus Nilai (Leger Nilai Lengkap)
+  const handleDownloadGradesExcel = () => {
+    if (!computedGrades || computedGrades.length === 0) return;
+
+    const rows = computedGrades.map((g: any, idx: number) => {
+      const rowObj: Record<string, any> = {
+        No: idx + 1,
+        NISN: g.student.nisn || '-',
+        'Nama Lengkap Peserta Didik': g.student.nama,
+        'L/P': g.student.gender || '-',
+      };
+
+      activeGradeColumns.forEach((c: any, i: number) => {
+        const val = g.gradeRecord?.[c.key];
+        rowObj[`TP ${i + 1} (${c.label})`] = typeof val === 'number' && !isNaN(val) ? val : '-';
+      });
+
+      rowObj['Rata Formatif'] = g.avgF !== null ? g.avgF : '-';
+      rowObj['STS (Sumatif Tengah)'] = g.sts !== null ? g.sts : '-';
+      rowObj['SAS (Sumatif Akhir)'] = g.sas !== null ? g.sas : '-';
+      rowObj['Nilai Akhir (NA)'] = g.hasAnyScore ? g.finalScore : '-';
+      rowObj['Predikat'] = g.predikat;
+      rowObj['Status Capaian'] = g.isTuntas ? 'TUNTAS' : 'REMEDIAL';
+      rowObj['Deskripsi Capaian'] = g.merdekaDeskripsiSingkat || g.merdekaDeskripsi || '-';
+
+      return rowObj;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Leger Nilai Merdeka');
+    const classNameClean = (data?.className || 'Kelas').replace(/\s+/g, '_');
+    const subjectClean = (data?.subject || 'Nilai').replace(/\s+/g, '_');
+    const fname = `Leger_Nilai_${classNameClean}_${subjectClean}_${Date.now()}.xlsx`;
+    XLSX.writeFile(wb, fname);
+  };
+
+  // Unduh Berkas Excel untuk Rapor Individu Murid
+  const handleDownloadSingleStudentExcel = (studentGrade: any) => {
+    if (!studentGrade) return;
+    const std = studentGrade.student;
+    const g = studentGrade.gradeRecord;
+    const m = getKurikulumMerdekaAssessment(
+      studentGrade.hasAnyScore ? studentGrade.finalScore : null,
+      Number(data?.kkm) || 75,
+      data?.subject || 'Mata Pelajaran',
+      std.nama
+    );
+
+    const rows: Record<string, any>[] = [
+      { 'Komponen Asesmen': 'Nama Murid', Nilai: std.nama, Keterangan: `NISN: ${std.nisn || '-'}` },
+      { 'Komponen Asesmen': 'Kelas / Rombel', Nilai: data?.className || '-', Keterangan: '-' },
+      { 'Komponen Asesmen': 'Mata Pelajaran', Nilai: data?.subject || 'Muatan Kejuruan', Keterangan: `KKM: ${data?.kkm || 75}` },
+      { 'Komponen Asesmen': 'Pendidik Pengampu', Nilai: data?.teacher || data?.teacherName || '-', Keterangan: '-' },
+    ];
+
+    activeGradeColumns.forEach((c: any, i: number) => {
+      const val = g?.[c.key];
+      rows.push({
+        'Komponen Asesmen': `Formatif ${i + 1} (${c.label})`,
+        Nilai: typeof val === 'number' && !isNaN(val) ? val : '-',
+        Keterangan: 'Asesmen Formatif TP',
+      });
+    });
+
+    rows.push(
+      { 'Komponen Asesmen': 'Rata-rata Formatif', Nilai: studentGrade.avgF !== null ? studentGrade.avgF : '-', Keterangan: 'Bobot 50%' },
+      { 'Komponen Asesmen': 'Sumatif Tengah Semester (STS)', Nilai: studentGrade.sts !== null ? studentGrade.sts : '-', Keterangan: 'Bobot 25%' },
+      { 'Komponen Asesmen': 'Sumatif Akhir Semester (SAS)', Nilai: studentGrade.sas !== null ? studentGrade.sas : '-', Keterangan: 'Bobot 25%' },
+      { 'Komponen Asesmen': 'Nilai Akhir (NA)', Nilai: studentGrade.hasAnyScore ? studentGrade.finalScore : '-', Keterangan: `Skala 0-100 (KKM: ${data?.kkm || 75})` },
+      { 'Komponen Asesmen': 'Predikat Capaian', Nilai: studentGrade.predikat, Keterangan: m.predikatLabel },
+      { 'Komponen Asesmen': 'Status Kelulusan', Nilai: studentGrade.isTuntas ? 'TUNTAS' : 'REMEDIAL', Keterangan: '-' },
+      { 'Komponen Asesmen': 'Deskripsi Capaian Kompetensi', Nilai: m.deskripsi, Keterangan: 'Kurikulum Merdeka' }
+    );
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Rapor Murid');
+    const stdNameClean = std.nama.replace(/\s+/g, '_');
+    const fname = `Rapor_${stdNameClean}_${Date.now()}.xlsx`;
+    XLSX.writeFile(wb, fname);
+  };
+
   return (
     <div className="public-share-page min-h-screen relative bg-slate-50 dark:bg-black text-slate-900 dark:text-white pb-16 transition-colors selection:bg-indigo-500 selection:text-white">
       {/* Scroll Reading Progress Bar with Smooth Animation */}
@@ -663,6 +749,18 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                 <span>Dokumen A4</span>
               </button>
             </div>
+
+            {effectiveType === 'nilai' && (
+              <button
+                type="button"
+                onClick={handleDownloadGradesExcel}
+                className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                title="Download Leger Nilai ke Format File Microsoft Excel (.xlsx)"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-white" />
+                <span>Download File Excel</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -1381,6 +1479,16 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                     Rincian TP Lengkap
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadGradesExcel}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer ml-1"
+                  title="Download Data Nilai ke Format Excel (.xlsx)"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unduh Excel</span>
+                </button>
               </div>
             </div>
 
@@ -1807,6 +1915,18 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                         </button>
                       </div>
 
+                      {effectiveType === 'nilai' && selectedStudentGrade && (
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadSingleStudentExcel(selectedStudentGrade)}
+                          className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                          title="Download Rapor Siswa ke Format Microsoft Excel (.xlsx)"
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5" />
+                          <span>Download Excel</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => window.print()}
@@ -1835,6 +1955,23 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                       raporModalTab === 'document' ? 'block' : 'hidden print:block'
                     } bg-white text-slate-900 border border-slate-300 p-6 sm:p-10 font-serif leading-relaxed max-w-[210mm] mx-auto shadow-sm rounded-xl print:border-none print:shadow-none print:p-0 print:m-0`}
                   >
+                    {/* Toolbar Unduh Excel di Lembar Rapor Siap Cetak (no-print) */}
+                    <div className="mb-3 p-2.5 bg-emerald-50 border border-emerald-300 rounded-lg flex items-center justify-between no-print text-xs text-emerald-950">
+                      <div className="flex items-center gap-2">
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <span className="font-semibold text-emerald-900">Format Rapor Siap Cetak A4 & Spreadsheet</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadSingleStudentExcel(selectedStudentGrade)}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-md flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                        title="Download Rapor ke File Excel"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download Excel (.xlsx)</span>
+                      </button>
+                    </div>
+
                     <OfficialLetterhead />
 
                     {/* Judul Dokumen */}
@@ -2477,6 +2614,30 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         {/* 3. Tipe Nilai (Leger Nilai Asesmen) */}
         {effectiveType === 'nilai' && (
           <div className="mb-4">
+            {/* Toolbar Download File Excel Dokumen Siap Cetak (no-print) */}
+            <div className="mb-3.5 p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex flex-wrap items-center justify-between gap-3 text-slate-900 no-print">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <FileSpreadsheet className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-bold text-xs text-emerald-950">Dokumen Siap Cetak Leger Nilai & Asesmen</p>
+                  <p className="text-[11px] text-emerald-800">
+                    Unduh lembar nilai ini dalam format file Microsoft Excel (.xlsx) resmi dengan data terstruktur lengkap.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadGradesExcel}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="Download File Excel (.xlsx)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download File Excel (.xlsx)</span>
+              </button>
+            </div>
+
             <table className="w-full border-collapse border border-black text-center text-[10px] font-sans">
               <thead>
                 <tr className="bg-slate-100 print:bg-slate-100">
