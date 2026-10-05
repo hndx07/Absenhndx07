@@ -104,7 +104,9 @@ export const GradesView: React.FC<GradesViewProps> = ({
   const [importRawText, setImportRawText] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [parsedGradeRows, setParsedGradeRows] = useState<GradePreviewRow[]>([]);
-  const [overwriteMode, setOverwriteMode] = useState<'skip' | 'update'>('skip');
+  const [rawGradeData, setRawGradeData] = useState<any[][] | null>(null);
+  const [overwriteMode, setOverwriteMode] = useState<'skip' | 'update'>('update');
+  const [isUploadingToCloud, setIsUploadingToCloud] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const classStudents = useMemo(() => {
@@ -488,35 +490,84 @@ export const GradesView: React.FC<GradesViewProps> = ({
     }
   };
 
+  const handleOverwriteModeChange = (mode: 'skip' | 'update') => {
+    setOverwriteMode(mode);
+    if (rawGradeData) {
+      processRawGradeRows(rawGradeData, mode);
+    }
+  };
+
   // Process raw Excel rows for Grades
-  const processRawGradeRows = (rawData: any[][]) => {
+  const processRawGradeRows = (rawData: any[][], currentMode: 'skip' | 'update' = overwriteMode) => {
     if (!rawData || rawData.length === 0) return;
 
     let headerRowIdx = -1;
     let colMap: Record<string, number> = { nisn: -1, nama: -1, sts: -1, sas: -1, catatan: -1 };
     for (let f = 1; f <= 10; f++) colMap[`tp${f}`] = -1;
 
-    for (let i = 0; i < Math.min(6, rawData.length); i++) {
-      const row = rawData[i].map((c) => String(c || '').toLowerCase().trim());
-      const namaIdx = row.findIndex((c) => c.includes('nama') || c.includes('siswa') || c.includes('murid'));
+    const normalizeHeader = (s: any) =>
+      String(s || '')
+        .toLowerCase()
+        .trim()
+        .replace(/[\s_\-():.]+/g, '');
+
+    for (let i = 0; i < Math.min(10, rawData.length); i++) {
+      const row = rawData[i];
+      if (!Array.isArray(row)) continue;
+
+      const namaIdx = row.findIndex((c: any) => {
+        const norm = normalizeHeader(c);
+        return norm.includes('nama') || norm.includes('siswa') || norm.includes('murid');
+      });
+
       if (namaIdx !== -1) {
         headerRowIdx = i;
         colMap.nama = namaIdx;
-        colMap.nisn = row.findIndex((c) => c.includes('nisn') || c.includes('nis'));
-        colMap.sts = row.findIndex((c) => c.includes('sts') || c.includes('uts') || c.includes('tengah'));
-        colMap.sas = row.findIndex((c) => c.includes('sas') || c.includes('pas') || c.includes('uas') || c.includes('akhir'));
-        colMap.catatan = row.findIndex((c) => c.includes('catatan') || c.includes('keterangan'));
 
-        // map TP columns
-        for (let f = 1; f <= 10; f++) {
-          colMap[`tp${f}`] = row.findIndex(
-            (c) =>
-              c === `tp ${f}` ||
-              c === `tp${f}` ||
-              c.includes(`tp ${f}`) ||
-              c.includes(`formatif ${f}`) ||
-              c.includes(`f${f}`)
-          );
+        colMap.nisn = row.findIndex((c: any) => {
+          const norm = normalizeHeader(c);
+          return norm.includes('nisn') || norm === 'nis' || norm.startsWith('nis');
+        });
+
+        colMap.sts = row.findIndex((c: any) => {
+          const norm = normalizeHeader(c);
+          return norm.includes('sts') || norm.includes('uts') || norm.includes('pts') || norm.includes('tengah');
+        });
+
+        colMap.sas = row.findIndex((c: any) => {
+          const norm = normalizeHeader(c);
+          return norm.includes('sas') || norm.includes('pas') || norm.includes('uas') || norm.includes('akhir');
+        });
+
+        colMap.catatan = row.findIndex((c: any) => {
+          const norm = normalizeHeader(c);
+          return norm.includes('catatan') || norm.includes('keterangan');
+        });
+
+        // Map TP columns from 10 down to 1 so TP10 is not captured by TP1
+        for (let f = 10; f >= 1; f--) {
+          const normTarget = `tp${f}`;
+          const normFormatif = `formatif${f}`;
+          const normF = `f${f}`;
+          const targetIdx = row.findIndex((c: any, colIdx: number) => {
+            if (colIdx === colMap.nama || colIdx === colMap.nisn || colIdx === colMap.sts || colIdx === colMap.sas || colIdx === colMap.catatan) {
+              return false;
+            }
+            const norm = normalizeHeader(c);
+            return (
+              norm === normTarget ||
+              norm.startsWith(normTarget) ||
+              norm === normFormatif ||
+              norm.startsWith(normFormatif) ||
+              norm === normF ||
+              norm.startsWith(normF) ||
+              norm === `ph${f}` ||
+              norm === `uh${f}`
+            );
+          });
+          if (targetIdx !== -1) {
+            colMap[`tp${f}`] = targetIdx;
+          }
         }
         break;
       }
@@ -531,7 +582,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
     const seenStudentIds = new Set<string>();
 
     dataRows.forEach((row, idx) => {
-      if (!row || row.length === 0 || row.every((c) => !c || String(c).trim() === '')) return;
+      if (!row || !Array.isArray(row) || row.length === 0 || row.every((c) => !c || String(c).trim() === '')) return;
 
       let nisn = '';
       let nama = '';
@@ -540,16 +591,16 @@ export const GradesView: React.FC<GradesViewProps> = ({
       let catatan = '';
       const scores: Record<string, number | null> = {};
 
+      const parseNum = (v: any) => {
+        if (v === undefined || v === null || String(v).trim() === '' || String(v).trim() === '-') return null;
+        const n = parseFloat(String(v).replace(',', '.'));
+        return isNaN(n) ? null : Math.min(100, Math.max(0, n));
+      };
+
       if (headerRowIdx !== -1 && colMap.nama !== -1) {
         nama = String(row[colMap.nama] || '').trim();
         nisn = colMap.nisn !== -1 ? String(row[colMap.nisn] || '').trim() : '';
         catatan = colMap.catatan !== -1 ? String(row[colMap.catatan] || '').trim() : '';
-
-        const parseNum = (v: any) => {
-          if (v === undefined || v === null || String(v).trim() === '') return null;
-          const n = parseFloat(String(v));
-          return isNaN(n) ? null : Math.min(100, Math.max(0, n));
-        };
 
         if (colMap.sts !== -1) sts = parseNum(row[colMap.sts]);
         if (colMap.sas !== -1) sas = parseNum(row[colMap.sas]);
@@ -563,39 +614,62 @@ export const GradesView: React.FC<GradesViewProps> = ({
         }
       } else {
         // Fallback positional
-        nisn = String(row[0] || '').trim();
-        nama = String(row[1] || '').trim();
+        const val0 = String(row[0] || '').trim();
+        const val1 = String(row[1] || '').trim();
+        const val2 = String(row[2] || '').trim();
+
+        if (val0.match(/^\d{1,3}$/) && val2) {
+          nisn = val1;
+          nama = val2;
+        } else {
+          nisn = val0;
+          nama = val1;
+        }
       }
 
-      if (nama.toLowerCase() === 'nama' || nama.toLowerCase() === 'nama siswa') return;
+      if (
+        !nama ||
+        nama.toLowerCase() === 'nama' ||
+        nama.toLowerCase() === 'nama murid' ||
+        nama.toLowerCase() === 'nama siswa' ||
+        nama.toLowerCase() === 'nama lengkap'
+      ) {
+        return;
+      }
 
       scores.sumatifTengah = sts;
       scores.sumatifAkhir = sas;
 
+      const cleanNisn = nisn && nisn !== '-' && nisn !== '0' ? nisn.trim() : '';
+      const cleanNama = nama.toLowerCase().replace(/\s+/g, ' ').trim();
+
       // Find student in current class
-      const matchedStudent = classStudents.find(
-        (s) =>
-          (nisn && s.nisn && s.nisn === nisn) ||
-          s.nama.toLowerCase().trim() === nama.toLowerCase().trim()
-      );
+      const matchedStudent = classStudents.find((s) => {
+        if (cleanNisn && s.nisn && s.nisn.trim() === cleanNisn) return true;
+        if (cleanNama && s.nama.toLowerCase().replace(/\s+/g, ' ').trim() === cleanNama) return true;
+        return false;
+      });
 
       let status: 'valid' | 'duplicate' | 'not_found' | 'invalid' = 'valid';
       let reason = '';
 
       if (!matchedStudent) {
         status = 'not_found';
-        reason = `Murid "${nama}" tidak ditemukan di daftar kelas ${currentClass.namaKelas}`;
+        reason = `Murid "${nama}" tidak terdaftar di kelas ${currentClass.namaKelas}`;
       } else if (seenStudentIds.has(matchedStudent.id)) {
         status = 'duplicate';
-        reason = `Data murid "${matchedStudent.nama}" muncul ganda dalam file Excel ini (dilewati)`;
+        reason = `Data murid "${matchedStudent.nama}" muncul ganda dalam file Excel ini (baris ini dilewati)`;
       } else if (existingGradesByStudentId.has(matchedStudent.id)) {
-        if (overwriteMode === 'skip') {
+        if (currentMode === 'skip') {
           status = 'duplicate';
           reason = `Nilai murid "${matchedStudent.nama}" sudah ada di database (mode: lewati aktif)`;
         } else {
           status = 'valid';
-          reason = `Akan memperbarui nilai yang sudah ada`;
+          reason = `Akan memperbarui nilai murid di database cloud`;
         }
+      } else {
+        status = 'valid';
+        reason = `Nilai baru siap diunggah ke cloud`;
       }
 
       if (matchedStudent && status === 'valid') {
@@ -622,62 +696,102 @@ export const GradesView: React.FC<GradesViewProps> = ({
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-        processRawGradeRows(jsonData);
+        const buffer = e.target?.result as ArrayBuffer;
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          alert('Berkas Excel kosong atau tidak memiliki lembar kerja.');
+          return;
+        }
+
+        // Find sheet that contains data
+        let chosenSheet = workbook.SheetNames[0];
+        let foundData: any[][] = [];
+        for (const sName of workbook.SheetNames) {
+          const ws = workbook.Sheets[sName];
+          const raw = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
+          if (raw && raw.length > 0) {
+            chosenSheet = sName;
+            foundData = raw;
+            break;
+          }
+        }
+
+        if (foundData.length === 0) {
+          alert(`Lembar kerja "${chosenSheet}" tidak memiliki data yang dapat diimpor.`);
+          return;
+        }
+
+        setRawGradeData(foundData);
+        processRawGradeRows(foundData, overwriteMode);
       } catch (err) {
         console.error(err);
-        alert('Gagal membaca file Excel.');
+        alert('Gagal membaca file Excel. Pastikan format file .xlsx atau .xls valid.');
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handleCommitGradeImport = async () => {
-    const validRows = parsedGradeRows.filter((r) => r.status === 'valid' && r.studentId);
+    const validRows = parsedGradeRows.filter((r) => (r.status === 'valid' || overwriteMode === 'update') && r.studentId);
     if (validRows.length === 0) {
-      alert('Tidak ada data nilai valid yang dapat disimpan.');
+      alert('Tidak ada data nilai murid valid yang dapat disimpan. Pastikan nama murid sesuai dengan kelas ini.');
       return;
     }
 
+    setIsUploadingToCloud(true);
     setSyncStatus('saving');
-    const newGradesMap = { ...localGrades };
 
-    for (const r of validRows) {
-      const studentId = r.studentId!;
-      const existing = localGrades[studentId];
-      const updated: StudentGrade = {
-        id: existing ? existing.id : `grd_imp_${Date.now()}_${studentId}`,
-        studentId,
-        classId: currentClass.id,
-        catatan: r.catatan || existing?.catatan || '',
-        formatif1: r.scores.formatif1 ?? existing?.formatif1 ?? null,
-        formatif2: r.scores.formatif2 ?? existing?.formatif2 ?? null,
-        formatif3: r.scores.formatif3 ?? existing?.formatif3 ?? null,
-        formatif4: r.scores.formatif4 ?? existing?.formatif4 ?? null,
-        formatif5: r.scores.formatif5 ?? existing?.formatif5 ?? null,
-        formatif6: r.scores.formatif6 ?? existing?.formatif6 ?? null,
-        formatif7: r.scores.formatif7 ?? existing?.formatif7 ?? null,
-        formatif8: r.scores.formatif8 ?? existing?.formatif8 ?? null,
-        formatif9: r.scores.formatif9 ?? existing?.formatif9 ?? null,
-        formatif10: r.scores.formatif10 ?? existing?.formatif10 ?? null,
-        sumatifTengah: r.scores.sumatifTengah ?? existing?.sumatifTengah ?? null,
-        sumatifAkhir: r.scores.sumatifAkhir ?? existing?.sumatifAkhir ?? null,
-      };
+    try {
+      const newGradesMap = { ...localGrades };
+      const updatedGradesList: StudentGrade[] = [];
 
-      newGradesMap[studentId] = updated;
-      await onSaveGrade(updated);
+      for (const r of validRows) {
+        const studentId = r.studentId!;
+        const existing = localGrades[studentId];
+        const updated: StudentGrade = {
+          id: existing ? existing.id : `grd_imp_${Date.now()}_${studentId}`,
+          studentId,
+          classId: currentClass.id,
+          catatan: r.catatan || existing?.catatan || '',
+          formatif1: r.scores.formatif1 ?? existing?.formatif1 ?? null,
+          formatif2: r.scores.formatif2 ?? existing?.formatif2 ?? null,
+          formatif3: r.scores.formatif3 ?? existing?.formatif3 ?? null,
+          formatif4: r.scores.formatif4 ?? existing?.formatif4 ?? null,
+          formatif5: r.scores.formatif5 ?? existing?.formatif5 ?? null,
+          formatif6: r.scores.formatif6 ?? existing?.formatif6 ?? null,
+          formatif7: r.scores.formatif7 ?? existing?.formatif7 ?? null,
+          formatif8: r.scores.formatif8 ?? existing?.formatif8 ?? null,
+          formatif9: r.scores.formatif9 ?? existing?.formatif9 ?? null,
+          formatif10: r.scores.formatif10 ?? existing?.formatif10 ?? null,
+          sumatifTengah: r.scores.sumatifTengah ?? existing?.sumatifTengah ?? null,
+          sumatifAkhir: r.scores.sumatifAkhir ?? existing?.sumatifAkhir ?? null,
+        };
+
+        newGradesMap[studentId] = updated;
+        updatedGradesList.push(updated);
+      }
+
+      // Fast concurrent saves in chunks of 10
+      const chunkSize = 10;
+      for (let i = 0; i < updatedGradesList.length; i += chunkSize) {
+        const chunk = updatedGradesList.slice(i, i + chunkSize);
+        await Promise.all(chunk.map((g) => onSaveGrade(g)));
+      }
+
+      setLocalGrades(newGradesMap);
+      setSyncStatus('saved');
+      setIsImportOpen(false);
+      setParsedGradeRows([]);
+      setImportFileName('');
+      setRawGradeData(null);
+      alert(`Berhasil mengunggah dan menyimpan nilai ${validRows.length} murid ke cloud Supabase!`);
+    } catch (err) {
+      console.error('Error committing grade import to cloud:', err);
+      setSyncStatus('error');
+      alert('Terjadi kesalahan saat mengunggah nilai ke cloud. Silakan coba lagi.');
+    } finally {
+      setIsUploadingToCloud(false);
     }
-
-    setLocalGrades(newGradesMap);
-    setSyncStatus('saved');
-    setIsImportOpen(false);
-    setParsedGradeRows([]);
-    setImportFileName('');
-    alert(`Berhasil mengimpor dan memperbarui nilai ${validRows.length} murid ke cloud!`);
   };
 
   // Metrics calculation - HANYA siswa yang sudah memiliki nilai terinput
@@ -873,12 +987,15 @@ export const GradesView: React.FC<GradesViewProps> = ({
                 setParsedGradeRows([]);
                 setImportFileName('');
                 setImportRawText('');
+                setRawGradeData(null);
+                setOverwriteMode('update');
                 setIsImportOpen(true);
               }}
-              className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5"
+              className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Upload berkas Excel nilai murid dan sinkronkan ke database cloud Supabase"
             >
               <Upload className="w-4 h-4 text-emerald-600" />
-              Impor Excel
+              Upload / Impor Excel
             </button>
 
             {/* Export Excel Button for Grades */}
@@ -1365,28 +1482,28 @@ export const GradesView: React.FC<GradesViewProps> = ({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
                 <div>
                   <p className="text-xs font-bold text-slate-800">
-                    Mode Penanganan Data Ganda:
+                    Mode Penanganan Data Nilai:
                   </p>
-                  <div className="flex items-center gap-4 mt-1 text-xs">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="overwriteMode"
-                        checked={overwriteMode === 'skip'}
-                        onChange={() => setOverwriteMode('skip')}
-                        className="text-indigo-600"
-                      />
-                      <span>Data sudah ada &ndash; <strong>Lewati</strong></span>
-                    </label>
+                  <div className="flex flex-wrap items-center gap-4 mt-1 text-xs">
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="radio"
                         name="overwriteMode"
                         checked={overwriteMode === 'update'}
-                        onChange={() => setOverwriteMode('update')}
-                        className="text-indigo-600"
+                        onChange={() => handleOverwriteModeChange('update')}
+                        className="text-emerald-600 cursor-pointer"
                       />
-                      <span>Update data nilai yang ada</span>
+                      <span className="font-semibold text-emerald-800">Perbarui nilai murid yang ada (Rekomendasi)</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="overwriteMode"
+                        checked={overwriteMode === 'skip'}
+                        onChange={() => handleOverwriteModeChange('skip')}
+                        className="text-slate-600 cursor-pointer"
+                      />
+                      <span>Lewati jika sudah ada nilai</span>
                     </label>
                   </div>
                 </div>
@@ -1549,34 +1666,84 @@ export const GradesView: React.FC<GradesViewProps> = ({
             </div>
 
             {/* Modal Actions */}
-            <div className="px-6 py-4 bg-slate-50 border-t flex items-center justify-between">
-              <span className="text-xs text-slate-500">
-                {parsedGradeRows.filter((r) => r.status === 'valid').length > 0
-                  ? `${parsedGradeRows.filter((r) => r.status === 'valid').length} nilai murid siap diterapkan`
-                  : 'Unggah berkas untuk memvalidasi nilai'}
-              </span>
+            <div className="px-6 py-4 bg-slate-50 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="text-xs">
+                {(() => {
+                  const validCount = parsedGradeRows.filter((r) => (r.status === 'valid' || overwriteMode === 'update') && r.studentId).length;
+                  if (validCount > 0) {
+                    return (
+                      <span className="font-bold text-emerald-700 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        {validCount} nilai murid siap diunggah & disimpan ke database cloud
+                      </span>
+                    );
+                  }
+                  if (parsedGradeRows.length > 0) {
+                    return (
+                      <span className="text-amber-700 font-semibold flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-600" />
+                        Semua murid sudah memiliki data nilai.{' '}
+                        <button
+                          type="button"
+                          onClick={() => handleOverwriteModeChange('update')}
+                          className="underline font-bold text-indigo-700 hover:text-indigo-900 cursor-pointer"
+                        >
+                          Klik di sini untuk mengaktifkan mode update
+                        </button>
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="text-slate-500">
+                      Pilih atau seret berkas Excel untuk memverifikasi nilai murid.
+                    </span>
+                  );
+                })()}
+              </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 <button
                   type="button"
-                  onClick={() => setIsImportOpen(false)}
-                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl"
+                  onClick={() => {
+                    setIsImportOpen(false);
+                    setParsedGradeRows([]);
+                    setImportFileName('');
+                    setRawGradeData(null);
+                  }}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
                 >
                   Batal
                 </button>
-                <button
-                  type="button"
-                  disabled={parsedGradeRows.filter((r) => r.status === 'valid').length === 0}
-                  onClick={handleCommitGradeImport}
-                  className={`px-5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                    parsedGradeRows.filter((r) => r.status === 'valid').length > 0
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm'
-                      : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                  }`}
-                >
-                  <Check className="w-4 h-4" />
-                  Terapkan Nilai ke Cloud
-                </button>
+                {(() => {
+                  const validCount = parsedGradeRows.filter((r) => (r.status === 'valid' || overwriteMode === 'update') && r.studentId).length;
+                  const canSubmit = validCount > 0 && !isUploadingToCloud;
+
+                  return (
+                    <button
+                      type="button"
+                      disabled={!canSubmit}
+                      onClick={handleCommitGradeImport}
+                      className={`px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm ${
+                        canSubmit
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-emerald-600/30 active:scale-95'
+                          : 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60'
+                      }`}
+                      title={canSubmit ? `Upload ${validCount} nilai murid ke cloud Supabase` : 'Pilih berkas Excel dengan data nilai murid terlebih dahulu'}
+                    >
+                      {isUploadingToCloud ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Mengunggah ke Cloud...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Cloud className="w-4 h-4" />
+                          <span>Upload Nilai ke Cloud {validCount > 0 ? `(${validCount} Murid)` : ''}</span>
+                        </>
+                      )}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>
