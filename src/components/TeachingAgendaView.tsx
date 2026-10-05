@@ -34,6 +34,7 @@ import {
 import { TeachingAgenda, ClassRoom, TeacherProfile, Student, AttendanceSession } from '../types';
 import { exportAgendasToExcel, exportToWordDocument, exportAgendaToPDF } from '../utils/exportUtils';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
+import { OfficialLetterhead } from './OfficialLetterhead';
 import { SearchableClassSelect } from './SearchableClassSelect';
 import { UiStatePersistence } from '../utils/storageCache';
 import { getStudents, getAttendanceSessions } from '../services/data';
@@ -1755,65 +1756,23 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
             {/* A4 Paper Simulation Canvas */}
             <div className="p-4 sm:p-8 overflow-y-auto bg-slate-100 dark:bg-slate-950 flex-1">
               <div className="bg-white mx-auto p-6 sm:p-10 shadow-lg rounded-xl border border-slate-200 text-slate-900 max-w-[210mm] font-serif leading-relaxed text-xs">
-                {/* Kop Surat Resmi Dokumen Siap Cetak (Sesuai Format SMK Muhammadiyah Bawang) */}
-                <div className="pb-1 mb-4">
-                  <div className="flex items-center justify-between gap-3 sm:gap-4 pb-2">
-                    {/* Logo SMK Muhiba (Dari Header) */}
-                    <div className="w-20 sm:w-24 shrink-0 flex items-center justify-center">
-                      <img
-                        src={SCHOOL_CONFIG.logoUrl}
-                        alt="Logo SMK Muhammadiyah Bawang"
-                        className="w-16 h-16 sm:w-20 sm:h-20 object-contain"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
-                        }}
-                      />
-                    </div>
-
-                    {/* Teks Kop Surat */}
-                    <div className="flex-1 text-center font-serif text-slate-900">
-                      <h3 className="font-bold text-xs sm:text-sm tracking-wide uppercase leading-tight">
-                        MAJLIS PENDIDIKAN DASAR DAN MENENGAH
-                      </h3>
-                      <h4 className="font-bold text-xs sm:text-sm tracking-wide uppercase leading-tight mt-0.5">
-                        DAERAH MUHAMMADIYAH BATANG
-                      </h4>
-                      <h1 className="text-base sm:text-xl md:text-2xl font-black tracking-wide uppercase my-1 leading-tight text-slate-950">
-                        SMK MUHAMMADIYAH BAWANG
-                      </h1>
-                      <p className="font-black text-[11px] sm:text-xs tracking-[0.25em] sm:tracking-[0.3em] uppercase leading-tight my-1">
-                        T E R A K R E D I T A S I &ldquo;A&rdquo;
-                      </p>
-                      <p className="text-[10px] sm:text-[11px] leading-tight text-slate-800">
-                        Jl. Bawang-Sukorejo Km 01 Ds. Jlamprang Kec. Bawang Kab. Batang.
-                      </p>
-                      <p className="text-[10px] sm:text-[11px] leading-tight text-slate-800 mt-0.5">
-                        Email : <span className="underline text-blue-800">smkmuhbawang@gmail.com</span> Website : <span className="underline text-blue-800">www.smkmuhiba.sch.id</span>
-                      </p>
-                      <p className="text-[10px] sm:text-[11px] leading-tight text-slate-800 mt-0.5">
-                        Kode Pos. 51274 Telp. (0285) 4486909 Fax. (0285) 4486899
-                      </p>
-                    </div>
-
-                    {/* Spacer Penyeimbang Agar Tengah */}
-                    <div className="w-20 sm:w-24 shrink-0 hidden sm:block"></div>
-                  </div>
-
-                  {/* Garis Ganda Kop Surat Resmi: Garis Tebal Atas + Garis Tipis Bawah */}
-                  <div className="border-b-[3px] border-black"></div>
-                  <div className="border-b border-black mt-[2px]"></div>
-                </div>
+                {/* Kop Surat Resmi Dokumen Siap Cetak */}
+                <OfficialLetterhead namaSekolah={teacher.namaSekolah} />
 
                 {/* Document Title */}
                 <div className="text-center mb-5">
                   <h2 className="text-sm font-bold uppercase tracking-wider underline">
                     BUKU JURNAL / AGENDA MENGAJAR PENDIDIK
                   </h2>
+                  <p className="text-[11px] font-sans font-semibold tracking-wide uppercase text-slate-800 mt-0.5">
+                    TAHUN PELAJARAN {teacher.tahunAjaran || SCHOOL_CONFIG.tahunAjaran} ({teacher.semester || SCHOOL_CONFIG.semester})
+                  </p>
                 </div>
 
                 {/* Pendidik & Rombel Info */}
                 <div className="grid grid-cols-2 gap-4 text-xs mb-5 font-sans bg-slate-50 p-3 rounded-lg border border-slate-200">
                   <div className="space-y-1">
+                    <p><span className="text-slate-500 inline-block w-28">Satuan Pendidikan:</span> <strong>{teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah}</strong></p>
                     <p><span className="text-slate-500 inline-block w-28">Nama Pendidik:</span> <strong>{teacher.namaGuru}</strong></p>
                     <p><span className="text-slate-500 inline-block w-28">NBM / NIP:</span> {teacher.nbm || teacher.nip || '-'}</p>
                     <p><span className="text-slate-500 inline-block w-28">Mata Pelajaran:</span> {filterClassId === 'all' ? teacher.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
@@ -1877,19 +1836,40 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                   </table>
                 </div>
 
-                {/* Tanda Tangan */}
-                <div className="flex justify-end pt-4 font-sans text-xs">
-                  <div className="text-center w-64">
+                {/* Tanda Tangan Resmi Dokumen */}
+                <div className="pt-6 font-sans text-xs">
+                  <div className="flex justify-end mb-4">
                     <p className="text-slate-600">
                       Bawang, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>
-                    <p className="text-slate-600 mt-0.5">Pendidik Pengampu Mata Pelajaran,</p>
-                    <div className="h-16 flex items-end justify-center">
-                      <p className="font-bold underline text-slate-900">{teacher.namaGuru}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-8 text-center">
+                    <div>
+                      <p className="font-semibold text-slate-800">Mengetahui,</p>
+                      <p className="font-semibold text-slate-800">Kepala {teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah}</p>
+                      <div className="h-16 flex items-end justify-center">
+                        <p className="font-bold underline text-slate-900">
+                          {teacher.namaKepalaSekolah ? teacher.namaKepalaSekolah : '( .................................................... )'}
+                        </p>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                        {teacher.nipKepalaSekolah
+                          ? `NIP. ${teacher.nipKepalaSekolah}`
+                          : teacher.nbmKepalaSekolah
+                          ? `NBM. ${teacher.nbmKepalaSekolah}`
+                          : 'NBM / NIP. ........................................'}
+                      </p>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                      NBM / NIP: {teacher.nbm || teacher.nip || '-'}
-                    </p>
+                    <div>
+                      <p className="font-semibold text-slate-800">Pendidik Pengampu Mata Pelajaran,</p>
+                      <p className="text-slate-600">{filterClassId === 'all' ? teacher.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
+                      <div className="h-16 flex items-end justify-center">
+                        <p className="font-bold underline text-slate-900">{teacher.namaGuru}</p>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                        NBM / NIP: {teacher.nbm || teacher.nip || '-'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

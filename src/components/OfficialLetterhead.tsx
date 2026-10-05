@@ -3,9 +3,15 @@ import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface OfficialLetterheadProps {
   className?: string;
+  namaSekolah?: string;
 }
 
-export const OfficialLetterhead: React.FC<OfficialLetterheadProps> = ({ className = '' }) => {
+export const OfficialLetterhead: React.FC<OfficialLetterheadProps> = ({
+  className = '',
+  namaSekolah,
+}) => {
+  const displayNamaSekolah = namaSekolah || SCHOOL_CONFIG.namaSekolah;
+
   return (
     <div className={`official-kop-surat pb-1 mb-4 select-none ${className}`}>
       <div className="flex items-center justify-between gap-3 sm:gap-4 pb-2">
@@ -13,7 +19,7 @@ export const OfficialLetterhead: React.FC<OfficialLetterheadProps> = ({ classNam
         <div className="w-20 sm:w-24 shrink-0 flex items-center justify-center">
           <img
             src={SCHOOL_CONFIG.logoUrl}
-            alt="Logo SMK Muhammadiyah Bawang"
+            alt={`Logo ${displayNamaSekolah}`}
             className="w-16 h-16 sm:w-20 sm:h-20 object-contain print:w-20 print:h-20"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
@@ -30,7 +36,7 @@ export const OfficialLetterhead: React.FC<OfficialLetterheadProps> = ({ classNam
             {SCHOOL_CONFIG.daerah}
           </h4>
           <h1 className="text-base sm:text-xl md:text-2xl font-black tracking-wide uppercase my-1 leading-tight text-slate-950 print:text-black">
-            {SCHOOL_CONFIG.namaSekolah}
+            {displayNamaSekolah}
           </h1>
           <p className="font-black text-[11px] sm:text-xs tracking-[0.25em] sm:tracking-[0.3em] uppercase leading-tight my-1 text-slate-900 print:text-black">
             T E R A K R E D I T A S I &ldquo;A&rdquo;

@@ -51,6 +51,9 @@ export async function getTeacherProfile(force = false): Promise<TeacherProfile |
     nip: data.nip || '',
     nbm: data.nbm || '',
     namaSekolah: data.nama_sekolah || SCHOOL_CONFIG.namaSekolah,
+    namaKepalaSekolah: data.nama_kepala_sekolah || user.user_metadata?.nama_kepala_sekolah || '',
+    nipKepalaSekolah: data.nip_kepala_sekolah || user.user_metadata?.nip_kepala_sekolah || '',
+    nbmKepalaSekolah: data.nbm_kepala_sekolah || user.user_metadata?.nbm_kepala_sekolah || '',
     mataPelajaranUtama: data.mata_pelajaran_utama || 'Konsentrasi Keahlian TKJ',
     tahunAjaran: data.tahun_ajaran || '2025/2026',
     semester: (data.semester as 'Ganjil' | 'Genap') || 'Genap',
@@ -82,7 +85,28 @@ export async function createOrUpdateTeacherProfile(
     .maybeSingle();
 
   const profileId = profile.id || existing?.id || `teacher_${user.id.slice(0, 8)}`;
-  const payload = {
+  const namaKepala = profile.namaKepalaSekolah ?? existing?.nama_kepala_sekolah ?? user.user_metadata?.nama_kepala_sekolah ?? '';
+  const nipKepala = profile.nipKepalaSekolah ?? existing?.nip_kepala_sekolah ?? user.user_metadata?.nip_kepala_sekolah ?? '';
+  const nbmKepala = profile.nbmKepalaSekolah ?? existing?.nbm_kepala_sekolah ?? user.user_metadata?.nbm_kepala_sekolah ?? '';
+
+  // Synchronize to Auth user metadata in cloud as resilient backup
+  try {
+    await supabase.auth.updateUser({
+      data: {
+        nama_guru: profile.namaGuru ?? existing?.nama_guru ?? user.user_metadata?.nama_guru,
+        nama_sekolah: profile.namaSekolah ?? existing?.nama_sekolah ?? SCHOOL_CONFIG.namaSekolah,
+        nama_kepala_sekolah: namaKepala,
+        nip_kepala_sekolah: nipKepala,
+        nbm_kepala_sekolah: nbmKepala,
+        tahun_ajaran: profile.tahunAjaran ?? existing?.tahun_ajaran ?? '2025/2026',
+        semester: profile.semester ?? existing?.semester ?? 'Genap',
+      },
+    });
+  } catch (authErr) {
+    console.warn('Auth user_metadata sync notice:', authErr);
+  }
+
+  const payload: Record<string, any> = {
     id: profileId,
     user_id: user.id,
     nama_guru:
@@ -93,6 +117,9 @@ export async function createOrUpdateTeacherProfile(
     nip: profile.nip ?? existing?.nip ?? '',
     nbm: profile.nbm ?? existing?.nbm ?? '',
     nama_sekolah: profile.namaSekolah ?? existing?.nama_sekolah ?? SCHOOL_CONFIG.namaSekolah,
+    nama_kepala_sekolah: namaKepala,
+    nip_kepala_sekolah: nipKepala,
+    nbm_kepala_sekolah: nbmKepala,
     mata_pelajaran_utama:
       profile.mataPelajaranUtama ?? existing?.mata_pelajaran_utama ?? 'Konsentrasi Keahlian TKJ',
     tahun_ajaran: profile.tahunAjaran ?? existing?.tahun_ajaran ?? '2025/2026',
@@ -104,15 +131,38 @@ export async function createOrUpdateTeacherProfile(
     updated_at: new Date().toISOString(),
   };
 
-  const { data, error } = await supabase
+  let data: any = null;
+  const { data: upsertData, error } = await supabase
     .from('teacher_profiles')
     .upsert(payload, { onConflict: 'user_id' })
     .select()
     .single();
 
   if (error) {
-    console.error('Error saving teacher profile:', error);
-    throw error;
+    // If the columns do not exist yet in postgres table, retry without them
+    if (error.message?.includes('nama_kepala_sekolah') || error.code === '42703') {
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.nama_kepala_sekolah;
+      delete fallbackPayload.nip_kepala_sekolah;
+      delete fallbackPayload.nbm_kepala_sekolah;
+
+      const { data: retryData, error: retryError } = await supabase
+        .from('teacher_profiles')
+        .upsert(fallbackPayload, { onConflict: 'user_id' })
+        .select()
+        .single();
+
+      if (retryError) {
+        console.error('Error saving teacher profile retry:', retryError);
+        throw retryError;
+      }
+      data = retryData;
+    } else {
+      console.error('Error saving teacher profile:', error);
+      throw error;
+    }
+  } else {
+    data = upsertData;
   }
 
   const result: TeacherProfile = {
@@ -120,7 +170,10 @@ export async function createOrUpdateTeacherProfile(
     namaGuru: data.nama_guru,
     nip: data.nip || '',
     nbm: data.nbm || '',
-    namaSekolah: data.nama_sekolah,
+    namaSekolah: data.nama_sekolah || SCHOOL_CONFIG.namaSekolah,
+    namaKepalaSekolah: data.nama_kepala_sekolah || namaKepala || '',
+    nipKepalaSekolah: data.nip_kepala_sekolah || nipKepala || '',
+    nbmKepalaSekolah: data.nbm_kepala_sekolah || nbmKepala || '',
     mataPelajaranUtama: data.mata_pelajaran_utama,
     tahunAjaran: data.tahun_ajaran,
     semester: data.semester as 'Ganjil' | 'Genap',

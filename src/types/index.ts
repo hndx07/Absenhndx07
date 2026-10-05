@@ -77,6 +77,9 @@ export interface TeacherProfile {
   nip?: string;
   nbm?: string;
   namaSekolah: string;
+  namaKepalaSekolah?: string;
+  nipKepalaSekolah?: string;
+  nbmKepalaSekolah?: string;
   mataPelajaranUtama: string;
   tahunAjaran: string;
   semester: string;

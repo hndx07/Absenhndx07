@@ -238,13 +238,13 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
     <div className="space-y-6">
       {/* Print-Only Official Letterhead & Document Header (A4 Ready) */}
       <div className="hidden print:block mb-4 text-black font-serif">
-        <OfficialLetterhead />
+        <OfficialLetterhead namaSekolah={teacher.namaSekolah} />
         <div className="text-center my-3">
           <h2 className="text-sm font-bold uppercase tracking-wider underline">
             REKAPITULASI PRESENSI / KEHADIRAN PESERTA DIDIK BULANAN
           </h2>
           <p className="text-[11px] font-sans mt-0.5 font-medium text-slate-700">
-            Tahun Pelajaran {SCHOOL_CONFIG.tahunAjaran} &bull; Semester {SCHOOL_CONFIG.semester}
+            Tahun Pelajaran {teacher.tahunAjaran || SCHOOL_CONFIG.tahunAjaran} &bull; Semester {teacher.semester || SCHOOL_CONFIG.semester}
           </p>
         </div>
 
@@ -252,7 +252,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
         <div className="border border-black p-2.5 mb-3 text-[11px] font-sans">
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
             <div className="space-y-0.5">
-              <p><span className="inline-block w-28 text-slate-700">Satuan Pendidikan:</span> <strong>{SCHOOL_CONFIG.namaSekolah}</strong></p>
+              <p><span className="inline-block w-28 text-slate-700">Satuan Pendidikan:</span> <strong>{teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah}</strong></p>
               <p><span className="inline-block w-28 text-slate-700">Kelas / Rombel:</span> <strong>{classLabel}</strong></p>
               <p><span className="inline-block w-28 text-slate-700">Bulan / Periode:</span> <strong>{monthLabel} {selectedYear}</strong></p>
             </div>
@@ -643,7 +643,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
           </SmoothHorizontalScroller>
         )}
 
-        {/* Print-Only Formal Signature Block (Tanpa Nama Kepala Sekolah) */}
+        {/* Print-Only Formal Signature Block */}
         <div className="hidden print:block mt-8 font-sans text-xs text-black">
           <div className="flex justify-end mb-4">
             <p>Bawang, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
@@ -651,15 +651,25 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
           <div className="grid grid-cols-2 gap-8 text-center">
             <div>
               <p className="font-semibold">Mengetahui,</p>
-              <p className="font-semibold">Kepala SMK Muhammadiyah Bawang</p>
-              <div className="h-20"></div>
-              <p className="font-bold underline">( .................................................... )</p>
-              <p className="text-[11px] text-slate-600">NBM / NIP. ........................................</p>
+              <p className="font-semibold">Kepala {teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah}</p>
+              <div className="h-20 flex items-end justify-center">
+                <p className="font-bold underline">
+                  {teacher.namaKepalaSekolah ? teacher.namaKepalaSekolah : '( .................................................... )'}
+                </p>
+              </div>
+              <p className="text-[11px] text-slate-600 font-mono mt-0.5">
+                {teacher.nipKepalaSekolah
+                  ? `NIP. ${teacher.nipKepalaSekolah}`
+                  : teacher.nbmKepalaSekolah
+                  ? `NBM. ${teacher.nbmKepalaSekolah}`
+                  : 'NBM / NIP. ........................................'}
+              </p>
             </div>
             <div>
               <p className="font-semibold">Pendidik Pengampu Mata Pelajaran,</p>
-              <div className="h-20"></div>
-              <p className="font-bold underline">{teacher.namaGuru}</p>
+              <div className="h-20 flex items-end justify-center">
+                <p className="font-bold underline">{teacher.namaGuru}</p>
+              </div>
               <p className="text-[11px] text-slate-600 font-mono mt-0.5">
                 NBM / NIP: {teacher.nbm || teacher.nip || '-'}
               </p>

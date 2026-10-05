@@ -179,27 +179,86 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Tahun Ajaran
+                  Tahun Ajaran *
                 </label>
                 <input
                   type="text"
+                  required
                   value={formData.tahunAjaran}
                   onChange={(e) => setFormData({ ...formData, tahunAjaran: e.target.value })}
+                  placeholder="2025/2026"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#009B62]/30 focus:border-[#009B62]"
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Semester
+                  Semester *
                 </label>
                 <select
                   value={formData.semester}
                   onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#009B62]/30 focus:border-[#009B62]"
                 >
-                  <option value="Ganjil">Ganjil</option>
-                  <option value="Genap">Genap</option>
+                  <option value="Ganjil">Semester Ganjil</option>
+                  <option value="Genap">Semester Genap</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Bagian Kepala Sekolah Terintegrasi Dokumen Cetak */}
+            <div className="pt-3 border-t border-slate-200">
+              <div className="mb-2.5">
+                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  Data Kepala Sekolah (Otomatis ke Dokumen Cetak)
+                </span>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Data ini digunakan pada kolom tanda tangan &ldquo;Mengetahui, Kepala Sekolah&rdquo; pada dokumen cetak nilai, presensi, dan agenda.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Nama Kepala Sekolah
+                  </label>
+                  <div className="relative">
+                    <Award className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={formData.namaKepalaSekolah || ''}
+                      onChange={(e) => setFormData({ ...formData, namaKepalaSekolah: e.target.value })}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#009B62]/30 focus:border-[#009B62]"
+                      placeholder="Contoh: Drs. H. Ahmad Sudrajat, M.Pd."
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      NIP Kepala Sekolah (Opsional)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.nipKepalaSekolah || ''}
+                      onChange={(e) => setFormData({ ...formData, nipKepalaSekolah: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#009B62]/30 focus:border-[#009B62]"
+                      placeholder="19700101 199503 1 002"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      NBM Kepala Sekolah (Opsional)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.nbmKepalaSekolah || ''}
+                      onChange={(e) => setFormData({ ...formData, nbmKepalaSekolah: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#009B62]/30 focus:border-[#009B62]"
+                      placeholder="987654"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

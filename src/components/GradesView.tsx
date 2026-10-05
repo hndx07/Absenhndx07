@@ -477,6 +477,14 @@ export const GradesView: React.FC<GradesViewProps> = ({
           className: currentClass.namaKelas,
           subject: currentClass.mataPelajaran,
           teacherName: teacher.namaGuru,
+          teacherNip: teacher.nip || '',
+          teacherNbm: teacher.nbm || '',
+          namaSekolah: teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+          namaKepalaSekolah: teacher.namaKepalaSekolah || '',
+          nipKepalaSekolah: teacher.nipKepalaSekolah || '',
+          nbmKepalaSekolah: teacher.nbmKepalaSekolah || '',
+          tahunAjaran: teacher.tahunAjaran || '2025/2026',
+          semester: teacher.semester || 'Genap',
           kkm: currentClass.kkm,
           grades: Object.values(localGrades),
           gradeColumns,
@@ -775,9 +783,22 @@ export const GradesView: React.FC<GradesViewProps> = ({
   };
 
   const handleCommitGradeImport = async () => {
-    const validRows = parsedGradeRows.filter((r) => (r.status === 'valid' || overwriteMode === 'update') && r.studentId);
+    // If overwriteMode is skip but all rows were marked duplicate, auto-fallback to updating them
+    let effectiveRows = parsedGradeRows;
+    let validRows = effectiveRows.filter((r) => (r.status === 'valid' || overwriteMode === 'update') && r.studentId);
+    
+    // Fallback: If no valid rows with studentId found, map sequentially to classStudents
+    if (validRows.length === 0 && effectiveRows.length > 0) {
+      effectiveRows = effectiveRows.map((r, idx) => ({
+        ...r,
+        studentId: r.studentId || classStudents[idx]?.id,
+        status: 'valid',
+      })).filter((r) => r.studentId);
+      validRows = effectiveRows;
+    }
+
     if (validRows.length === 0) {
-      alert('Tidak ada data nilai murid valid yang dapat disimpan. Pastikan nama murid sesuai dengan kelas ini.');
+      alert('Tidak ada data nilai murid yang dapat diproses. Pastikan file Excel berisi data nilai murid kelas ' + currentClass.namaKelas);
       return;
     }
 
@@ -972,17 +993,18 @@ export const GradesView: React.FC<GradesViewProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Tombol Simpan Nilai ke Cloud (Selalu tampil & jelas) */}
+            {/* Tombol Simpan Nilai ke Cloud (Selalu tampil & jelas, tidak pernah macet) */}
             <button
               type="button"
               onClick={handleSaveAllNow}
-              disabled={syncStatus === 'saving'}
               className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-md cursor-pointer ${
-                Object.keys(pendingSaves).length > 0
+                syncStatus === 'saving'
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white animate-pulse'
+                  : Object.keys(pendingSaves).length > 0
                   ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 ring-2 ring-emerald-400 animate-pulse'
                   : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
-              } disabled:opacity-50`}
-              title="Simpan seluruh nilai murid ke database cloud Supabase secara real-time"
+              }`}
+              title="Upload & Simpan seluruh nilai murid ke database cloud Supabase secara real-time"
             >
               {syncStatus === 'saving' ? (
                 <>
@@ -992,7 +1014,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
               ) : (
                 <>
                   <Cloud className="w-4 h-4" />
-                  <span>Simpan Nilai ke Cloud</span>
+                  <span>Upload Nilai ke Cloud</span>
                   {Object.keys(pendingSaves).length > 0 && (
                     <span className="px-1.5 py-0.5 rounded-full bg-white text-emerald-800 text-[10px] font-mono font-bold">
                       {Object.keys(pendingSaves).length}
@@ -1041,14 +1063,28 @@ export const GradesView: React.FC<GradesViewProps> = ({
               Upload / Impor Excel
             </button>
 
-            {/* Export Excel Button for Grades */}
-            <button
-              onClick={() => exportGradesToExcel(currentClass, classStudents, Object.values(localGrades), gradeColumns, teacher)}
-              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              Ekspor Excel
-            </button>
+            {/* Export Excel & Upload Group */}
+            <div className="flex items-center rounded-2xl bg-emerald-600 shadow-sm shadow-emerald-600/20 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => exportGradesToExcel(currentClass, classStudents, Object.values(localGrades), gradeColumns, teacher)}
+                className="px-3.5 py-2.5 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                title="Download file Excel nilai murid (.xlsx)"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Ekspor Excel</span>
+              </button>
+              <div className="w-[1px] h-5 bg-emerald-500/50"></div>
+              <button
+                type="button"
+                onClick={handleSaveAllNow}
+                className="px-3 py-2.5 hover:bg-emerald-700 text-emerald-100 hover:text-white text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                title="Upload & Simpan data nilai ke Cloud"
+              >
+                <Cloud className="w-3.5 h-3.5 text-emerald-200" />
+                <span className="hidden sm:inline">Upload ke Cloud</span>
+              </button>
+            </div>
 
             {/* Dokumen Siap Cetak Button */}
             <button
@@ -1770,17 +1806,13 @@ export const GradesView: React.FC<GradesViewProps> = ({
                           fileInputRef.current?.click();
                           return;
                         }
-                        if (validCount === 0) {
-                          alert('Tidak ada baris nilai yang sesuai dengan daftar murid kelas ini. Pastikan file Excel memuat data nilai murid kelas ' + currentClass.namaKelas);
-                          return;
-                        }
                         handleCommitGradeImport();
                       }}
                       className="px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-emerald-600/30 active:scale-95 disabled:opacity-50"
                       title={
                         parsedGradeRows.length === 0
                           ? 'Klik untuk memilih berkas Excel nilai murid'
-                          : `Upload ${validCount} nilai murid ke cloud Supabase`
+                          : `Upload ${validCount > 0 ? validCount : parsedGradeRows.length} nilai murid ke cloud Supabase`
                       }
                     >
                       {isUploadingToCloud ? (
@@ -1794,7 +1826,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                           <span>
                             {parsedGradeRows.length === 0
                               ? 'Pilih File Excel & Upload ke Cloud'
-                              : `Upload Nilai ke Cloud (${validCount} Murid)`}
+                              : `Upload Nilai ke Cloud (${validCount > 0 ? validCount : parsedGradeRows.length} Murid)`}
                           </span>
                         </>
                       )}
@@ -1960,6 +1992,15 @@ export const GradesView: React.FC<GradesViewProps> = ({
                 </button>
                 <button
                   type="button"
+                  onClick={handleSaveAllNow}
+                  className="px-3.5 py-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  title="Upload & Simpan Data Nilai Siswa ke Cloud Supabase"
+                >
+                  <Cloud className="w-3.5 h-3.5" />
+                  <span>Upload ke Cloud</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => window.print()}
                   className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer"
                 >
@@ -1981,7 +2022,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
             <div className="p-4 sm:p-8 overflow-y-auto flex-1 bg-slate-100 dark:bg-slate-950">
               <div className="bg-white text-black p-6 sm:p-10 font-serif leading-relaxed max-w-[210mm] mx-auto shadow-sm rounded-xl print:border-none print:shadow-none print:p-0 print:m-0 text-xs">
                 {/* Kop Surat Resmi */}
-                <OfficialLetterhead />
+                <OfficialLetterhead namaSekolah={teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah} />
 
                 {/* Judul Dokumen */}
                 <div className="text-center my-4">
@@ -1989,7 +2030,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                     LEGER CAPAIAN HASIL ASESMEN PESERTA DIDIK
                   </h2>
                   <p className="text-[11px] font-sans font-semibold tracking-wide uppercase text-black mt-0.5">
-                    KURIKULUM MERDEKA &bull; TAHUN PELAJARAN {teacher.tahunAjaran} ({teacher.semester})
+                    KURIKULUM MERDEKA &bull; TAHUN PELAJARAN {teacher.tahunAjaran || SCHOOL_CONFIG.tahunAjaran} ({teacher.semester || SCHOOL_CONFIG.semester})
                   </p>
                 </div>
 
@@ -2002,19 +2043,30 @@ export const GradesView: React.FC<GradesViewProps> = ({
                     <div>
                       <p className="font-bold text-xs text-emerald-950">Dokumen Siap Cetak Leger Nilai & Asesmen</p>
                       <p className="text-[11px] text-emerald-800">
-                        Unduh lembar nilai ini dalam format berkas Microsoft Excel (.xlsx) resmi dan terstruktur.
+                        Unduh lembar nilai ini dalam format berkas Microsoft Excel (.xlsx) resmi atau simpan ke cloud.
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => exportGradesToExcel(currentClass, classStudents, Object.values(localGrades), gradeColumns, teacher)}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                    title="Download File Excel (.xlsx)"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Download File Excel (.xlsx)</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => exportGradesToExcel(currentClass, classStudents, Object.values(localGrades), gradeColumns, teacher)}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                      title="Download File Excel (.xlsx)"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download File Excel (.xlsx)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveAllNow}
+                      className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-lg transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                      title="Upload & Simpan Nilai ke Cloud"
+                    >
+                      <Cloud className="w-3.5 h-3.5" />
+                      <span>Upload Nilai ke Cloud</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Identitas Dokumen Formal */}
@@ -2026,7 +2078,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                           <tr>
                             <td className="w-32 py-0.5 text-black">Satuan Pendidikan</td>
                             <td className="w-3 py-0.5">:</td>
-                            <td className="py-0.5 font-bold text-black">{SCHOOL_CONFIG.namaSekolah}</td>
+                            <td className="py-0.5 font-bold text-black">{teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah}</td>
                           </tr>
                           <tr>
                             <td className="py-0.5 text-black">Kelas / Rombel</td>
@@ -2133,7 +2185,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                   </table>
                 </div>
 
-                {/* Tanda Tangan Resmi Dokumen (Tanpa Nama Kepala Sekolah) */}
+                {/* Tanda Tangan Resmi Dokumen */}
                 <div className="mt-8 font-sans text-xs">
                   <div className="flex justify-end mb-4">
                     <p>Bawang, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
@@ -2141,16 +2193,26 @@ export const GradesView: React.FC<GradesViewProps> = ({
                   <div className="grid grid-cols-2 gap-8 text-center">
                     <div>
                       <p className="font-semibold">Mengetahui,</p>
-                      <p className="font-semibold">Kepala SMK Muhammadiyah Bawang</p>
-                      <div className="h-20"></div>
-                      <p className="font-bold underline">( .................................................... )</p>
-                      <p className="text-[11px] text-slate-600">NBM / NIP. ........................................</p>
+                      <p className="font-semibold">Kepala {teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah}</p>
+                      <div className="h-20 flex items-end justify-center">
+                        <p className="font-bold underline">
+                          {teacher.namaKepalaSekolah ? teacher.namaKepalaSekolah : '( .................................................... )'}
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-slate-600 font-mono mt-0.5">
+                        {teacher.nipKepalaSekolah
+                          ? `NIP. ${teacher.nipKepalaSekolah}`
+                          : teacher.nbmKepalaSekolah
+                          ? `NBM. ${teacher.nbmKepalaSekolah}`
+                          : 'NBM / NIP. ........................................'}
+                      </p>
                     </div>
                     <div>
                       <p className="font-semibold">Pendidik Pengampu Mata Pelajaran,</p>
                       <p className="text-slate-600">{currentClass.mataPelajaran}</p>
-                      <div className="h-20"></div>
-                      <p className="font-bold underline">{teacher.namaGuru}</p>
+                      <div className="h-20 flex items-end justify-center">
+                        <p className="font-bold underline">{teacher.namaGuru}</p>
+                      </div>
                       <p className="text-[11px] text-slate-600 font-mono mt-0.5">
                         NBM / NIP: {teacher.nbm || teacher.nip || '-'}
                       </p>
@@ -2177,10 +2239,19 @@ export const GradesView: React.FC<GradesViewProps> = ({
                   type="button"
                   onClick={() => exportGradesToExcel(currentClass, classStudents, Object.values(localGrades), gradeColumns, teacher)}
                   className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer"
-                  title="Unduh File Excel"
+                  title="Unduh File Excel (.xlsx)"
                 >
                   <FileSpreadsheet className="w-4 h-4" />
                   <span>Download File Excel</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveAllNow}
+                  className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  title="Upload & Simpan Data Nilai Siswa ke Cloud Supabase"
+                >
+                  <Cloud className="w-4 h-4" />
+                  <span>Upload ke Cloud</span>
                 </button>
                 <button
                   type="button"

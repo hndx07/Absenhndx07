@@ -35,7 +35,8 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getSafeSupabaseClient } from '../services/supabase';
-import { getPublicShare } from '../services/data';
+import { getPublicShare, getTeacherProfile } from '../services/data';
+import { TeacherProfile } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { getKurikulumMerdekaAssessment } from '../utils/gradeCalculations';
 import { SmoothScrollToTop } from './SmoothScrollToTop';
@@ -82,6 +83,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   shareId,
 }) => {
   const [data, setData] = useState<any>(null);
+  const [cloudTeacher, setCloudTeacher] = useState<TeacherProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
@@ -96,12 +98,36 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   const effectiveType: 'absen' | 'nilai' | 'tabungan' | 'agenda' =
     data?.shareType || initialType;
 
+  // Integrated profile values with Cloud teacher profile fallback
+  const satuanPendidikan =
+    data?.namaSekolah || data?.school || cloudTeacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah;
+  const guruPengampu =
+    data?.teacherName || data?.teacher || cloudTeacher?.namaGuru || 'Pendidik Pengampu';
+  const nipGuru = data?.teacherNip || cloudTeacher?.nip || '';
+  const nbmGuru = data?.teacherNbm || cloudTeacher?.nbm || '';
+  const tahunAjaran =
+    data?.tahunAjaran || cloudTeacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran;
+  const semester =
+    data?.semester || cloudTeacher?.semester || SCHOOL_CONFIG.semester;
+  const kepalaSekolah =
+    data?.namaKepalaSekolah || cloudTeacher?.namaKepalaSekolah || '';
+  const nipKepala =
+    data?.nipKepalaSekolah || cloudTeacher?.nipKepalaSekolah || '';
+  const nbmKepala =
+    data?.nbmKepalaSekolah || cloudTeacher?.nbmKepalaSekolah || '';
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const sharePayload = await getPublicShare(shareId);
+      const [sharePayload, teacherData] = await Promise.all([
+        getPublicShare(shareId).catch(() => null),
+        getTeacherProfile().catch(() => null),
+      ]);
       if (sharePayload) {
         setData(sharePayload);
+      }
+      if (teacherData) {
+        setCloudTeacher(teacherData);
       }
     } catch (err) {
       console.warn('Could not load public share from supabase', err);
@@ -1978,7 +2004,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                       </button>
                     </div>
 
-                    <OfficialLetterhead />
+                    <OfficialLetterhead namaSekolah={satuanPendidikan} />
 
                     {/* Judul Dokumen */}
                     <div className="text-center my-4">
@@ -1996,6 +2022,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                         <div>
                           <table className="w-full text-left">
                             <tbody>
+                              <tr>
+                                <td className="w-32 py-0.5 text-slate-700">Satuan Pendidikan</td>
+                                <td className="w-3 py-0.5">:</td>
+                                <td className="py-0.5 font-bold text-slate-950">{satuanPendidikan}</td>
+                              </tr>
                               <tr>
                                 <td className="w-32 py-0.5 text-slate-700">Nama Murid</td>
                                 <td className="w-3 py-0.5">:</td>
@@ -2025,12 +2056,12 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                               <tr>
                                 <td className="py-0.5 text-slate-700">Pendidik Pengampu</td>
                                 <td className="py-0.5">:</td>
-                                <td className="py-0.5 font-bold text-slate-950">{data?.teacher || data?.teacherName || 'Pendidik Pengampu'}</td>
+                                <td className="py-0.5 font-bold text-slate-950">{guruPengampu}</td>
                               </tr>
                               <tr>
                                 <td className="py-0.5 text-slate-700">Tahun Pelajaran</td>
                                 <td className="py-0.5">:</td>
-                                <td className="py-0.5">{SCHOOL_CONFIG.tahunAjaran} ({SCHOOL_CONFIG.semester})</td>
+                                <td className="py-0.5">{tahunAjaran} ({semester})</td>
                               </tr>
                             </tbody>
                           </table>
@@ -2432,7 +2463,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         } bg-white text-black border border-slate-300 p-6 sm:p-10 font-serif leading-relaxed max-w-[210mm] mx-auto shadow-sm rounded-xl print:border-none print:shadow-none print:p-0 print:m-0 print:max-w-none text-xs`}
       >
         {/* Kop Surat Resmi Dokumen Siap Cetak (Serupa dengan Agenda Mengajar) */}
-        <OfficialLetterhead />
+        <OfficialLetterhead namaSekolah={satuanPendidikan} />
 
         {/* Judul Dokumen Resmi */}
         <div className="text-center my-4">
@@ -2450,7 +2481,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           <p className="text-[11px] font-sans font-semibold tracking-wide uppercase text-black mt-0.5">
             {effectiveType === 'absen' && absenViewMode === 'latest' && currentSession
               ? `Pertemuan Ke-${currentSession.pertemuanKe} • Tanggal: ${formatIndonesianDate(currentSession.tanggal)}`
-              : `Kurikulum Merdeka • Tahun Pelajaran ${SCHOOL_CONFIG.tahunAjaran} (${SCHOOL_CONFIG.semester})`}
+              : `Kurikulum Merdeka • Tahun Pelajaran ${tahunAjaran} (${semester})`}
           </p>
         </div>
 
@@ -2463,7 +2494,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                   <tr>
                     <td className="w-32 py-0.5 text-black">Satuan Pendidikan</td>
                     <td className="w-3 py-0.5">:</td>
-                    <td className="py-0.5 font-bold text-black">{SCHOOL_CONFIG.namaSekolah}</td>
+                    <td className="py-0.5 font-bold text-black">{satuanPendidikan}</td>
                   </tr>
                   <tr>
                     <td className="py-0.5 text-black">Kelas / Rombel</td>
@@ -2484,12 +2515,12 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                   <tr>
                     <td className="w-32 py-0.5 text-black">Pendidik Pengampu</td>
                     <td className="py-0.5">:</td>
-                    <td className="py-0.5 font-bold text-black">{data?.teacher || data?.teacherName || 'Pendidik Pengampu'}</td>
+                    <td className="py-0.5 font-bold text-black">{guruPengampu}</td>
                   </tr>
                   <tr>
                     <td className="py-0.5 text-black">Tahun Pelajaran</td>
                     <td className="py-0.5">:</td>
-                    <td className="py-0.5 text-black">{SCHOOL_CONFIG.tahunAjaran} ({SCHOOL_CONFIG.semester})</td>
+                    <td className="py-0.5 text-black">{tahunAjaran} ({semester})</td>
                   </tr>
                   {effectiveType === 'absen' && currentSession && (
                     <tr>
@@ -2751,7 +2782,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           </div>
         )}
 
-        {/* Tanda Tangan Resmi Dokumen (Tanpa Nama Kepala Sekolah) */}
+        {/* Tanda Tangan Resmi Dokumen Terintegrasi Profil Guru Cloud */}
         <div className="mt-8 font-sans text-xs">
           <div className="flex justify-end mb-4">
             <p>Bawang, {formatIndonesianDate(new Date().toISOString())}</p>
@@ -2759,17 +2790,29 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           <div className="grid grid-cols-2 gap-8 text-center">
             <div>
               <p className="font-semibold">Mengetahui,</p>
-              <p className="font-semibold">Kepala SMK Muhammadiyah Bawang</p>
-              <div className="h-20"></div>
-              <p className="font-bold underline">( .................................................... )</p>
-              <p className="text-[11px] text-slate-600">NBM / NIP. ........................................</p>
+              <p className="font-semibold">Kepala {satuanPendidikan}</p>
+              <div className="h-20 flex items-end justify-center">
+                <p className="font-bold underline">
+                  {kepalaSekolah ? kepalaSekolah : '( .................................................... )'}
+                </p>
+              </div>
+              <p className="text-[11px] text-slate-600 font-mono mt-0.5">
+                {nipKepala
+                  ? `NIP. ${nipKepala}`
+                  : nbmKepala
+                  ? `NBM. ${nbmKepala}`
+                  : 'NBM / NIP. ........................................'}
+              </p>
             </div>
             <div>
               <p className="font-semibold">Pendidik Pengampu Mata Pelajaran,</p>
               <p className="text-slate-600">{data?.subject || 'Guru Pengampu'}</p>
-              <div className="h-20"></div>
-              <p className="font-bold underline">{data?.teacher || data?.teacherName || 'Pendidik Pengampu'}</p>
-              <p className="text-[11px] text-slate-600">NBM/NIP. -</p>
+              <div className="h-20 flex items-end justify-center">
+                <p className="font-bold underline">{guruPengampu}</p>
+              </div>
+              <p className="text-[11px] text-slate-600 font-mono mt-0.5">
+                {nbmGuru || nipGuru ? `NBM / NIP: ${nbmGuru || nipGuru}` : 'NBM / NIP. -'}
+              </p>
             </div>
           </div>
         </div>
