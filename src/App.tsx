@@ -89,6 +89,7 @@ import { SchoolMapView } from './components/SchoolMapView';
 import { MonthlyAttendanceRecapView } from './components/MonthlyAttendanceRecapView';
 import { SmoothScrollToTop } from './components/SmoothScrollToTop';
 import { ScrollProgressBar } from './components/ScrollProgressBar';
+import { ExcelDownloadToast } from './components/ExcelDownloadToast';
 import { smoothScrollToTop } from './utils/smoothScroll';
 
 type NavTab =
@@ -1333,6 +1334,9 @@ export default function App() {
 
       {/* Floating Animated Smooth Scroll To Top Button with Circular Progress Ring */}
       <SmoothScrollToTop showPercent threshold={200} />
+
+      {/* Toast Notifikasi Terpusat Unduh File Excel */}
+      <ExcelDownloadToast />
     </div>
   );
 }

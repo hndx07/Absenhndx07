@@ -41,6 +41,8 @@ import { getKurikulumMerdekaAssessment } from '../utils/gradeCalculations';
 import { SmoothScrollToTop } from './SmoothScrollToTop';
 import { ScrollProgressBar } from './ScrollProgressBar';
 import { OfficialLetterhead } from './OfficialLetterhead';
+import { saveExcelFileWithNotification } from '../utils/exportUtils';
+import { ExcelDownloadToast } from './ExcelDownloadToast';
 
 interface PublicSharePageProps {
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
@@ -561,7 +563,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     const classNameClean = (data?.className || 'Kelas').replace(/\s+/g, '_');
     const subjectClean = (data?.subject || 'Nilai').replace(/\s+/g, '_');
     const fname = `Leger_Nilai_${classNameClean}_${subjectClean}_${Date.now()}.xlsx`;
-    XLSX.writeFile(wb, fname);
+    saveExcelFileWithNotification(
+      wb,
+      fname,
+      `Leger Nilai - ${data?.className || 'Kelas'} (${data?.subject || 'Nilai'})`
+    );
   };
 
   // Unduh Berkas Excel untuk Rapor Individu Murid
@@ -607,7 +613,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     XLSX.utils.book_append_sheet(wb, ws, 'Rapor Murid');
     const stdNameClean = std.nama.replace(/\s+/g, '_');
     const fname = `Rapor_${stdNameClean}_${Date.now()}.xlsx`;
-    XLSX.writeFile(wb, fname);
+    saveExcelFileWithNotification(wb, fname, `Rapor Murid - ${std.nama}`);
   };
 
   return (
@@ -2793,6 +2799,9 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
 
       {/* Floating Animated Smooth Scroll To Top Button with Circular Progress */}
       <SmoothScrollToTop showPercent threshold={200} />
+
+      {/* Toast Notifikasi Download File Excel Selesai */}
+      <ExcelDownloadToast />
     </div>
   );
 };

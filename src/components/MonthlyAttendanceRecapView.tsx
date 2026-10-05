@@ -21,6 +21,7 @@ import { AttendanceSession, ClassRoom, Student, TeacherProfile, AttendanceStatus
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
 import { OfficialLetterhead } from './OfficialLetterhead';
+import { saveExcelFileWithNotification } from '../utils/exportUtils';
 
 interface MonthlyAttendanceRecapViewProps {
   currentClass: ClassRoom;
@@ -222,9 +223,10 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
     // Re-add json after headers
     XLSX.utils.sheet_add_json(ws, dataRows, { origin: 'A6' });
 
-    XLSX.writeFile(
+    saveExcelFileWithNotification(
       wb,
-      `Rekap_Presensi_${classLabel.replace(/\s+/g, '_')}_${monthLabel}_${selectedYear}.xlsx`
+      `Rekap_Presensi_${classLabel.replace(/\s+/g, '_')}_${monthLabel}_${selectedYear}.xlsx`,
+      `Rekap Presensi - ${classLabel} (${monthLabel} ${selectedYear})`
     );
   };
 

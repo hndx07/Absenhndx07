@@ -14,6 +14,40 @@ import {
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { calculateGradeMetrics } from './gradeCalculations';
 
+export interface ExcelDownloadEventDetail {
+  fileName: string;
+  title: string;
+  timestamp: string;
+}
+
+/**
+ * Notifikasi terpusat untuk memberitahu pendownload saat berkas Excel selesai dibuat dan diunduh.
+ */
+export function notifyExcelDownloaded(fileName: string, title = 'File Excel') {
+  if (typeof window !== 'undefined') {
+    const detail: ExcelDownloadEventDetail = {
+      fileName,
+      title,
+      timestamp: new Date().toLocaleTimeString('id-ID'),
+    };
+    window.dispatchEvent(
+      new CustomEvent('excel-download-completed', { detail })
+    );
+  }
+}
+
+/**
+ * Menyimpan workbook Excel ke perangkat pengguna dan memicu notifikasi unduhan selesai.
+ */
+export function saveExcelFileWithNotification(
+  wb: XLSX.WorkBook,
+  fileName: string,
+  docTitle = 'File Excel'
+) {
+  XLSX.writeFile(wb, fileName);
+  notifyExcelDownloaded(fileName, docTitle);
+}
+
 export function downloadDataBackupJSON(data: any, fileName = 'backup_data_muhiba.json') {
   const jsonStr = JSON.stringify(data, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -51,7 +85,7 @@ export function exportStudentsToExcel(
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Daftar Murid');
   const fname = `Data_Murid_${classRoom ? classRoom.namaKelas.replace(/\s+/g, '_') : 'Semua'}_${Date.now()}.xlsx`;
-  XLSX.writeFile(wb, fname);
+  saveExcelFileWithNotification(wb, fname, `Data Murid - ${classRoom ? classRoom.namaKelas : 'Semua Kelas'}`);
 }
 
 export function downloadStudentTemplateExcel(classRoom?: ClassRoom) {
@@ -86,7 +120,7 @@ export function downloadStudentTemplateExcel(classRoom?: ClassRoom) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Template Murid');
   const className = classRoom?.namaKelas ? classRoom.namaKelas.replace(/\s+/g, '_') : 'Umum';
-  XLSX.writeFile(wb, `Template_Data_Murid_${className}.xlsx`);
+  saveExcelFileWithNotification(wb, `Template_Data_Murid_${className}.xlsx`, `Template Impor Siswa - ${className}`);
 }
 
 export function exportAttendanceToExcel(
@@ -118,7 +152,7 @@ export function exportAttendanceToExcel(
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Presensi Harian');
   const fname = `Presensi_${classRoom.namaKelas.replace(/\s+/g, '_')}_P${session.pertemuanKe}_${session.tanggal}.xlsx`;
-  XLSX.writeFile(wb, fname);
+  saveExcelFileWithNotification(wb, fname, `Presensi Harian P${session.pertemuanKe} - ${classRoom.namaKelas}`);
 }
 
 export function exportAttendanceToPDF(
@@ -250,7 +284,7 @@ export function exportMonthlyRecapToExcel(
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Rekap Bulanan');
   const fname = `Rekap_Presensi_${monthName}_${year}_${Date.now()}.xlsx`;
-  XLSX.writeFile(wb, fname);
+  saveExcelFileWithNotification(wb, fname, `Rekap Presensi ${monthName} ${year}`);
 }
 
 export function exportMonthlyRecapToPDF(
@@ -400,7 +434,7 @@ export function exportGradesToExcel(
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Nilai Kurikulum Merdeka');
   const fname = `Nilai_${classRoom.namaKelas.replace(/\s+/g, '_')}_${Date.now()}.xlsx`;
-  XLSX.writeFile(wb, fname);
+  saveExcelFileWithNotification(wb, fname, `Nilai Murid (Merdeka) - ${classRoom.namaKelas}`);
 }
 
 export function exportGradesToPDF(
@@ -479,7 +513,8 @@ export function downloadGradesTemplateExcel(
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Template Nilai');
-  XLSX.writeFile(wb, `Template_Nilai_${classRoom.namaKelas.replace(/\s+/g, '_')}.xlsx`);
+  const fname = `Template_Nilai_${classRoom.namaKelas.replace(/\s+/g, '_')}.xlsx`;
+  saveExcelFileWithNotification(wb, fname, `Template Nilai - ${classRoom.namaKelas}`);
 }
 
 export function exportAgendasToExcel(
@@ -509,7 +544,7 @@ export function exportAgendasToExcel(
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Agenda Mengajar');
   const fname = `Agenda_Mengajar_${Date.now()}.xlsx`;
-  XLSX.writeFile(wb, fname);
+  saveExcelFileWithNotification(wb, fname, 'Jurnal & Agenda Mengajar Pendidik');
 }
 
 export function exportAgendaToPDF(
@@ -602,5 +637,5 @@ export function exportSavingsToExcel(
   XLSX.utils.book_append_sheet(wb, ws, 'Keuangan');
   const className = classRoom ? classRoom.namaKelas.replace(/\s+/g, '_') : 'Semua';
   const fname = `Keuangan_${className}_${Date.now()}.xlsx`;
-  XLSX.writeFile(wb, fname);
+  saveExcelFileWithNotification(wb, fname, `Buku Tabungan & Kas - ${className}`);
 }

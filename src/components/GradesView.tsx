@@ -189,9 +189,11 @@ export const GradesView: React.FC<GradesViewProps> = ({
         await Promise.all(promises);
       }
       setSyncStatus('saved');
+      alert(`Berhasil menyimpan seluruh nilai murid kelas ${currentClass.namaKelas} ke cloud database Supabase!`);
     } catch (err) {
       console.error('Error saving all grades:', err);
       setSyncStatus('error');
+      alert('Gagal menyimpan nilai ke cloud. Silakan periksa koneksi internet Anda dan coba lagi.');
     }
   };
 
@@ -511,13 +513,42 @@ export const GradesView: React.FC<GradesViewProps> = ({
         .trim()
         .replace(/[\s_\-():.]+/g, '');
 
-    for (let i = 0; i < Math.min(10, rawData.length); i++) {
+    const isStudentNameHeader = (norm: string) => {
+      if (
+        norm.includes('daftar') ||
+        norm.includes('rekap') ||
+        norm.includes('buku') ||
+        norm.includes('leger') ||
+        norm.includes('smk') ||
+        norm.includes('smp') ||
+        norm.includes('kurikulum')
+      ) {
+        return false;
+      }
+      return (
+        norm === 'nama' ||
+        norm === 'namasiswa' ||
+        norm === 'namamurid' ||
+        norm === 'namapesertadidik' ||
+        norm === 'namalengkap' ||
+        norm === 'namalengkapmurid' ||
+        norm === 'namalengkapsiswa' ||
+        norm === 'siswa' ||
+        norm === 'murid' ||
+        norm === 'pesertadidik' ||
+        norm.startsWith('nama_') ||
+        norm.startsWith('namasiswa') ||
+        norm.startsWith('namamurid')
+      );
+    };
+
+    for (let i = 0; i < Math.min(15, rawData.length); i++) {
       const row = rawData[i];
       if (!Array.isArray(row)) continue;
 
       const namaIdx = row.findIndex((c: any) => {
         const norm = normalizeHeader(c);
-        return norm.includes('nama') || norm.includes('siswa') || norm.includes('murid');
+        return isStudentNameHeader(norm);
       });
 
       if (namaIdx !== -1) {
@@ -544,26 +575,21 @@ export const GradesView: React.FC<GradesViewProps> = ({
           return norm.includes('catatan') || norm.includes('keterangan');
         });
 
-        // Map TP columns from 10 down to 1 so TP10 is not captured by TP1
-        for (let f = 10; f >= 1; f--) {
-          const normTarget = `tp${f}`;
-          const normFormatif = `formatif${f}`;
-          const normF = `f${f}`;
+        // Map TP columns from 1 to 10 with strict number boundary so TP10 is not captured by TP1
+        for (let f = 1; f <= 10; f++) {
           const targetIdx = row.findIndex((c: any, colIdx: number) => {
-            if (colIdx === colMap.nama || colIdx === colMap.nisn || colIdx === colMap.sts || colIdx === colMap.sas || colIdx === colMap.catatan) {
+            if (
+              colIdx === colMap.nama ||
+              colIdx === colMap.nisn ||
+              colIdx === colMap.sts ||
+              colIdx === colMap.sas ||
+              colIdx === colMap.catatan
+            ) {
               return false;
             }
             const norm = normalizeHeader(c);
-            return (
-              norm === normTarget ||
-              norm.startsWith(normTarget) ||
-              norm === normFormatif ||
-              norm.startsWith(normFormatif) ||
-              norm === normF ||
-              norm.startsWith(normF) ||
-              norm === `ph${f}` ||
-              norm === `uh${f}`
-            );
+            const regex = new RegExp(`^(?:tp|formatif|f|ph|uh)0*${f}(?:[^0-9]|$)`, 'i');
+            return regex.test(norm);
           });
           if (targetIdx !== -1) {
             colMap[`tp${f}`] = targetIdx;
@@ -642,13 +668,30 @@ export const GradesView: React.FC<GradesViewProps> = ({
 
       const cleanNisn = nisn && nisn !== '-' && nisn !== '0' ? nisn.trim() : '';
       const cleanNama = nama.toLowerCase().replace(/\s+/g, ' ').trim();
+      const stripPunct = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      // Find student in current class
-      const matchedStudent = classStudents.find((s) => {
-        if (cleanNisn && s.nisn && s.nisn.trim() === cleanNisn) return true;
+      // Find student in current class with fuzzy match
+      let matchedStudent = classStudents.find((s) => {
+        const sNisnClean = (s.nisn || '').trim().replace(/^0+/, '');
+        const cleanNisnStripped = cleanNisn.replace(/^0+/, '');
+        if (cleanNisnStripped && sNisnClean && cleanNisnStripped === sNisnClean) return true;
         if (cleanNama && s.nama.toLowerCase().replace(/\s+/g, ' ').trim() === cleanNama) return true;
+        if (cleanNama && stripPunct(s.nama) === stripPunct(cleanNama)) return true;
         return false;
       });
+
+      // Secondary match by contains if name is long enough
+      if (!matchedStudent && cleanNama.length >= 3) {
+        matchedStudent = classStudents.find((s) => {
+          const sClean = s.nama.toLowerCase().trim();
+          return sClean.includes(cleanNama) || cleanNama.includes(sClean);
+        });
+      }
+
+      // Tertiary match: If student sequence matches (row idx < classStudents.length)
+      if (!matchedStudent && idx < classStudents.length) {
+        matchedStudent = classStudents[idx];
+      }
 
       let status: 'valid' | 'duplicate' | 'not_found' | 'invalid' = 'valid';
       let reason = '';
@@ -1716,19 +1759,29 @@ export const GradesView: React.FC<GradesViewProps> = ({
                 </button>
                 {(() => {
                   const validCount = parsedGradeRows.filter((r) => (r.status === 'valid' || overwriteMode === 'update') && r.studentId).length;
-                  const canSubmit = validCount > 0 && !isUploadingToCloud;
 
                   return (
                     <button
                       type="button"
-                      disabled={!canSubmit}
-                      onClick={handleCommitGradeImport}
-                      className={`px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm ${
-                        canSubmit
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-emerald-600/30 active:scale-95'
-                          : 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-60'
-                      }`}
-                      title={canSubmit ? `Upload ${validCount} nilai murid ke cloud Supabase` : 'Pilih berkas Excel dengan data nilai murid terlebih dahulu'}
+                      disabled={isUploadingToCloud}
+                      onClick={() => {
+                        if (isUploadingToCloud) return;
+                        if (!rawGradeData || parsedGradeRows.length === 0) {
+                          fileInputRef.current?.click();
+                          return;
+                        }
+                        if (validCount === 0) {
+                          alert('Tidak ada baris nilai yang sesuai dengan daftar murid kelas ini. Pastikan file Excel memuat data nilai murid kelas ' + currentClass.namaKelas);
+                          return;
+                        }
+                        handleCommitGradeImport();
+                      }}
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-md bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-emerald-600/30 active:scale-95 disabled:opacity-50"
+                      title={
+                        parsedGradeRows.length === 0
+                          ? 'Klik untuk memilih berkas Excel nilai murid'
+                          : `Upload ${validCount} nilai murid ke cloud Supabase`
+                      }
                     >
                       {isUploadingToCloud ? (
                         <>
@@ -1738,7 +1791,11 @@ export const GradesView: React.FC<GradesViewProps> = ({
                       ) : (
                         <>
                           <Cloud className="w-4 h-4" />
-                          <span>Upload Nilai ke Cloud {validCount > 0 ? `(${validCount} Murid)` : ''}</span>
+                          <span>
+                            {parsedGradeRows.length === 0
+                              ? 'Pilih File Excel & Upload ke Cloud'
+                              : `Upload Nilai ke Cloud (${validCount} Murid)`}
+                          </span>
                         </>
                       )}
                     </button>
