@@ -25,6 +25,27 @@ export const ExcelDownloadToast: React.FC = () => {
 
       setToasts((prev) => [...prev.slice(-3), newToast]);
 
+      // Gentle pleasant chime audio notification
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.12, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.35);
+        }
+      } catch {
+        // Safe to ignore audio context errors
+      }
+
       // Auto dismiss after 5 seconds
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== newToast.id));

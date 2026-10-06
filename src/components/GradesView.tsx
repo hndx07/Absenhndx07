@@ -792,7 +792,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
       effectiveRows = effectiveRows.map((r, idx) => ({
         ...r,
         studentId: r.studentId || classStudents[idx]?.id,
-        status: 'valid',
+        status: 'valid' as const,
       })).filter((r) => r.studentId);
       validRows = effectiveRows;
     }
@@ -1032,7 +1032,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
               className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
             >
               <Sliders className="w-4 h-4" />
-              Atur Kolom TP
+              Atur Kolom Formatif
             </button>
 
             {/* Auto Apply Deskripsi Kurikulum Merdeka ke Seluruh Murid */}
@@ -1120,7 +1120,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {num} TP
+                {num} Formatif
               </button>
             ))}
           </div>
@@ -1241,10 +1241,10 @@ export const GradesView: React.FC<GradesViewProps> = ({
                   </div>
                 </th>
                 
-                {/* Formatif TP Columns */}
+                {/* Formatif Columns */}
                 {gradeColumns.slice(0, activeColumnsCount).map((col, idx) => (
                   <th key={col.id} className="py-2 px-1 text-center w-16 border-r border-white/20 font-medium text-[11px] text-white">
-                    <div className="font-bold text-white">TP {idx + 1}</div>
+                    <div className="font-bold text-white">Formatif {idx + 1}</div>
                     <div className="text-[9px] text-emerald-100 truncate max-w-[60px]" title={col.label}>
                       {col.label}
                     </div>
@@ -1846,7 +1846,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <Sliders className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-900 text-base">Atur Label Tujuan Pembelajaran (TP)</h3>
+                <h3 className="font-bold text-slate-900 text-base">Atur Label Asesmen Formatif</h3>
               </div>
               <button
                 onClick={() => setIsColumnEditorOpen(false)}
@@ -1859,7 +1859,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
             <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
               {editingColumns.slice(0, activeColumnsCount).map((col, idx) => (
                 <div key={col.id} className="flex items-center gap-2">
-                  <span className="w-14 font-mono font-bold text-xs text-slate-500">TP {idx + 1}</span>
+                  <span className="w-20 font-mono font-bold text-xs text-slate-500">Formatif {idx + 1}</span>
                   <input
                     type="text"
                     value={col.label}
@@ -1868,7 +1868,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                       updated[idx] = { ...updated[idx], label: e.target.value };
                       setEditingColumns(updated);
                     }}
-                    placeholder={`Nama materi TP ${idx + 1}...`}
+                    placeholder={`Nama materi Formatif ${idx + 1}...`}
                     className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold"
                   />
                 </div>

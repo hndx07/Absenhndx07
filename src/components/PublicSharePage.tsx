@@ -271,9 +271,9 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       return data.gradeColumns;
     }
     return [
-      { key: 'formatif1', label: 'TP 1' },
-      { key: 'formatif2', label: 'TP 2' },
-      { key: 'formatif3', label: 'TP 3' },
+      { key: 'formatif1', label: 'Formatif 1' },
+      { key: 'formatif2', label: 'Formatif 2' },
+      { key: 'formatif3', label: 'Formatif 3' },
     ];
   }, [data?.gradeColumns]);
 
@@ -555,44 +555,54 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     );
   }
 
-  // Unduh Berkas Excel Khusus Nilai (Leger Nilai Lengkap)
+  // Unduh Berkas Excel Khusus Nilai di Link Preview Publik (Hanya Total Formatif, Total Sumatif, Nilai Akhir & Deskripsi Lengkap)
   const handleDownloadGradesExcel = () => {
     if (!computedGrades || computedGrades.length === 0) return;
 
     const rows = computedGrades.map((g: any, idx: number) => {
+      const fVals: number[] = g.fVals || [];
+      const sumFormatif = fVals.length > 0 ? fVals.reduce((a, b) => a + b, 0) : null;
+      const sts = typeof g.sts === 'number' && !isNaN(g.sts) ? g.sts : null;
+      const sas = typeof g.sas === 'number' && !isNaN(g.sas) ? g.sas : null;
+      let sumSumatif: number | null = null;
+      if (sts !== null || sas !== null) {
+        sumSumatif = (sts !== null ? sts : 0) + (sas !== null ? sas : 0);
+      }
+
+      const m = getKurikulumMerdekaAssessment(
+        g.hasAnyScore ? g.finalScore : null,
+        Number(data?.kkm) || 75,
+        data?.subject || 'Mata Pelajaran',
+        g.student.nama
+      );
+      const deskripsiLengkap = g.merdekaDeskripsi || m.deskripsi || '-';
+
       const rowObj: Record<string, any> = {
         No: idx + 1,
         NISN: g.student.nisn || '-',
-        'Nama Lengkap Peserta Didik': g.student.nama,
+        'Nama Peserta Didik': g.student.nama,
         'L/P': g.student.gender || '-',
+        'Jumlah Total Nilai Formatif': sumFormatif !== null ? sumFormatif : '-',
+        'Jumlah Total Nilai Sumatif': sumSumatif !== null ? sumSumatif : '-',
+        'Nilai Akhir (NA)': g.hasAnyScore ? g.finalScore : '-',
+        'Predikat': g.predikat,
+        'Status Ketuntasan': g.isTuntas ? 'TUNTAS' : 'REMEDIAL',
+        'Deskripsi Capaian Pembelajaran': deskripsiLengkap,
       };
-
-      activeGradeColumns.forEach((c: any, i: number) => {
-        const val = g.gradeRecord?.[c.key];
-        rowObj[`TP ${i + 1} (${c.label})`] = typeof val === 'number' && !isNaN(val) ? val : '-';
-      });
-
-      rowObj['Rata Formatif'] = g.avgF !== null ? g.avgF : '-';
-      rowObj['STS (Sumatif Tengah)'] = g.sts !== null ? g.sts : '-';
-      rowObj['SAS (Sumatif Akhir)'] = g.sas !== null ? g.sas : '-';
-      rowObj['Nilai Akhir (NA)'] = g.hasAnyScore ? g.finalScore : '-';
-      rowObj['Predikat'] = g.predikat;
-      rowObj['Status Capaian'] = g.isTuntas ? 'TUNTAS' : 'REMEDIAL';
-      rowObj['Deskripsi Capaian'] = g.merdekaDeskripsiSingkat || g.merdekaDeskripsi || '-';
 
       return rowObj;
     });
 
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Leger Nilai Merdeka');
+    XLSX.utils.book_append_sheet(wb, ws, 'Nilai Rapor Merdeka');
     const classNameClean = (data?.className || 'Kelas').replace(/\s+/g, '_');
     const subjectClean = (data?.subject || 'Nilai').replace(/\s+/g, '_');
-    const fname = `Leger_Nilai_${classNameClean}_${subjectClean}_${Date.now()}.xlsx`;
+    const fname = `Nilai_${classNameClean}_${subjectClean}_${Date.now()}.xlsx`;
     saveExcelFileWithNotification(
       wb,
       fname,
-      `Leger Nilai - ${data?.className || 'Kelas'} (${data?.subject || 'Nilai'})`
+      `Nilai Rapor - ${data?.className || 'Kelas'} (${data?.subject || 'Nilai'})`
     );
   };
 
@@ -600,7 +610,6 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   const handleDownloadSingleStudentExcel = (studentGrade: any) => {
     if (!studentGrade) return;
     const std = studentGrade.student;
-    const g = studentGrade.gradeRecord;
     const m = getKurikulumMerdekaAssessment(
       studentGrade.hasAnyScore ? studentGrade.finalScore : null,
       Number(data?.kkm) || 75,
@@ -608,38 +617,36 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       std.nama
     );
 
+    const fVals: number[] = studentGrade.fVals || [];
+    const sumFormatif = fVals.length > 0 ? fVals.reduce((a, b) => a + b, 0) : null;
+    const sts = typeof studentGrade.sts === 'number' && !isNaN(studentGrade.sts) ? studentGrade.sts : null;
+    const sas = typeof studentGrade.sas === 'number' && !isNaN(studentGrade.sas) ? studentGrade.sas : null;
+    let sumSumatif: number | null = null;
+    if (sts !== null || sas !== null) {
+      sumSumatif = (sts !== null ? sts : 0) + (sas !== null ? sas : 0);
+    }
+
     const rows: Record<string, any>[] = [
+      { 'Komponen Asesmen': 'Satuan Pendidikan', Nilai: satuanPendidikan, Keterangan: '-' },
       { 'Komponen Asesmen': 'Nama Murid', Nilai: std.nama, Keterangan: `NISN: ${std.nisn || '-'}` },
       { 'Komponen Asesmen': 'Kelas / Rombel', Nilai: data?.className || '-', Keterangan: '-' },
       { 'Komponen Asesmen': 'Mata Pelajaran', Nilai: data?.subject || 'Muatan Kejuruan', Keterangan: `KKM: ${data?.kkm || 75}` },
-      { 'Komponen Asesmen': 'Pendidik Pengampu', Nilai: data?.teacher || data?.teacherName || '-', Keterangan: '-' },
-    ];
-
-    activeGradeColumns.forEach((c: any, i: number) => {
-      const val = g?.[c.key];
-      rows.push({
-        'Komponen Asesmen': `Formatif ${i + 1} (${c.label})`,
-        Nilai: typeof val === 'number' && !isNaN(val) ? val : '-',
-        Keterangan: 'Asesmen Formatif TP',
-      });
-    });
-
-    rows.push(
-      { 'Komponen Asesmen': 'Rata-rata Formatif', Nilai: studentGrade.avgF !== null ? studentGrade.avgF : '-', Keterangan: 'Bobot 50%' },
-      { 'Komponen Asesmen': 'Sumatif Tengah Semester (STS)', Nilai: studentGrade.sts !== null ? studentGrade.sts : '-', Keterangan: 'Bobot 25%' },
-      { 'Komponen Asesmen': 'Sumatif Akhir Semester (SAS)', Nilai: studentGrade.sas !== null ? studentGrade.sas : '-', Keterangan: 'Bobot 25%' },
+      { 'Komponen Asesmen': 'Pendidik Pengampu', Nilai: guruPengampu, Keterangan: nbmGuru || nipGuru ? `NIP/NBM: ${nbmGuru || nipGuru}` : '-' },
+      { 'Komponen Asesmen': 'Tahun Pelajaran', Nilai: `${tahunAjaran} (${semester})`, Keterangan: '-' },
+      { 'Komponen Asesmen': 'Jumlah Total Nilai Formatif', Nilai: sumFormatif !== null ? sumFormatif : '-', Keterangan: 'Total Asesmen Formatif' },
+      { 'Komponen Asesmen': 'Jumlah Total Nilai Sumatif', Nilai: sumSumatif !== null ? sumSumatif : '-', Keterangan: 'Total Asesmen Sumatif (STS + SAS)' },
       { 'Komponen Asesmen': 'Nilai Akhir (NA)', Nilai: studentGrade.hasAnyScore ? studentGrade.finalScore : '-', Keterangan: `Skala 0-100 (KKM: ${data?.kkm || 75})` },
       { 'Komponen Asesmen': 'Predikat Capaian', Nilai: studentGrade.predikat, Keterangan: m.predikatLabel },
-      { 'Komponen Asesmen': 'Status Kelulusan', Nilai: studentGrade.isTuntas ? 'TUNTAS' : 'REMEDIAL', Keterangan: '-' },
-      { 'Komponen Asesmen': 'Deskripsi Capaian Kompetensi', Nilai: m.deskripsi, Keterangan: 'Kurikulum Merdeka' }
-    );
+      { 'Komponen Asesmen': 'Status Ketuntasan', Nilai: studentGrade.isTuntas ? 'TUNTAS' : 'REMEDIAL', Keterangan: '-' },
+      { 'Komponen Asesmen': 'Deskripsi Capaian Pembelajaran', Nilai: m.deskripsi, Keterangan: 'Lengkap Raport Kurikulum Merdeka' },
+    ];
 
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Rapor Murid');
+    XLSX.utils.book_append_sheet(wb, ws, 'Rapor Nilai Murid');
     const stdNameClean = std.nama.replace(/\s+/g, '_');
     const fname = `Rapor_${stdNameClean}_${Date.now()}.xlsx`;
-    saveExcelFileWithNotification(wb, fname, `Rapor Murid - ${std.nama}`);
+    saveExcelFileWithNotification(wb, fname, `Rapor Nilai - ${std.nama}`);
   };
 
   return (
@@ -1508,7 +1515,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                         : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
-                    Rincian TP Lengkap
+                    Rincian Formatif Lengkap
                   </button>
                 </div>
 

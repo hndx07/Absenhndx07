@@ -24,6 +24,7 @@ import {
 import QRCode from 'qrcode';
 import { SavingTransaction, Student, ClassRoom, TeacherProfile, PublicShareRecord } from '../types';
 import { createOrUpdatePublicShare } from '../services/data';
+import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface SavingsViewProps {
   currentClass: ClassRoom;
@@ -200,7 +201,38 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
           saldo: studentBalances[s.id] || 0,
         })),
         teacher: teacher.namaGuru,
-        school: teacher.namaSekolah,
+        teacherName: teacher.namaGuru,
+        teacherNip: teacher.nip || '',
+        teacherNbm: teacher.nbm || '',
+        school: teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+        namaSekolah: teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+        namaKepalaSekolah: teacher.namaKepalaSekolah || '',
+        nipKepalaSekolah: teacher.nipKepalaSekolah || '',
+        nbmKepalaSekolah: teacher.nbmKepalaSekolah || '',
+        tahunAjaran: teacher.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
+        semester: teacher.semester || SCHOOL_CONFIG.semester,
+      },
+      payload: {
+        className: currentClass.namaKelas,
+        classCashBalance,
+        totalCashIn,
+        totalCashOut,
+        cashTransactions,
+        students: classStudents.map((s) => ({
+          ...s,
+          saldo: studentBalances[s.id] || 0,
+        })),
+        teacher: teacher.namaGuru,
+        teacherName: teacher.namaGuru,
+        teacherNip: teacher.nip || '',
+        teacherNbm: teacher.nbm || '',
+        school: teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+        namaSekolah: teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+        namaKepalaSekolah: teacher.namaKepalaSekolah || '',
+        nipKepalaSekolah: teacher.nipKepalaSekolah || '',
+        nbmKepalaSekolah: teacher.nbmKepalaSekolah || '',
+        tahunAjaran: teacher.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
+        semester: teacher.semester || SCHOOL_CONFIG.semester,
       },
     };
 

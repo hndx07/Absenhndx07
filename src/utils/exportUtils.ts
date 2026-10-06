@@ -417,7 +417,7 @@ export function exportGradesToExcel(
     for (let i = 0; i < activeColumnsCount; i++) {
       const col = gradeColumns[i];
       const k = (col?.key || `formatif${i + 1}`) as keyof StudentGrade;
-      rowObj[`TP ${i + 1} (${col?.label || ''})`] = g ? (g[k] ?? '-') : '-';
+      rowObj[`Formatif ${i + 1} (${col?.label || ''})`] = g ? (g[k] ?? '-') : '-';
     }
 
     rowObj['STS'] = g?.sumatifTengah ?? '-';
@@ -425,7 +425,7 @@ export function exportGradesToExcel(
     rowObj['Nilai Akhir'] = metrics.hasAnyScore ? metrics.finalScore : '-';
     rowObj['Predikat'] = metrics.predicate;
     rowObj['Status'] = metrics.isPassed ? 'TUNTAS' : 'REMEDIAL';
-    rowObj['Deskripsi Capaian'] = metrics.merdekaDeskripsiSingkat;
+    rowObj['Deskripsi Capaian'] = metrics.merdekaDeskripsi || metrics.merdekaDeskripsiSingkat;
 
     return rowObj;
   });
