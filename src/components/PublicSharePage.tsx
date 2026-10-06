@@ -561,13 +561,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
 
     const rows = computedGrades.map((g: any, idx: number) => {
       const fVals: number[] = g.fVals || [];
-      const sumFormatif = fVals.length > 0 ? fVals.reduce((a, b) => a + b, 0) : null;
+      const avgF = g.avgF !== null ? g.avgF : (fVals.length > 0 ? Math.round(fVals.reduce((a: number, b: number) => a + b, 0) / fVals.length) : null);
       const sts = typeof g.sts === 'number' && !isNaN(g.sts) ? g.sts : null;
       const sas = typeof g.sas === 'number' && !isNaN(g.sas) ? g.sas : null;
-      let sumSumatif: number | null = null;
-      if (sts !== null || sas !== null) {
-        sumSumatif = (sts !== null ? sts : 0) + (sas !== null ? sas : 0);
-      }
+      const sumatifVals = [sts, sas].filter((v): v is number => v !== null);
+      const avgSumatif = sumatifVals.length > 0 ? Math.round(sumatifVals.reduce((a, b) => a + b, 0) / sumatifVals.length) : null;
 
       const m = getKurikulumMerdekaAssessment(
         g.hasAnyScore ? g.finalScore : null,
@@ -577,13 +575,18 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       );
       const deskripsiLengkap = g.merdekaDeskripsi || m.deskripsi || '-';
 
+      // Kolom Total Formatif adalah nilai rata-rata (bukan raw sum ratusan)
+      const totalFormatifVal = avgF !== null ? avgF : (avgSumatif !== null ? avgSumatif : '-');
+      // Kolom Total Sumatif adalah nilai rata-rata semua nilai sumatif
+      const totalSumatifVal = avgSumatif !== null ? avgSumatif : (avgF !== null ? avgF : '-');
+
       const rowObj: Record<string, any> = {
         No: idx + 1,
         NISN: g.student.nisn || '-',
         'Nama Peserta Didik': g.student.nama,
         'L/P': g.student.gender || '-',
-        'Jumlah Total Nilai Formatif': sumFormatif !== null ? sumFormatif : '-',
-        'Jumlah Total Nilai Sumatif': sumSumatif !== null ? sumSumatif : '-',
+        'Total Formatif': totalFormatifVal,
+        'Total Sumatif': totalSumatifVal,
         'Nilai Akhir (NA)': g.hasAnyScore ? g.finalScore : '-',
         'Predikat': g.predikat,
         'Status Ketuntasan': g.isTuntas ? 'TUNTAS' : 'REMEDIAL',
@@ -618,13 +621,14 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     );
 
     const fVals: number[] = studentGrade.fVals || [];
-    const sumFormatif = fVals.length > 0 ? fVals.reduce((a, b) => a + b, 0) : null;
+    const avgF = studentGrade.avgF !== null ? studentGrade.avgF : (fVals.length > 0 ? Math.round(fVals.reduce((a: number, b: number) => a + b, 0) / fVals.length) : null);
     const sts = typeof studentGrade.sts === 'number' && !isNaN(studentGrade.sts) ? studentGrade.sts : null;
     const sas = typeof studentGrade.sas === 'number' && !isNaN(studentGrade.sas) ? studentGrade.sas : null;
-    let sumSumatif: number | null = null;
-    if (sts !== null || sas !== null) {
-      sumSumatif = (sts !== null ? sts : 0) + (sas !== null ? sas : 0);
-    }
+    const sumatifVals = [sts, sas].filter((v): v is number => v !== null);
+    const avgSumatif = sumatifVals.length > 0 ? Math.round(sumatifVals.reduce((a, b) => a + b, 0) / sumatifVals.length) : null;
+
+    const totalFormatifVal = avgF !== null ? avgF : (avgSumatif !== null ? avgSumatif : '-');
+    const totalSumatifVal = avgSumatif !== null ? avgSumatif : (avgF !== null ? avgF : '-');
 
     const rows: Record<string, any>[] = [
       { 'Komponen Asesmen': 'Satuan Pendidikan', Nilai: satuanPendidikan, Keterangan: '-' },
@@ -633,8 +637,8 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       { 'Komponen Asesmen': 'Mata Pelajaran', Nilai: data?.subject || 'Muatan Kejuruan', Keterangan: `KKM: ${data?.kkm || 75}` },
       { 'Komponen Asesmen': 'Pendidik Pengampu', Nilai: guruPengampu, Keterangan: nbmGuru || nipGuru ? `NIP/NBM: ${nbmGuru || nipGuru}` : '-' },
       { 'Komponen Asesmen': 'Tahun Pelajaran', Nilai: `${tahunAjaran} (${semester})`, Keterangan: '-' },
-      { 'Komponen Asesmen': 'Jumlah Total Nilai Formatif', Nilai: sumFormatif !== null ? sumFormatif : '-', Keterangan: 'Total Asesmen Formatif' },
-      { 'Komponen Asesmen': 'Jumlah Total Nilai Sumatif', Nilai: sumSumatif !== null ? sumSumatif : '-', Keterangan: 'Total Asesmen Sumatif (STS + SAS)' },
+      { 'Komponen Asesmen': 'Total Formatif', Nilai: totalFormatifVal, Keterangan: 'Rata-rata Asesmen Formatif' },
+      { 'Komponen Asesmen': 'Total Sumatif', Nilai: totalSumatifVal, Keterangan: 'Rata-rata Asesmen Sumatif (STS + SAS)' },
       { 'Komponen Asesmen': 'Nilai Akhir (NA)', Nilai: studentGrade.hasAnyScore ? studentGrade.finalScore : '-', Keterangan: `Skala 0-100 (KKM: ${data?.kkm || 75})` },
       { 'Komponen Asesmen': 'Predikat Capaian', Nilai: studentGrade.predikat, Keterangan: m.predikatLabel },
       { 'Komponen Asesmen': 'Status Ketuntasan', Nilai: studentGrade.isTuntas ? 'TUNTAS' : 'REMEDIAL', Keterangan: '-' },
