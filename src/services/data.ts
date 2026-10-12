@@ -464,12 +464,58 @@ export async function saveStudent(std: Student): Promise<Student> {
   };
 }
 
+/**
+ * Urutkan dan sesuaikan nomor absen murid berdasarkan abjad nama (A-Z).
+ * Menjamin nomor absen otomatis berurutan dari 1 sampai N tanpa jeda jika ada siswa ditambah atau dihapus.
+ */
+export function resequenceStudentsAlphabetically(students: Student[], classId?: string): Student[] {
+  const targetClassId = classId || students[0]?.classId;
+  if (!targetClassId) return students;
+
+  const classStudents = students.filter((s) => s.classId === targetClassId);
+  const otherStudents = students.filter((s) => s.classId !== targetClassId);
+
+  // Urutkan nama sesuai abjad bahasa Indonesia
+  const sortedClassStudents = [...classStudents].sort((a, b) =>
+    a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' })
+  );
+
+  // Berikan nomor absen berurutan 1 sampai N
+  const resequencedClassStudents = sortedClassStudents.map((std, index) => ({
+    ...std,
+    no: index + 1,
+  }));
+
+  return [...otherStudents, ...resequencedClassStudents];
+}
+
 export async function deleteStudent(studentId: string): Promise<void> {
   const supabase = getSupabaseClient();
+
+  // Ambil class_id murid terlebih dahulu untuk re-sequence absen murid tersisa
+  const { data: stdData } = await supabase
+    .from('students')
+    .select('class_id')
+    .eq('id', studentId)
+    .maybeSingle();
+
+  const classId = stdData?.class_id;
+
   const { error } = await supabase.from('students').delete().eq('id', studentId);
   if (error) {
     console.error('Error deleting student:', error);
     throw error;
+  }
+
+  // Jika class_id ditemukan, otomatis urutkan kembali nomor absen siswa yang tersisa sesuai abjad
+  if (classId) {
+    try {
+      const remaining = await getStudents(classId);
+      const resequenced = resequenceStudentsAlphabetically(remaining, classId);
+      await batchInsertStudents(resequenced);
+    } catch (err) {
+      console.warn('Notice: Gagal otomatis menyinkronkan nomor absen baru ke cloud:', err);
+    }
   }
 }
 

@@ -54,25 +54,30 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
   teacher,
 }) => {
   const currentDate = new Date();
-  const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth()); // 0-11, or -1 for All
+  const currentMonthIdx = currentDate.getMonth();
+  const [startMonth, setStartMonth] = useState<number>(currentMonthIdx); // 0-11
+  const [endMonth, setEndMonth] = useState<number>(currentMonthIdx); // 0-11
   const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
   const [selectedClassId, setSelectedClassId] = useState<string>(currentClass.id || 'all');
   const [studentSearch, setStudentSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
 
-  // Filter sessions by month and year
+  // Filter sessions by month range (startMonth s.d. endMonth) and year
   const filteredSessions = useMemo(() => {
+    const minM = Math.min(startMonth, endMonth);
+    const maxM = Math.max(startMonth, endMonth);
     return sessions.filter((s) => {
       if (selectedClassId !== 'all' && s.classId !== selectedClassId) return false;
       if (!s.tanggal) return false;
       const d = new Date(s.tanggal);
       if (isNaN(d.getTime())) return false;
       if (d.getFullYear() !== selectedYear) return false;
-      if (selectedMonth !== -1 && d.getMonth() !== selectedMonth) return false;
+      const m = d.getMonth();
+      if (m < minM || m > maxM) return false;
       return true;
     });
-  }, [sessions, selectedClassId, selectedYear, selectedMonth]);
+  }, [sessions, selectedClassId, selectedYear, startMonth, endMonth]);
 
   // Students to display
   const targetStudents = useMemo(() => {
@@ -182,7 +187,14 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
     };
   }, [filteredSessions, studentRecap]);
 
-  const monthLabel = selectedMonth === -1 ? 'Seluruh Bulan' : NAMA_BULAN[selectedMonth];
+  const minMonth = Math.min(startMonth, endMonth);
+  const maxMonth = Math.max(startMonth, endMonth);
+  const monthLabel = minMonth === maxMonth
+    ? NAMA_BULAN[minMonth]
+    : `${NAMA_BULAN[minMonth]} s.d. ${NAMA_BULAN[maxMonth]}`;
+  const safeMonthFileLabel = minMonth === maxMonth
+    ? NAMA_BULAN[minMonth]
+    : `${NAMA_BULAN[minMonth]}_sd_${NAMA_BULAN[maxMonth]}`;
   const activeClassObj = classes.find((c) => c.id === selectedClassId);
   const classLabel = selectedClassId === 'all' ? 'Seluruh Rombel' : (activeClassObj?.namaKelas || currentClass.namaKelas);
 
@@ -225,7 +237,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
 
     saveExcelFileWithNotification(
       wb,
-      `Rekap_Presensi_${classLabel.replace(/\s+/g, '_')}_${monthLabel}_${selectedYear}.xlsx`,
+      `Rekap_Presensi_${classLabel.replace(/\s+/g, '_')}_${safeMonthFileLabel}_${selectedYear}.xlsx`,
       `Rekap Presensi - ${classLabel} (${monthLabel} ${selectedYear})`
     );
   };
@@ -305,23 +317,111 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
 
       {/* Filter Toolbar */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4 no-print">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-          <Filter className="w-3.5 h-3.5 text-indigo-600" />
-          Filter Rekapitulasi Presensi
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+            <Filter className="w-3.5 h-3.5 text-indigo-600" />
+            Filter Rekapitulasi Presensi
+          </div>
+
+          {/* Preset Cepat Periode Rekapitulasi */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-[11px] font-bold text-slate-400 mr-0.5">Preset:</span>
+            <button
+              type="button"
+              onClick={() => {
+                setStartMonth(currentMonthIdx);
+                setEndMonth(currentMonthIdx);
+              }}
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer ${
+                startMonth === currentMonthIdx && endMonth === currentMonthIdx
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              Bulan Ini
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStartMonth(6);
+                setEndMonth(11);
+              }}
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer ${
+                startMonth === 6 && endMonth === 11
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              Semester Gasal (Jul - Des)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStartMonth(0);
+                setEndMonth(5);
+              }}
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer ${
+                startMonth === 0 && endMonth === 5
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              Semester Genap (Jan - Jun)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStartMonth(0);
+                setEndMonth(11);
+              }}
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer ${
+                startMonth === 0 && endMonth === 11
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              1 Tahun Penuh
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-          {/* Bulan */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
+          {/* Bulan Mulai */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              Bulan
+              Bulan Mulai
             </label>
             <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              value={startMonth}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setStartMonth(val);
+                if (val > endMonth) setEndMonth(val);
+              }}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value={-1}>Seluruh Bulan</option>
+              {NAMA_BULAN.map((bln, idx) => (
+                <option key={bln} value={idx}>
+                  {bln}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Bulan Akhir */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+              Bulan Akhir
+            </label>
+            <select
+              value={endMonth}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setEndMonth(val);
+                if (val < startMonth) setStartMonth(val);
+              }}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
               {NAMA_BULAN.map((bln, idx) => (
                 <option key={bln} value={idx}>
                   {bln}
@@ -445,7 +545,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
       </div>
 
       {/* KPI Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 no-print">
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Sesi</span>
           <p className="text-xl font-black text-slate-900 dark:text-white font-mono mt-0.5">{summaryStats.totalSesi}</p>
@@ -490,8 +590,8 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
       </div>
 
       {/* Recap Table */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="p-4 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white flex items-center justify-between">
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden print:border-none print:shadow-none print:rounded-none">
+        <div className="p-4 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white flex items-center justify-between no-print">
           <div className="flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-emerald-100" />
             <h3 className="font-bold text-white text-sm">

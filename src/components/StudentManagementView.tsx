@@ -833,17 +833,15 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    No. Urut
+                    No. Absen
                   </label>
                   <input
-                    type="number"
-                    min="1"
-                    required
-                    value={editingStudent.no || 1}
-                    onChange={(e) =>
-                      setEditingStudent({ ...editingStudent, no: Number(e.target.value) })
-                    }
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono"
+                    type="text"
+                    readOnly
+                    disabled
+                    value={editingStudent.no ? `#${editingStudent.no} (A-Z)` : 'Otomatis'}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-100 text-xs font-mono font-bold text-slate-600 cursor-not-allowed"
+                    title="Nomor absen otomatis ditentukan dan disesuaikan berdasarkan urutan abjad nama murid (A-Z)"
                   />
                 </div>
                 <div className="col-span-2">

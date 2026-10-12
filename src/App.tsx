@@ -44,6 +44,7 @@ import {
   updateStudent,
   deleteStudent,
   batchInsertStudents,
+  resequenceStudentsAlphabetically,
   getAttendanceSessions,
   saveAttendanceSession,
   deleteAttendanceSession,
@@ -540,14 +541,31 @@ export default function App() {
 
   // 2. Students Handlers
   const handleSaveStudent = async (std: Student) => {
+    const targetClassId = std.classId;
     const exists = students.some((s) => s.id === std.id);
+    const updatedList = exists
+      ? students.map((s) => (s.id === std.id ? std : s))
+      : [...students, std];
+
+    // Otomatis urutkan dan sesuaikan nomor absen murid berdasarkan abjad nama (A-Z)
+    const resequencedAll = resequenceStudentsAlphabetically(updatedList, targetClassId);
+    setStudents(resequencedAll);
+
+    const savedTarget = resequencedAll.find((s) => s.id === std.id) || std;
     if (exists) {
-      const updated = await updateStudent(std);
-      setStudents((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+      await updateStudent(savedTarget);
     } else {
-      const created = await createStudent(std);
-      setStudents((prev) => [...prev, created]);
+      await createStudent(savedTarget);
     }
+
+    // Sinkronkan seluruh nomor absen kelas ke database jika urutan bergeser
+    const classOnly = resequencedAll.filter((s) => s.classId === targetClassId);
+    try {
+      await batchInsertStudents(classOnly);
+    } catch (e) {
+      console.warn('Sync resequence student to cloud notice:', e);
+    }
+
     if (activeClassId) {
       SafeCache.invalidate(`class_data_${activeClassId}`);
       SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
@@ -557,8 +575,27 @@ export default function App() {
   };
 
   const handleDeleteStudent = async (stdId: string) => {
+    const deletedStd = students.find((s) => s.id === stdId);
+    const targetClassId = deletedStd?.classId || activeClassId;
+
+    // Otomatis re-sequence nomor absen siswa tersisa sesuai abjad nama (1..N) tanpa jeda
+    const remaining = students.filter((s) => s.id !== stdId);
+    const resequencedAll = resequenceStudentsAlphabetically(remaining, targetClassId);
+    setStudents(resequencedAll);
+
+    // Hapus dari cloud database
     await deleteStudent(stdId);
-    setStudents((prev) => prev.filter((s) => s.id !== stdId));
+
+    // Perbarui urutan absen murid yang tersisa di database cloud
+    const classRemaining = resequencedAll.filter((s) => s.classId === targetClassId);
+    if (classRemaining.length > 0) {
+      try {
+        await batchInsertStudents(classRemaining);
+      } catch (err) {
+        console.warn('Batch resequence after delete notice:', err);
+      }
+    }
+
     if (activeClassId) {
       SafeCache.invalidate(`class_data_${activeClassId}`);
       SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
@@ -569,13 +606,19 @@ export default function App() {
 
   const handleBatchAddStudents = async (newStds: Student[]) => {
     if (!newStds || newStds.length === 0) return;
+    const targetClassId = newStds[0].classId || activeClassId;
 
-    // 1. Immediately update application state so students are instantly visible in the UI
-    setStudents((prev) => {
-      const existingIds = new Set(prev.map((s) => s.id));
-      const filtered = newStds.filter((s) => !existingIds.has(s.id));
-      return [...prev, ...filtered];
-    });
+    const existingOther = students.filter((s) => s.classId !== targetClassId);
+    const existingClass = students.filter((s) => s.classId === targetClassId);
+    const existingIds = new Set(existingClass.map((s) => s.id));
+    const toAdd = newStds.filter((s) => !existingIds.has(s.id));
+
+    // Gabungkan dan susun nomor absen otomatis sesuai abjad nama (A-Z)
+    const combinedClass = [...existingClass, ...toAdd];
+    const resequencedClass = resequenceStudentsAlphabetically(combinedClass, targetClassId)
+      .filter((s) => s.classId === targetClassId);
+
+    setStudents([...existingOther, ...resequencedClass]);
 
     if (activeClassId) {
       SafeCache.invalidate(`class_data_${activeClassId}`);
@@ -584,13 +627,16 @@ export default function App() {
       SafeCache.invalidate(`pub_share_sav_share_${activeClassId}`);
     }
 
-    // 2. Persist to Supabase if configured and online
+    // Persist to Supabase if configured and online
     try {
-      await batchInsertStudents(newStds);
+      await batchInsertStudents(resequencedClass);
       if (activeClassId) {
         const fresh = await getStudents(activeClassId);
         if (fresh && fresh.length > 0) {
-          setStudents(fresh);
+          setStudents((prev) => {
+            const others = prev.filter((p) => p.classId !== activeClassId);
+            return [...others, ...fresh];
+          });
         }
       }
     } catch (err) {

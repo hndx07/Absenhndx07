@@ -1711,8 +1711,8 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
 
       {/* Modal Preview PDF Agenda Mengajar */}
       {isPreviewPdfOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto max-h-[92vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in print:static print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print-modal-active">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto max-h-[92vh] print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:max-h-none print:p-0 print:m-0 print:bg-white">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white border-b border-slate-800 no-print">
               <div className="flex items-center gap-2.5">
@@ -1754,8 +1754,8 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
             </div>
 
             {/* A4 Paper Simulation Canvas */}
-            <div className="p-4 sm:p-8 overflow-y-auto bg-slate-100 dark:bg-slate-950 flex-1">
-              <div className="bg-white mx-auto p-6 sm:p-10 shadow-lg rounded-xl border border-slate-200 text-slate-900 max-w-[210mm] font-serif leading-relaxed text-xs">
+            <div className="p-4 sm:p-8 overflow-y-auto bg-slate-100 dark:bg-slate-950 flex-1 print:bg-white print:p-0 print:m-0 print:overflow-visible">
+              <div className="bg-white mx-auto p-6 sm:p-10 shadow-lg rounded-xl border border-slate-200 text-slate-900 max-w-[210mm] font-serif leading-relaxed text-xs print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0 print:max-w-none print:bg-white">
                 {/* Kop Surat Resmi Dokumen Siap Cetak */}
                 <OfficialLetterhead namaSekolah={teacher.namaSekolah} />
 

@@ -183,6 +183,34 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
     const fullLink = `${baseUrl}?tabungan_share=${shareId}`;
     setShareLink(fullLink);
 
+    // Hitung tanggal terakhir tabungan diinput per siswa
+    const studentLatestDateMap: Record<string, string> = {};
+    classStudents.forEach((std) => {
+      const stdTxs = classTxList
+        .filter((tx) => !tx.isClassCash && tx.studentId === std.id)
+        .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+      if (stdTxs.length > 0) {
+        studentLatestDateMap[std.id] = stdTxs[0].tanggal;
+      }
+    });
+
+    // Format data transaksi lengkap dengan nama murid untuk laporan detail mutasi
+    const detailedTransactions = classTxList.map((tx) => {
+      const std = classStudents.find((s) => s.id === tx.studentId);
+      return {
+        ...tx,
+        namaMurid: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
+        namaSiswa: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
+      };
+    });
+
+    const studentsWithDates = classStudents.map((s) => ({
+      ...s,
+      saldo: studentBalances[s.id] || 0,
+      tanggalInput: studentLatestDateMap[s.id] || '',
+      lastTransactionDate: studentLatestDateMap[s.id] || '',
+    }));
+
     const shareRecord: PublicShareRecord = {
       id: shareId,
       type: 'tabungan',
@@ -196,10 +224,9 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
         totalCashIn,
         totalCashOut,
         cashTransactions,
-        students: classStudents.map((s) => ({
-          ...s,
-          saldo: studentBalances[s.id] || 0,
-        })),
+        transactions: detailedTransactions,
+        allTransactions: detailedTransactions,
+        students: studentsWithDates,
         teacher: teacher.namaGuru,
         teacherName: teacher.namaGuru,
         teacherNip: teacher.nip || '',
@@ -218,10 +245,9 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
         totalCashIn,
         totalCashOut,
         cashTransactions,
-        students: classStudents.map((s) => ({
-          ...s,
-          saldo: studentBalances[s.id] || 0,
-        })),
+        transactions: detailedTransactions,
+        allTransactions: detailedTransactions,
+        students: studentsWithDates,
         teacher: teacher.namaGuru,
         teacherName: teacher.namaGuru,
         teacherNip: teacher.nip || '',
