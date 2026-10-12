@@ -44,7 +44,6 @@ import {
   updateStudent,
   deleteStudent,
   batchInsertStudents,
-  resequenceStudentsAlphabetically,
   getAttendanceSessions,
   saveAttendanceSession,
   deleteAttendanceSession,
@@ -120,24 +119,21 @@ const NAV_ITEMS = [
 function parsePublicShareFromUrl(): {
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
   shareId: string;
-  classParam?: string;
 } | null {
   if (typeof window === 'undefined') return null;
 
   const checkParams = (params: URLSearchParams) => {
-    const classParam = params.get('class') || params.get('kelas') || params.get('class_id') || params.get('classId') || undefined;
-
     if (params.get('nilai_share')) {
-      return { type: 'nilai' as const, shareId: params.get('nilai_share')!, classParam };
+      return { type: 'nilai' as const, shareId: params.get('nilai_share')! };
     }
     if (params.get('absen_share')) {
-      return { type: 'absen' as const, shareId: params.get('absen_share')!, classParam };
+      return { type: 'absen' as const, shareId: params.get('absen_share')! };
     }
     if (params.get('tabungan_share')) {
-      return { type: 'tabungan' as const, shareId: params.get('tabungan_share')!, classParam };
+      return { type: 'tabungan' as const, shareId: params.get('tabungan_share')! };
     }
     if (params.get('agenda_share')) {
-      return { type: 'agenda' as const, shareId: params.get('agenda_share')!, classParam };
+      return { type: 'agenda' as const, shareId: params.get('agenda_share')! };
     }
     // Generic fallback for links like ?share=... or ?share_id=...
     const genericShare = params.get('share') || params.get('share_id');
@@ -146,23 +142,7 @@ function parsePublicShareFromUrl(): {
       if (genericShare.startsWith('att_') || genericShare.includes('absen')) detectedType = 'absen';
       else if (genericShare.startsWith('sav_') || genericShare.includes('tabungan')) detectedType = 'tabungan';
       else if (genericShare.startsWith('age_') || genericShare.includes('agenda')) detectedType = 'agenda';
-      return { type: detectedType, shareId: genericShare, classParam };
-    }
-    // Preview parameter or direct class preview
-    const previewType = params.get('preview') || params.get('mode') || params.get('tipe');
-    if (previewType && ['absen', 'nilai', 'tabungan', 'agenda'].includes(previewType)) {
-      return {
-        type: previewType as 'absen' | 'nilai' | 'tabungan' | 'agenda',
-        shareId: classParam ? `${previewType === 'absen' ? 'att_share_' : previewType === 'nilai' ? 'grade_share_' : 'sav_share_'}${classParam}` : `preview_${previewType}`,
-        classParam,
-      };
-    }
-    if (classParam && (params.get('public') === 'true' || params.has('preview'))) {
-      return {
-        type: 'absen' as const,
-        shareId: `att_share_${classParam}`,
-        classParam,
-      };
+      return { type: detectedType, shareId: genericShare };
     }
     return null;
   };
@@ -186,7 +166,6 @@ export default function App() {
   const [publicShare, setPublicShare] = useState<{
     type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
     shareId: string;
-    classParam?: string;
   } | null>(() => parsePublicShareFromUrl());
 
   // Listen for navigation or URL query updates
@@ -341,15 +320,14 @@ export default function App() {
           getSavingTransactions(currentClassId),
         ]);
 
-        const sequencedStudents = resequenceStudentsAlphabetically(loadedStudents, currentClassId);
-        setStudents(sequencedStudents);
+        setStudents(loadedStudents);
         setAttendance(loadedAttendance);
         setGrades(loadedGrades);
         setGradeColumns(loadedGradeCols);
         setSavings(loadedSavings);
 
         SafeCache.set(`class_data_${currentClassId}`, {
-          students: sequencedStudents,
+          students: loadedStudents,
           attendance: loadedAttendance,
           grades: loadedGrades,
           gradeColumns: loadedGradeCols,
@@ -505,15 +483,14 @@ export default function App() {
         getSavingTransactions(clsId),
       ]);
 
-      const sequencedStudents = resequenceStudentsAlphabetically(loadedStudents, clsId);
-      setStudents(sequencedStudents);
+      setStudents(loadedStudents);
       setAttendance(loadedAttendance);
       setGrades(loadedGrades);
       setGradeColumns(loadedGradeCols);
       setSavings(loadedSavings);
 
       SafeCache.set(`class_data_${clsId}`, {
-        students: sequencedStudents,
+        students: loadedStudents,
         attendance: loadedAttendance,
         grades: loadedGrades,
         gradeColumns: loadedGradeCols,
@@ -563,31 +540,14 @@ export default function App() {
 
   // 2. Students Handlers
   const handleSaveStudent = async (std: Student) => {
-    const targetClassId = std.classId;
     const exists = students.some((s) => s.id === std.id);
-    const updatedList = exists
-      ? students.map((s) => (s.id === std.id ? std : s))
-      : [...students, std];
-
-    // Otomatis urutkan dan sesuaikan nomor absen murid berdasarkan abjad nama (A-Z)
-    const resequencedAll = resequenceStudentsAlphabetically(updatedList, targetClassId);
-    setStudents(resequencedAll);
-
-    const savedTarget = resequencedAll.find((s) => s.id === std.id) || std;
     if (exists) {
-      await updateStudent(savedTarget);
+      const updated = await updateStudent(std);
+      setStudents((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
     } else {
-      await createStudent(savedTarget);
+      const created = await createStudent(std);
+      setStudents((prev) => [...prev, created]);
     }
-
-    // Sinkronkan seluruh nomor absen kelas ke database jika urutan bergeser
-    const classOnly = resequencedAll.filter((s) => s.classId === targetClassId);
-    try {
-      await batchInsertStudents(classOnly);
-    } catch (e) {
-      console.warn('Sync resequence student to cloud notice:', e);
-    }
-
     if (activeClassId) {
       SafeCache.invalidate(`class_data_${activeClassId}`);
       SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
@@ -597,27 +557,8 @@ export default function App() {
   };
 
   const handleDeleteStudent = async (stdId: string) => {
-    const deletedStd = students.find((s) => s.id === stdId);
-    const targetClassId = deletedStd?.classId || activeClassId;
-
-    // Otomatis re-sequence nomor absen siswa tersisa sesuai abjad nama (1..N) tanpa jeda
-    const remaining = students.filter((s) => s.id !== stdId);
-    const resequencedAll = resequenceStudentsAlphabetically(remaining, targetClassId);
-    setStudents(resequencedAll);
-
-    // Hapus dari cloud database
     await deleteStudent(stdId);
-
-    // Perbarui urutan absen murid yang tersisa di database cloud
-    const classRemaining = resequencedAll.filter((s) => s.classId === targetClassId);
-    if (classRemaining.length > 0) {
-      try {
-        await batchInsertStudents(classRemaining);
-      } catch (err) {
-        console.warn('Batch resequence after delete notice:', err);
-      }
-    }
-
+    setStudents((prev) => prev.filter((s) => s.id !== stdId));
     if (activeClassId) {
       SafeCache.invalidate(`class_data_${activeClassId}`);
       SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
@@ -628,19 +569,13 @@ export default function App() {
 
   const handleBatchAddStudents = async (newStds: Student[]) => {
     if (!newStds || newStds.length === 0) return;
-    const targetClassId = newStds[0].classId || activeClassId;
 
-    const existingOther = students.filter((s) => s.classId !== targetClassId);
-    const existingClass = students.filter((s) => s.classId === targetClassId);
-    const existingIds = new Set(existingClass.map((s) => s.id));
-    const toAdd = newStds.filter((s) => !existingIds.has(s.id));
-
-    // Gabungkan dan susun nomor absen otomatis sesuai abjad nama (A-Z)
-    const combinedClass = [...existingClass, ...toAdd];
-    const resequencedClass = resequenceStudentsAlphabetically(combinedClass, targetClassId)
-      .filter((s) => s.classId === targetClassId);
-
-    setStudents([...existingOther, ...resequencedClass]);
+    // 1. Immediately update application state so students are instantly visible in the UI
+    setStudents((prev) => {
+      const existingIds = new Set(prev.map((s) => s.id));
+      const filtered = newStds.filter((s) => !existingIds.has(s.id));
+      return [...prev, ...filtered];
+    });
 
     if (activeClassId) {
       SafeCache.invalidate(`class_data_${activeClassId}`);
@@ -649,16 +584,13 @@ export default function App() {
       SafeCache.invalidate(`pub_share_sav_share_${activeClassId}`);
     }
 
-    // Persist to Supabase if configured and online
+    // 2. Persist to Supabase if configured and online
     try {
-      await batchInsertStudents(resequencedClass);
+      await batchInsertStudents(newStds);
       if (activeClassId) {
         const fresh = await getStudents(activeClassId);
         if (fresh && fresh.length > 0) {
-          setStudents((prev) => {
-            const others = prev.filter((p) => p.classId !== activeClassId);
-            return [...others, ...fresh];
-          });
+          setStudents(fresh);
         }
       }
     } catch (err) {
@@ -748,7 +680,6 @@ export default function App() {
       <PublicSharePage
         type={publicShare.type}
         shareId={publicShare.shareId}
-        classParam={publicShare.classParam}
       />
     );
   }
@@ -789,15 +720,15 @@ export default function App() {
   };
 
   const activeTeacher: TeacherProfile = teacher || {
-    id: session?.user?.id || 'guru_offline_id',
-    namaGuru: session?.user?.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
+    id: session.user.id,
+    namaGuru: session.user.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
     nip: '',
     nbm: '',
     namaSekolah: 'SMK Muhammadiyah Bawang',
     mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
     tahunAjaran: '2025/2026',
     semester: 'Genap',
-    email: session?.user?.email || 'guru@smkmuhbawang.sch.id',
+    email: session.user.email,
     isLoggedIn: true,
   };
 

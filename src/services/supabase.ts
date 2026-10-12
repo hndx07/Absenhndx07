@@ -128,93 +128,40 @@ export async function signUpWithEmailPassword(
   return data;
 }
 
-export function getOfflineSession() {
-  try {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('smk_offline_session');
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    }
-  } catch {}
-  return null;
-}
-
-export function createOfflineSession(email = 'guru@smkmuhbawang.sch.id', namaGuru = 'Guru SMK Muhammadiyah Bawang') {
-  const session = {
-    user: {
-      id: 'guru_offline_id',
-      email: email,
-      user_metadata: {
-        nama_guru: namaGuru,
-      },
-    },
-    expires_at: 9999999999,
-    access_token: 'offline_token',
-  };
-  try {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('smk_offline_session', JSON.stringify(session));
-    }
-  } catch {}
-  return session;
-}
-
-export function clearOfflineSession() {
-  try {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('smk_offline_session');
-    }
-  } catch {}
-}
-
 export async function getAuthSession() {
   const client = getSafeSupabaseClient();
-  if (!client) {
-    return getOfflineSession();
-  }
+  if (!client) return null;
   try {
     const { data, error } = await client.auth.getSession();
-    if (error || !data?.session) {
-      return getOfflineSession();
+    if (error) {
+      console.error('Failed to retrieve Supabase session:', error);
+      return null;
     }
-    return data.session;
+    return data?.session ?? null;
   } catch {
-    return getOfflineSession();
+    return null;
   }
 }
 
 export async function getAuthUser() {
   const client = getSafeSupabaseClient();
-  if (!client) {
-    const offline = getOfflineSession();
-    return offline?.user || null;
+  if (!client) return null;
+  const { data, error } = await client.auth.getUser();
+  if (error) {
+    console.error('Failed to retrieve Supabase user:', error);
+    return null;
   }
-  try {
-    const { data, error } = await client.auth.getUser();
-    if (error || !data?.user) {
-      const offline = getOfflineSession();
-      return offline?.user || null;
-    }
-    return data.user;
-  } catch {
-    const offline = getOfflineSession();
-    return offline?.user || null;
-  }
+  return data.user;
 }
 
 export const getCurrentUser = getAuthUser;
 
 export async function signOutSupabase() {
-  clearOfflineSession();
   const client = getSafeSupabaseClient();
   if (client) {
-    try {
-      await client.auth.signOut();
-    } catch {}
+    await client.auth.signOut();
   }
 }
-
 
 export interface SupabaseHealthStatus {
   ok: boolean;

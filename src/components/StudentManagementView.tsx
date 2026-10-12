@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Users,
   UserPlus,
@@ -27,7 +27,6 @@ import {
 import * as XLSX from 'xlsx';
 import { Student, ClassRoom, TeacherProfile } from '../types';
 import { exportStudentsToExcel, downloadStudentTemplateExcel } from '../utils/exportUtils';
-import { resequenceStudentsAlphabetically } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface StudentManagementViewProps {
@@ -80,10 +79,8 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const classStudents = useMemo(() => {
-    const raw = students.filter((s) => s.classId === currentClass.id);
-    return resequenceStudentsAlphabetically(raw, currentClass.id);
-  }, [students, currentClass.id]);
+  const classStudents = students
+    .filter((s) => s.classId === currentClass.id);
 
   const filtered = classStudents
     .filter(
@@ -836,15 +833,17 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    No. Absen
+                    No. Urut
                   </label>
                   <input
-                    type="text"
-                    readOnly
-                    disabled
-                    value={editingStudent.no ? `#${editingStudent.no} (A-Z)` : 'Otomatis'}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-100 text-xs font-mono font-bold text-slate-600 cursor-not-allowed"
-                    title="Nomor absen otomatis ditentukan dan disesuaikan berdasarkan urutan abjad nama murid (A-Z)"
+                    type="number"
+                    min="1"
+                    required
+                    value={editingStudent.no || 1}
+                    onChange={(e) =>
+                      setEditingStudent({ ...editingStudent, no: Number(e.target.value) })
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono"
                   />
                 </div>
                 <div className="col-span-2">

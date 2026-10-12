@@ -16,7 +16,6 @@ import {
   isSupabaseConfigured,
   getSupabaseUrl,
   isValidHttpUrl,
-  createOfflineSession,
 } from '../services/supabase';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
@@ -29,12 +28,12 @@ const STORAGE_SAVED_EMAIL = 'smk_saved_login_email';
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState(() => {
     try {
-      return localStorage.getItem(STORAGE_SAVED_EMAIL) || 'guru@smkmuhbawang.sch.id';
+      return localStorage.getItem(STORAGE_SAVED_EMAIL) || '';
     } catch {
-      return 'guru@smkmuhbawang.sch.id';
+      return '';
     }
   });
-  const [password, setPassword] = useState('123456');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,6 +55,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       return;
     }
 
+    if (!isConfigured) {
+      const url = getSupabaseUrl();
+      if (!isValidHttpUrl(url)) {
+        setErrorMessage(
+          'URL Supabase belum valid. Harap periksa konfigurasi VITE_SUPABASE_URL (harus berupa URL https://... bukan token rahasia).'
+        );
+      } else {
+        setErrorMessage(
+          'Supabase belum terkonfigurasi dengan benar. Harap periksa VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY.'
+        );
+      }
+      return;
+    }
+
     if (rememberMe) {
       try {
         localStorage.setItem(STORAGE_SAVED_EMAIL, cleanEmail);
@@ -66,13 +79,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       } catch {}
     }
 
-    // Jika Supabase belum dikonfigurasi, langsung gunakan mode lokal offline tanpa error
-    if (!isConfigured) {
-      createOfflineSession(cleanEmail, 'Guru SMK Muhammadiyah Bawang');
-      onLoginSuccess();
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -80,18 +86,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       if (res.session) {
         onLoginSuccess();
       } else {
-        createOfflineSession(cleanEmail, 'Guru SMK Muhammadiyah Bawang');
-        onLoginSuccess();
+        setErrorMessage('Sesi login tidak ditemukan. Silakan coba kembali.');
       }
     } catch (err: any) {
-      console.warn('Supabase Auth error, falling back to local session:', err);
-      const rawMsg = err?.message || '';
+      console.error('Supabase Auth error:', err);
+      const rawMsg = err?.message || 'Gagal masuk ke sistem Supabase.';
       if (rawMsg.includes('Invalid login credentials')) {
-        setErrorMessage('Alamat email atau kata sandi tidak sesuai. Silakan periksa kembali email dan kata sandi Anda.');
+        setErrorMessage('Alamat email atau kata sandi salah. Silakan periksa kembali.');
+      } else if (rawMsg.includes('Email not confirmed')) {
+        setErrorMessage('Email Anda belum dikonfirmasi di Supabase. Silakan periksa email.');
       } else {
-        // Fallback to offline session if cloud connection is unreachable
-        createOfflineSession(cleanEmail, 'Guru SMK Muhammadiyah Bawang');
-        onLoginSuccess();
+        setErrorMessage(rawMsg);
       }
     } finally {
       setIsSubmitting(false);

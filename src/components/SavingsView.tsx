@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { SavingTransaction, Student, ClassRoom, TeacherProfile, PublicShareRecord } from '../types';
-import { createOrUpdatePublicShare, resequenceStudentsAlphabetically } from '../services/data';
+import { createOrUpdatePublicShare } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface SavingsViewProps {
@@ -62,8 +62,9 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
 
   const classStudents = useMemo(() => {
-    const raw = students.filter((s) => s.classId === currentClass.id);
-    return resequenceStudentsAlphabetically(raw, currentClass.id);
+    return students
+      .filter((s) => s.classId === currentClass.id)
+      .sort((a, b) => a.no - b.no);
   }, [students, currentClass.id]);
 
   const sortedAndFilteredClassStudents = useMemo(() => {
@@ -182,34 +183,6 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
     const fullLink = `${baseUrl}?tabungan_share=${shareId}`;
     setShareLink(fullLink);
 
-    // Hitung tanggal terakhir tabungan diinput per siswa
-    const studentLatestDateMap: Record<string, string> = {};
-    classStudents.forEach((std) => {
-      const stdTxs = classTxList
-        .filter((tx) => !tx.isClassCash && tx.studentId === std.id)
-        .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
-      if (stdTxs.length > 0) {
-        studentLatestDateMap[std.id] = stdTxs[0].tanggal;
-      }
-    });
-
-    // Format data transaksi lengkap dengan nama murid untuk laporan detail mutasi
-    const detailedTransactions = classTxList.map((tx) => {
-      const std = classStudents.find((s) => s.id === tx.studentId);
-      return {
-        ...tx,
-        namaMurid: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
-        namaSiswa: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
-      };
-    });
-
-    const studentsWithDates = classStudents.map((s) => ({
-      ...s,
-      saldo: studentBalances[s.id] || 0,
-      tanggalInput: studentLatestDateMap[s.id] || '',
-      lastTransactionDate: studentLatestDateMap[s.id] || '',
-    }));
-
     const shareRecord: PublicShareRecord = {
       id: shareId,
       type: 'tabungan',
@@ -223,9 +196,10 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
         totalCashIn,
         totalCashOut,
         cashTransactions,
-        transactions: detailedTransactions,
-        allTransactions: detailedTransactions,
-        students: studentsWithDates,
+        students: classStudents.map((s) => ({
+          ...s,
+          saldo: studentBalances[s.id] || 0,
+        })),
         teacher: teacher.namaGuru,
         teacherName: teacher.namaGuru,
         teacherNip: teacher.nip || '',
@@ -244,9 +218,10 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
         totalCashIn,
         totalCashOut,
         cashTransactions,
-        transactions: detailedTransactions,
-        allTransactions: detailedTransactions,
-        students: studentsWithDates,
+        students: classStudents.map((s) => ({
+          ...s,
+          saldo: studentBalances[s.id] || 0,
+        })),
         teacher: teacher.namaGuru,
         teacherName: teacher.namaGuru,
         teacherNip: teacher.nip || '',

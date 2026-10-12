@@ -44,7 +44,7 @@ import {
   PublicShareRecord,
 } from '../types';
 import { exportAttendanceToExcel, exportAttendanceToPDF } from '../utils/exportUtils';
-import { createOrUpdatePublicShare, getStudents, getAttendanceSessions, resequenceStudentsAlphabetically } from '../services/data';
+import { createOrUpdatePublicShare, getStudents, getAttendanceSessions } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
 
@@ -65,10 +65,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   onSaveSession,
   onDeleteSession,
 }) => {
-  const classStudents = useMemo(() => {
-    const raw = students.filter((s) => s.classId === currentClass.id);
-    return resequenceStudentsAlphabetically(raw, currentClass.id);
-  }, [students, currentClass.id]);
+  const classStudents = students
+    .filter((s) => s.classId === currentClass.id)
+    .sort((a, b) => a.no - b.no);
 
   const classSessions = sessions
     .filter((s) => s.classId === currentClass.id)
