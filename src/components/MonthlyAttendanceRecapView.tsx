@@ -15,6 +15,7 @@ import {
   ArrowUpDown,
   ArrowUpAZ,
   ArrowDownZA,
+  Sparkles,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AttendanceSession, ClassRoom, Student, TeacherProfile, AttendanceStatus } from '../types';
@@ -63,6 +64,53 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
   const [studentSearch, setStudentSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
+
+  const currentPresetMode = useMemo(() => {
+    const minM = Math.min(startMonth, endMonth);
+    const maxM = Math.max(startMonth, endMonth);
+    if (minM === currentMonthIdx && maxM === currentMonthIdx) return 'this_month';
+    if (minM === 0 && maxM === 2) return 'q1';
+    if (minM === 3 && maxM === 5) return 'q2';
+    if (minM === 6 && maxM === 8) return 'q3';
+    if (minM === 9 && maxM === 11) return 'q4';
+    const last3Start = Math.max(0, currentMonthIdx - 2);
+    if (minM === last3Start && maxM === currentMonthIdx && currentMonthIdx >= 2) return 'last_3_months';
+    if (minM === 6 && maxM === 11) return 'sem_gasal';
+    if (minM === 0 && maxM === 5) return 'sem_genap';
+    if (minM === 0 && maxM === 11) return 'full_year';
+    return 'custom';
+  }, [startMonth, endMonth, currentMonthIdx]);
+
+  const handlePeriodSelect = (mode: string) => {
+    if (mode === 'this_month') {
+      setStartMonth(currentMonthIdx);
+      setEndMonth(currentMonthIdx);
+    } else if (mode === 'q1') {
+      setStartMonth(0);
+      setEndMonth(2);
+    } else if (mode === 'q2') {
+      setStartMonth(3);
+      setEndMonth(5);
+    } else if (mode === 'q3') {
+      setStartMonth(6);
+      setEndMonth(8);
+    } else if (mode === 'q4') {
+      setStartMonth(9);
+      setEndMonth(11);
+    } else if (mode === 'last_3_months') {
+      setStartMonth(Math.max(0, currentMonthIdx - 2));
+      setEndMonth(currentMonthIdx);
+    } else if (mode === 'sem_gasal') {
+      setStartMonth(6);
+      setEndMonth(11);
+    } else if (mode === 'sem_genap') {
+      setStartMonth(0);
+      setEndMonth(5);
+    } else if (mode === 'full_year') {
+      setStartMonth(0);
+      setEndMonth(11);
+    }
+  };
 
   // Filter sessions by month range (startMonth s.d. endMonth) and year
   const filteredSessions = useMemo(() => {
@@ -190,12 +238,27 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
 
   const minMonth = Math.min(startMonth, endMonth);
   const maxMonth = Math.max(startMonth, endMonth);
+  const isThreeMonths = maxMonth - minMonth === 2;
+
+  let quarterName = '';
+  if (minMonth === 0 && maxMonth === 2) quarterName = 'Triwulan 1';
+  else if (minMonth === 3 && maxMonth === 5) quarterName = 'Triwulan 2';
+  else if (minMonth === 6 && maxMonth === 8) quarterName = 'Triwulan 3';
+  else if (minMonth === 9 && maxMonth === 11) quarterName = 'Triwulan 4';
+  else if (isThreeMonths) quarterName = 'Rekap 3 Bulan';
+
   const monthLabel = minMonth === maxMonth
     ? NAMA_BULAN[minMonth]
+    : isThreeMonths
+    ? `${quarterName ? quarterName + ' (' : 'Rekap 3 Bulan ('}${NAMA_BULAN[minMonth]} - ${NAMA_BULAN[maxMonth]})`
     : `${NAMA_BULAN[minMonth]} s.d. ${NAMA_BULAN[maxMonth]}`;
+
   const safeMonthFileLabel = minMonth === maxMonth
     ? NAMA_BULAN[minMonth]
+    : isThreeMonths
+    ? `3_Bulan_${quarterName.replace(/\s+/g, '_')}_${NAMA_BULAN[minMonth]}_sd_${NAMA_BULAN[maxMonth]}`
     : `${NAMA_BULAN[minMonth]}_sd_${NAMA_BULAN[maxMonth]}`;
+
   const activeClassObj = classes.find((c) => c.id === selectedClassId);
   const classLabel = selectedClassId === 'all' ? 'Seluruh Rombel' : (activeClassObj?.namaKelas || currentClass.namaKelas);
 
@@ -220,11 +283,15 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Rekap Absensi');
 
-    // Add info header metadata
+    // Add info header metadata with explicit 3-month recap title if active
+    const reportTitle = isThreeMonths
+      ? `REKAPITULASI PRESENSI MURID 3 BULAN SEKALI (${quarterName ? quarterName.toUpperCase() : 'TRIWULAN'}) - ${SCHOOL_CONFIG.namaSekolah.toUpperCase()}`
+      : `REKAPITULASI PRESENSI MURID - ${SCHOOL_CONFIG.namaSekolah.toUpperCase()}`;
+
     XLSX.utils.sheet_add_aoa(
       ws,
       [
-        [`REKAPITULASI PRESENSI MURID - ${SCHOOL_CONFIG.namaSekolah.toUpperCase()}`],
+        [reportTitle],
         [`Periode: ${monthLabel} ${selectedYear} | Rombel: ${classLabel}`],
         [`Pendidik Pengampu: ${teacher.namaGuru} (NBM/NIP: ${teacher.nbm || teacher.nip || '-'})`],
         [`Website: ${SCHOOL_CONFIG.website} | Alamat: ${SCHOOL_CONFIG.alamat}`],
@@ -236,10 +303,11 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
     // Re-add json after headers
     XLSX.utils.sheet_add_json(ws, dataRows, { origin: 'A6' });
 
+    const filePrefix = isThreeMonths ? 'Rekap_3_Bulan_Presensi' : 'Rekap_Presensi';
     saveExcelFileWithNotification(
       wb,
-      `Rekap_Presensi_${classLabel.replace(/\s+/g, '_')}_${safeMonthFileLabel}_${selectedYear}.xlsx`,
-      `Rekap Presensi - ${classLabel} (${monthLabel} ${selectedYear})`
+      `${filePrefix}_${classLabel.replace(/\s+/g, '_')}_${safeMonthFileLabel}_${selectedYear}.xlsx`,
+      `${isThreeMonths ? 'Rekap 3 Bulan Presensi' : 'Rekap Presensi'} - ${classLabel} (${monthLabel} ${selectedYear})`
     );
   };
 
@@ -254,7 +322,9 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
         <OfficialLetterhead namaSekolah={teacher.namaSekolah} />
         <div className="text-center my-3">
           <h2 className="text-sm font-bold uppercase tracking-wider underline">
-            REKAPITULASI PRESENSI / KEHADIRAN PESERTA DIDIK BULANAN
+            {isThreeMonths
+              ? `REKAPITULASI PRESENSI / KEHADIRAN PESERTA DIDIK (REKAP 3 BULAN SEKALI / ${quarterName ? quarterName.toUpperCase() : 'TRIWULAN'})`
+              : 'REKAPITULASI PRESENSI / KEHADIRAN PESERTA DIDIK BULANAN'}
           </h2>
           <p className="text-[11px] font-sans mt-0.5 font-medium text-slate-700">
             Tahun Pelajaran {teacher.tahunAjaran || SCHOOL_CONFIG.tahunAjaran} &bull; Semester {teacher.semester || SCHOOL_CONFIG.semester}
@@ -281,7 +351,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
       {/* Top Banner */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-full">
               {classLabel}
             </span>
@@ -289,9 +359,15 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
             <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
               Periode {monthLabel} {selectedYear}
             </span>
+            {isThreeMonths && (
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5 shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                Pilihan Rekap 3 Bulan Sekali ({quarterName})
+              </span>
+            )}
           </div>
           <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
-            Rekapitulasi Absensi Bulanan
+            {isThreeMonths ? 'Rekapitulasi Presensi 3 Bulan Sekali (Triwulan)' : 'Rekapitulasi Absensi Bulanan'}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {SCHOOL_CONFIG.namaSekolah} &bull; Website: {SCHOOL_CONFIG.website} &bull; Pendidik: {teacher.namaGuru}
@@ -318,23 +394,94 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
 
       {/* Filter Toolbar */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4 no-print">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-            <Filter className="w-3.5 h-3.5 text-indigo-600" />
-            Filter Rekapitulasi Presensi
+        {/* Preset Cepat Periode Rekapitulasi */}
+        <div className="flex flex-col gap-2.5 border-b border-slate-100 dark:border-slate-800 pb-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              <Filter className="w-3.5 h-3.5 text-indigo-600" />
+              Filter & Periode Rekapitulasi
+            </div>
+            {isThreeMonths && (
+              <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200 flex items-center gap-1.5 self-start sm:self-auto">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                Pilihan Rekap 3 Bulan Sekali Aktif ({quarterName})
+              </span>
+            )}
           </div>
 
-          {/* Preset Cepat Periode Rekapitulasi */}
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="text-[11px] font-bold text-slate-400 mr-0.5">Preset:</span>
+            <span className="text-[11px] font-bold text-amber-800 dark:text-amber-400 mr-1 flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-amber-500" />
+              Pilihan Rekap 3 Bulan:
+            </span>
             <button
               type="button"
-              onClick={() => {
-                setStartMonth(currentMonthIdx);
-                setEndMonth(currentMonthIdx);
-              }}
+              onClick={() => handlePeriodSelect('q1')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                currentPresetMode === 'q1'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80'
+              }`}
+            >
+              <span>Triwulan 1</span>
+              <span className="text-[10px] opacity-80">(Jan - Mar)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePeriodSelect('q2')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                currentPresetMode === 'q2'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80'
+              }`}
+            >
+              <span>Triwulan 2</span>
+              <span className="text-[10px] opacity-80">(Apr - Jun)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePeriodSelect('q3')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                currentPresetMode === 'q3'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80'
+              }`}
+            >
+              <span>Triwulan 3</span>
+              <span className="text-[10px] opacity-80">(Jul - Sep)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePeriodSelect('q4')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                currentPresetMode === 'q4'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80'
+              }`}
+            >
+              <span>Triwulan 4</span>
+              <span className="text-[10px] opacity-80">(Okt - Des)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePeriodSelect('last_3_months')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                currentPresetMode === 'last_3_months'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200/80'
+              }`}
+            >
+              <span>3 Bulan Terakhir</span>
+            </button>
+
+            <span className="text-slate-300 dark:text-slate-700 mx-1">|</span>
+
+            <span className="text-[11px] font-bold text-slate-400 mr-0.5">Lainnya:</span>
+            <button
+              type="button"
+              onClick={() => handlePeriodSelect('this_month')}
               className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer ${
-                startMonth === currentMonthIdx && endMonth === currentMonthIdx
+                currentPresetMode === 'this_month'
                   ? 'bg-indigo-600 text-white shadow-2xs'
                   : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
@@ -343,50 +490,65 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
             </button>
             <button
               type="button"
-              onClick={() => {
-                setStartMonth(6);
-                setEndMonth(11);
-              }}
+              onClick={() => handlePeriodSelect('sem_gasal')}
               className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer ${
-                startMonth === 6 && endMonth === 11
+                currentPresetMode === 'sem_gasal'
                   ? 'bg-indigo-600 text-white shadow-2xs'
                   : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
-              Semester Gasal (Jul - Des)
+              Gasal (Jul-Des)
             </button>
             <button
               type="button"
-              onClick={() => {
-                setStartMonth(0);
-                setEndMonth(5);
-              }}
+              onClick={() => handlePeriodSelect('sem_genap')}
               className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer ${
-                startMonth === 0 && endMonth === 5
+                currentPresetMode === 'sem_genap'
                   ? 'bg-indigo-600 text-white shadow-2xs'
                   : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
-              Semester Genap (Jan - Jun)
+              Genap (Jan-Jun)
             </button>
             <button
               type="button"
-              onClick={() => {
-                setStartMonth(0);
-                setEndMonth(11);
-              }}
+              onClick={() => handlePeriodSelect('full_year')}
               className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition cursor-pointer ${
-                startMonth === 0 && endMonth === 11
+                currentPresetMode === 'full_year'
                   ? 'bg-indigo-600 text-white shadow-2xs'
                   : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
-              1 Tahun Penuh
+              1 Tahun
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
+          {/* Pilihan Rekap 3 Bulan Sekali (Triwulan) */}
+          <div className="sm:col-span-2">
+            <label className="block text-[11px] font-bold text-amber-800 dark:text-amber-400 uppercase mb-1 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              Pilihan Rekap 3 Bulan Sekali
+            </label>
+            <select
+              value={currentPresetMode}
+              onChange={(e) => handlePeriodSelect(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-amber-50/60 dark:bg-amber-950/20 text-slate-900 dark:text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
+            >
+              <option value="custom">Pilih Bebas / Kustom (Bulan Mulai & Akhir)</option>
+              <option value="q1">⭐ Rekap 3 Bulan: Triwulan I (Januari - Maret)</option>
+              <option value="q2">⭐ Rekap 3 Bulan: Triwulan II (April - Juni)</option>
+              <option value="q3">⭐ Rekap 3 Bulan: Triwulan III (Juli - September)</option>
+              <option value="q4">⭐ Rekap 3 Bulan: Triwulan IV (Oktober - Desember)</option>
+              <option value="last_3_months">⭐ Rekap 3 Bulan: 3 Bulan Terakhir (Berjalan)</option>
+              <option value="this_month">Rekap 1 Bulan: Bulan Ini</option>
+              <option value="sem_gasal">Semester Gasal (Juli - Desember)</option>
+              <option value="sem_genap">Semester Genap (Januari - Juni)</option>
+              <option value="full_year">1 Tahun Penuh (Januari - Desember)</option>
+            </select>
+          </div>
+
           {/* Bulan Mulai */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
@@ -487,18 +649,20 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
               <option value="kritis">Kehadiran Rendah (&lt;75%)</option>
             </select>
           </div>
+        </div>
 
-          {/* Cari Murid & Sortir */}
-          <div>
+        {/* Baris Pencarian & Pengurutan Murid */}
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex-1">
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
               Cari & Sortir Murid
             </label>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Nama / NISN..."
+                  placeholder="Ketik nama atau NISN murid..."
                   value={studentSearch}
                   onChange={(e) => setStudentSearch(e.target.value)}
                   className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -510,7 +674,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
                 <button
                   type="button"
                   onClick={() => setSortOrder('no')}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
                     sortOrder === 'no' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
                   }`}
                   title="Urutkan Nomor Urut"
@@ -520,7 +684,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
                 <button
                   type="button"
                   onClick={() => setSortOrder('name-asc')}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer ${
                     sortOrder === 'name-asc' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
                   }`}
                   title="Urutkan Abjad A-Z"
@@ -531,7 +695,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
                 <button
                   type="button"
                   onClick={() => setSortOrder('name-desc')}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer ${
                     sortOrder === 'name-desc' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
                   }`}
                   title="Urutkan Abjad Z-A"

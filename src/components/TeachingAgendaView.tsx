@@ -665,7 +665,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
   const renderAgendaPrintDocument = () => (
     <div className="bg-white text-black font-serif leading-relaxed text-xs print:p-0 print:m-0 print:w-full">
       {/* Kop Surat Resmi Dokumen Siap Cetak */}
-      <OfficialLetterhead namaSekolah={teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah} />
+      <OfficialLetterhead namaSekolah={teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah} />
 
       {/* Document Title */}
       <div className="text-center my-4">
@@ -673,22 +673,22 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
           BUKU JURNAL / AGENDA MENGAJAR PENDIDIK
         </h2>
         <p className="text-[11px] font-sans font-semibold tracking-wide uppercase text-black mt-0.5">
-          KURIKULUM MERDEKA &bull; TAHUN PELAJARAN {teacher.tahunAjaran || SCHOOL_CONFIG.tahunAjaran} ({teacher.semester || SCHOOL_CONFIG.semester})
+          KURIKULUM MERDEKA &bull; TAHUN PELAJARAN {teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran} ({teacher?.semester || SCHOOL_CONFIG.semester})
         </p>
       </div>
 
       {/* Pendidik & Rombel Info */}
       <div className="grid grid-cols-2 gap-4 text-xs mb-5 font-sans bg-slate-50 print:bg-white p-3 rounded-lg border border-slate-300 print:border-black text-black">
         <div className="space-y-1">
-          <p><span className="text-slate-600 print:text-black inline-block w-28">Satuan Pendidikan:</span> <strong>{teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah}</strong></p>
-          <p><span className="text-slate-600 print:text-black inline-block w-28">Nama Pendidik:</span> <strong>{teacher.namaGuru}</strong></p>
-          <p><span className="text-slate-600 print:text-black inline-block w-28">NBM / NIP:</span> {teacher.nbm || teacher.nip || '-'}</p>
-          <p><span className="text-slate-600 print:text-black inline-block w-28">Mata Pelajaran:</span> {filterClassId === 'all' ? teacher.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">Satuan Pendidikan:</span> <strong>{teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}</strong></p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">Nama Pendidik:</span> <strong>{teacher?.namaGuru || 'Guru Pengampu'}</strong></p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">NBM / NIP:</span> {teacher?.nbm || teacher?.nip || '-'}</p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">Mata Pelajaran:</span> {filterClassId === 'all' ? teacher?.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
         </div>
         <div className="space-y-1">
           <p><span className="text-slate-600 print:text-black inline-block w-28">Kelas / Rombel:</span> <strong>{filterClassId === 'all' ? 'Semua Kelas' : selectedClassObj?.namaKelas}</strong></p>
-          <p><span className="text-slate-600 print:text-black inline-block w-28">Tahun Ajaran:</span> {teacher.tahunAjaran}</p>
-          <p><span className="text-slate-600 print:text-black inline-block w-28">Semester:</span> {teacher.semester}</p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">Tahun Ajaran:</span> {teacher?.tahunAjaran || '-'}</p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">Semester:</span> {teacher?.semester || '-'}</p>
         </div>
       </div>
 
@@ -754,28 +754,28 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
         <div className="grid grid-cols-2 gap-8 text-center">
           <div>
             <p className="font-semibold text-black">Mengetahui,</p>
-            <p className="font-semibold text-black">Kepala {teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah}</p>
+            <p className="font-semibold text-black">Kepala {teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}</p>
             <div className="h-16 flex items-end justify-center">
               <p className="font-bold underline text-black">
-                {teacher.namaKepalaSekolah ? teacher.namaKepalaSekolah : '( .................................................... )'}
+                {teacher?.namaKepalaSekolah ? teacher.namaKepalaSekolah : '( .................................................... )'}
               </p>
             </div>
             <p className="text-[10px] text-slate-700 print:text-black font-mono mt-0.5">
-              {teacher.nipKepalaSekolah
+              {teacher?.nipKepalaSekolah
                 ? `NIP. ${teacher.nipKepalaSekolah}`
-                : teacher.nbmKepalaSekolah
+                : teacher?.nbmKepalaSekolah
                 ? `NBM. ${teacher.nbmKepalaSekolah}`
                 : 'NBM / NIP. ........................................'}
             </p>
           </div>
           <div>
             <p className="font-semibold text-black">Pendidik Pengampu Mata Pelajaran,</p>
-            <p className="text-slate-700 print:text-black">{filterClassId === 'all' ? teacher.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
+            <p className="text-slate-700 print:text-black">{filterClassId === 'all' ? teacher?.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
             <div className="h-16 flex items-end justify-center">
-              <p className="font-bold underline text-black">{teacher.namaGuru}</p>
+              <p className="font-bold underline text-black">{teacher?.namaGuru || 'Guru Pengampu'}</p>
             </div>
             <p className="text-[10px] text-slate-700 print:text-black font-mono mt-0.5">
-              NBM / NIP: {teacher.nbm || teacher.nip || '-'}
+              NBM / NIP: {teacher?.nbm || teacher?.nip || '-'}
             </p>
           </div>
         </div>

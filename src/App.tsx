@@ -768,15 +768,15 @@ export default function App() {
   };
 
   const activeTeacher: TeacherProfile = teacher || {
-    id: session.user.id,
-    namaGuru: session.user.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
+    id: session?.user?.id || 'guru_offline_id',
+    namaGuru: session?.user?.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
     nip: '',
     nbm: '',
     namaSekolah: 'SMK Muhammadiyah Bawang',
     mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
     tahunAjaran: '2025/2026',
     semester: 'Genap',
-    email: session.user.email,
+    email: session?.user?.email || 'guru@smkmuhbawang.sch.id',
     isLoggedIn: true,
   };
 
