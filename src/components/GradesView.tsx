@@ -7,7 +7,7 @@ import {
   FileText,
   Search,
   Check,
-  Sparkles,
+  Flame,
   ExternalLink,
   Copy,
   Sliders,
@@ -458,7 +458,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
   const handleOpenShare = async () => {
     const shareId = `grade_share_${currentClass.id}`;
     const baseUrl = window.location.origin + window.location.pathname;
-    const fullUrl = `${baseUrl}?nilai_share=${shareId}`;
+    const fullUrl = `${baseUrl}?nilai_share=${shareId}&class=${encodeURIComponent(currentClass.id)}`;
     setShareLink(fullUrl);
 
     try {
@@ -492,6 +492,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
       };
 
       await createOrUpdatePublicShare(record);
+      await createOrUpdatePublicShare({ ...record, id: currentClass.id });
       setShareModalOpen(true);
     } catch (e) {
       console.error(e);

@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   ExternalLink,
   Play,
-  Sparkles,
 } from 'lucide-react';
 import {
   signInWithEmailPassword,
@@ -42,11 +41,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isConfigured = isSupabaseConfigured();
-
-  const handleInstantDemoLogin = () => {
-    createOfflineSession('guru@smkmuhbawang.sch.id', 'Guru SMK Muhammadiyah Bawang');
-    onLoginSuccess();
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +87,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       console.warn('Supabase Auth error, falling back to local session:', err);
       const rawMsg = err?.message || '';
       if (rawMsg.includes('Invalid login credentials')) {
-        setErrorMessage('Alamat email atau kata sandi tidak cocok di Supabase Cloud. Anda tetap dapat masuk menggunakan tombol Masuk Langsung.');
+        setErrorMessage('Alamat email atau kata sandi tidak sesuai. Silakan periksa kembali email dan kata sandi Anda.');
       } else {
         // Fallback to offline session if cloud connection is unreachable
         createOfflineSession(cleanEmail, 'Guru SMK Muhammadiyah Bawang');
@@ -280,16 +274,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   <span>Masuk ke Sistem</span>
                 </>
               )}
-            </button>
-
-            {/* Quick Demo Access Button */}
-            <button
-              type="button"
-              onClick={handleInstantDemoLogin}
-              className="w-full py-2.5 px-4 bg-white/90 hover:bg-white text-indigo-900 border border-indigo-200 rounded-2xl font-bold text-xs transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <span>Masuk Langsung (Akun Guru / Mode Cepat)</span>
             </button>
           </form>
 

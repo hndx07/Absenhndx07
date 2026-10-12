@@ -120,21 +120,24 @@ const NAV_ITEMS = [
 function parsePublicShareFromUrl(): {
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
   shareId: string;
+  classParam?: string;
 } | null {
   if (typeof window === 'undefined') return null;
 
   const checkParams = (params: URLSearchParams) => {
+    const classParam = params.get('class') || params.get('kelas') || params.get('class_id') || params.get('classId') || undefined;
+
     if (params.get('nilai_share')) {
-      return { type: 'nilai' as const, shareId: params.get('nilai_share')! };
+      return { type: 'nilai' as const, shareId: params.get('nilai_share')!, classParam };
     }
     if (params.get('absen_share')) {
-      return { type: 'absen' as const, shareId: params.get('absen_share')! };
+      return { type: 'absen' as const, shareId: params.get('absen_share')!, classParam };
     }
     if (params.get('tabungan_share')) {
-      return { type: 'tabungan' as const, shareId: params.get('tabungan_share')! };
+      return { type: 'tabungan' as const, shareId: params.get('tabungan_share')!, classParam };
     }
     if (params.get('agenda_share')) {
-      return { type: 'agenda' as const, shareId: params.get('agenda_share')! };
+      return { type: 'agenda' as const, shareId: params.get('agenda_share')!, classParam };
     }
     // Generic fallback for links like ?share=... or ?share_id=...
     const genericShare = params.get('share') || params.get('share_id');
@@ -143,7 +146,23 @@ function parsePublicShareFromUrl(): {
       if (genericShare.startsWith('att_') || genericShare.includes('absen')) detectedType = 'absen';
       else if (genericShare.startsWith('sav_') || genericShare.includes('tabungan')) detectedType = 'tabungan';
       else if (genericShare.startsWith('age_') || genericShare.includes('agenda')) detectedType = 'agenda';
-      return { type: detectedType, shareId: genericShare };
+      return { type: detectedType, shareId: genericShare, classParam };
+    }
+    // Preview parameter or direct class preview
+    const previewType = params.get('preview') || params.get('mode') || params.get('tipe');
+    if (previewType && ['absen', 'nilai', 'tabungan', 'agenda'].includes(previewType)) {
+      return {
+        type: previewType as 'absen' | 'nilai' | 'tabungan' | 'agenda',
+        shareId: classParam ? `${previewType === 'absen' ? 'att_share_' : previewType === 'nilai' ? 'grade_share_' : 'sav_share_'}${classParam}` : `preview_${previewType}`,
+        classParam,
+      };
+    }
+    if (classParam && (params.get('public') === 'true' || params.has('preview'))) {
+      return {
+        type: 'absen' as const,
+        shareId: `att_share_${classParam}`,
+        classParam,
+      };
     }
     return null;
   };
@@ -167,6 +186,7 @@ export default function App() {
   const [publicShare, setPublicShare] = useState<{
     type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
     shareId: string;
+    classParam?: string;
   } | null>(() => parsePublicShareFromUrl());
 
   // Listen for navigation or URL query updates
@@ -728,6 +748,7 @@ export default function App() {
       <PublicSharePage
         type={publicShare.type}
         shareId={publicShare.shareId}
+        classParam={publicShare.classParam}
       />
     );
   }
