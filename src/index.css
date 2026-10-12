@@ -133,7 +133,8 @@ tbody {
   html,
   body,
   #root,
-  main {
+  main,
+  div[class*="max-w-7xl"] {
     background: #ffffff !important;
     background-color: #ffffff !important;
     color: #000000 !important;
@@ -142,6 +143,7 @@ tbody {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
     min-height: 100% !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { SavingTransaction, Student, ClassRoom, TeacherProfile, PublicShareRecord } from '../types';
-import { createOrUpdatePublicShare } from '../services/data';
+import { createOrUpdatePublicShare, resequenceStudentsAlphabetically } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface SavingsViewProps {
@@ -62,9 +62,8 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
 
   const classStudents = useMemo(() => {
-    return students
-      .filter((s) => s.classId === currentClass.id)
-      .sort((a, b) => a.no - b.no);
+    const raw = students.filter((s) => s.classId === currentClass.id);
+    return resequenceStudentsAlphabetically(raw, currentClass.id);
   }, [students, currentClass.id]);
 
   const sortedAndFilteredClassStudents = useMemo(() => {

@@ -333,7 +333,7 @@ export async function deleteClass(classId: string): Promise<void> {
 
 export async function getStudents(classId?: string): Promise<Student[]> {
   const supabase = getSupabaseClient();
-  let query = supabase.from('students').select('*').order('no', { ascending: true });
+  let query = supabase.from('students').select('*');
 
   if (classId) {
     query = query.eq('class_id', classId);
@@ -345,16 +345,33 @@ export async function getStudents(classId?: string): Promise<Student[]> {
     throw error;
   }
 
-  return (data || []).map((s: any) => ({
+  const raw: Student[] = (data || []).map((s: any) => ({
     id: s.id,
     classId: s.class_id,
-    no: Number(s.no),
+    no: Number(s.no) || 0,
     nisn: s.nisn || '',
     nama: s.nama,
     gender: s.gender as 'L' | 'P',
     catatanUmum: s.catatan_umum,
     noHpOrangTua: s.no_hp_orang_tua,
   }));
+
+  // Otomatis urutkan dan resequence abjad (1..N) tanpa jeda/nomor kosong
+  const resequenced = resequenceStudentsAlphabetically(raw, classId);
+
+  // Jika ada nomor urut yang tidak rapi (karena ada siswa dihapus atau acak), sinkronkan ke cloud
+  const hasMismatchedNumbers = raw.some((r) => {
+    const matched = resequenced.find((m) => m.id === r.id);
+    return matched && matched.no !== r.no;
+  });
+
+  if (hasMismatchedNumbers && resequenced.length > 0) {
+    batchInsertStudents(resequenced).catch((err) => {
+      console.warn('Auto-resync resequenced numbers to cloud notice:', err);
+    });
+  }
+
+  return resequenced;
 }
 
 export async function createStudent(std: Student): Promise<Student> {
@@ -467,26 +484,37 @@ export async function saveStudent(std: Student): Promise<Student> {
 /**
  * Urutkan dan sesuaikan nomor absen murid berdasarkan abjad nama (A-Z).
  * Menjamin nomor absen otomatis berurutan dari 1 sampai N tanpa jeda jika ada siswa ditambah atau dihapus.
+ * Menghilangkan nomor absen yang kosong / acak secara otomatis (contoh: 1-10 dihapus no 6, maka no 7 otomatis jadi 6).
  */
 export function resequenceStudentsAlphabetically(students: Student[], classId?: string): Student[] {
-  const targetClassId = classId || students[0]?.classId;
-  if (!targetClassId) return students;
+  if (!students || students.length === 0) return [];
 
-  const classStudents = students.filter((s) => s.classId === targetClassId);
-  const otherStudents = students.filter((s) => s.classId !== targetClassId);
+  // Jika classId spesifik diberikan, fokus pada kelas tersebut. Jika tidak, proses seluruh kelas yang ada.
+  const classIds = classId
+    ? [classId]
+    : Array.from(new Set(students.map((s) => s.classId).filter(Boolean)));
 
-  // Urutkan nama sesuai abjad bahasa Indonesia
-  const sortedClassStudents = [...classStudents].sort((a, b) =>
-    a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' })
-  );
+  let result = [...students];
 
-  // Berikan nomor absen berurutan 1 sampai N
-  const resequencedClassStudents = sortedClassStudents.map((std, index) => ({
-    ...std,
-    no: index + 1,
-  }));
+  for (const cId of classIds) {
+    const classStudents = result.filter((s) => s.classId === cId);
+    const otherStudents = result.filter((s) => s.classId !== cId);
 
-  return [...otherStudents, ...resequencedClassStudents];
+    // Urutkan nama sesuai abjad bahasa Indonesia secara konsisten
+    const sorted = [...classStudents].sort((a, b) =>
+      a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' })
+    );
+
+    // Berikan nomor urut absen berurutan 1 sampai N tanpa jeda
+    const resequenced = sorted.map((std, index) => ({
+      ...std,
+      no: index + 1,
+    }));
+
+    result = [...otherStudents, ...resequenced];
+  }
+
+  return result;
 }
 
 export async function deleteStudent(studentId: string): Promise<void> {

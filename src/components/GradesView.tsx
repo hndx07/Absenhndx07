@@ -38,7 +38,7 @@ import {
 } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { exportGradesToExcel, downloadGradesTemplateExcel } from '../utils/exportUtils';
-import { createOrUpdatePublicShare } from '../services/data';
+import { createOrUpdatePublicShare, resequenceStudentsAlphabetically } from '../services/data';
 import { getKurikulumMerdekaAssessment } from '../utils/gradeCalculations';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
 import { OfficialLetterhead } from './OfficialLetterhead';
@@ -110,9 +110,8 @@ export const GradesView: React.FC<GradesViewProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const classStudents = useMemo(() => {
-    return students
-      .filter((s) => s.classId === currentClass.id)
-      .sort((a, b) => a.no - b.no);
+    const raw = students.filter((s) => s.classId === currentClass.id);
+    return resequenceStudentsAlphabetically(raw, currentClass.id);
   }, [students, currentClass.id]);
 
   // Sync prop grades into local state ONLY when switching classes or on initial mount

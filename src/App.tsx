@@ -321,14 +321,15 @@ export default function App() {
           getSavingTransactions(currentClassId),
         ]);
 
-        setStudents(loadedStudents);
+        const sequencedStudents = resequenceStudentsAlphabetically(loadedStudents, currentClassId);
+        setStudents(sequencedStudents);
         setAttendance(loadedAttendance);
         setGrades(loadedGrades);
         setGradeColumns(loadedGradeCols);
         setSavings(loadedSavings);
 
         SafeCache.set(`class_data_${currentClassId}`, {
-          students: loadedStudents,
+          students: sequencedStudents,
           attendance: loadedAttendance,
           grades: loadedGrades,
           gradeColumns: loadedGradeCols,
@@ -484,14 +485,15 @@ export default function App() {
         getSavingTransactions(clsId),
       ]);
 
-      setStudents(loadedStudents);
+      const sequencedStudents = resequenceStudentsAlphabetically(loadedStudents, clsId);
+      setStudents(sequencedStudents);
       setAttendance(loadedAttendance);
       setGrades(loadedGrades);
       setGradeColumns(loadedGradeCols);
       setSavings(loadedSavings);
 
       SafeCache.set(`class_data_${clsId}`, {
-        students: loadedStudents,
+        students: sequencedStudents,
         attendance: loadedAttendance,
         grades: loadedGrades,
         gradeColumns: loadedGradeCols,

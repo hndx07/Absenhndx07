@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   Users,
   UserPlus,
@@ -27,6 +27,7 @@ import {
 import * as XLSX from 'xlsx';
 import { Student, ClassRoom, TeacherProfile } from '../types';
 import { exportStudentsToExcel, downloadStudentTemplateExcel } from '../utils/exportUtils';
+import { resequenceStudentsAlphabetically } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface StudentManagementViewProps {
@@ -79,8 +80,10 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const classStudents = students
-    .filter((s) => s.classId === currentClass.id);
+  const classStudents = useMemo(() => {
+    const raw = students.filter((s) => s.classId === currentClass.id);
+    return resequenceStudentsAlphabetically(raw, currentClass.id);
+  }, [students, currentClass.id]);
 
   const filtered = classStudents
     .filter(

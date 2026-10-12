@@ -22,6 +22,7 @@ import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
 import { OfficialLetterhead } from './OfficialLetterhead';
 import { saveExcelFileWithNotification } from '../utils/exportUtils';
+import { resequenceStudentsAlphabetically } from '../services/data';
 
 interface MonthlyAttendanceRecapViewProps {
   currentClass: ClassRoom;
@@ -81,7 +82,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
 
   // Students to display
   const targetStudents = useMemo(() => {
-    let list = students;
+    let list = resequenceStudentsAlphabetically(students, selectedClassId !== 'all' ? selectedClassId : undefined);
     if (selectedClassId !== 'all') {
       list = list.filter((std) => std.classId === selectedClassId);
     }
