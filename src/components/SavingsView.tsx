@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { SavingTransaction, Student, ClassRoom, TeacherProfile, PublicShareRecord } from '../types';
-import { createOrUpdatePublicShare } from '../services/data';
+import { createOrUpdatePublicShare, resequenceStudentsAlphabetically } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface SavingsViewProps {
@@ -62,9 +62,8 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
 
   const classStudents = useMemo(() => {
-    return students
-      .filter((s) => s.classId === currentClass.id)
-      .sort((a, b) => a.no - b.no);
+    const raw = students.filter((s) => s.classId === currentClass.id);
+    return resequenceStudentsAlphabetically(raw, currentClass.id);
   }, [students, currentClass.id]);
 
   const sortedAndFilteredClassStudents = useMemo(() => {
@@ -183,6 +182,34 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
     const fullLink = `${baseUrl}?tabungan_share=${shareId}`;
     setShareLink(fullLink);
 
+    // Hitung tanggal terakhir tabungan diinput per siswa
+    const studentLatestDateMap: Record<string, string> = {};
+    classStudents.forEach((std) => {
+      const stdTxs = classTxList
+        .filter((tx) => !tx.isClassCash && tx.studentId === std.id)
+        .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+      if (stdTxs.length > 0) {
+        studentLatestDateMap[std.id] = stdTxs[0].tanggal;
+      }
+    });
+
+    // Format data transaksi lengkap dengan nama murid untuk laporan detail mutasi
+    const detailedTransactions = classTxList.map((tx) => {
+      const std = classStudents.find((s) => s.id === tx.studentId);
+      return {
+        ...tx,
+        namaMurid: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
+        namaSiswa: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
+      };
+    });
+
+    const studentsWithDates = classStudents.map((s) => ({
+      ...s,
+      saldo: studentBalances[s.id] || 0,
+      tanggalInput: studentLatestDateMap[s.id] || '',
+      lastTransactionDate: studentLatestDateMap[s.id] || '',
+    }));
+
     const shareRecord: PublicShareRecord = {
       id: shareId,
       type: 'tabungan',
@@ -196,10 +223,9 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
         totalCashIn,
         totalCashOut,
         cashTransactions,
-        students: classStudents.map((s) => ({
-          ...s,
-          saldo: studentBalances[s.id] || 0,
-        })),
+        transactions: detailedTransactions,
+        allTransactions: detailedTransactions,
+        students: studentsWithDates,
         teacher: teacher.namaGuru,
         teacherName: teacher.namaGuru,
         teacherNip: teacher.nip || '',
@@ -218,10 +244,9 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
         totalCashIn,
         totalCashOut,
         cashTransactions,
-        students: classStudents.map((s) => ({
-          ...s,
-          saldo: studentBalances[s.id] || 0,
-        })),
+        transactions: detailedTransactions,
+        allTransactions: detailedTransactions,
+        students: studentsWithDates,
         teacher: teacher.namaGuru,
         teacherName: teacher.namaGuru,
         teacherNip: teacher.nip || '',
@@ -801,18 +826,32 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
               </button>
             </div>
 
-            <div className="flex justify-between items-center pt-2">
-              <a
-                href={shareLink}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1"
-              >
-                Buka Halaman Publik <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 pt-2">
+              <div className="flex items-center gap-2">
+                <a
+                  href={shareLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-xs text-indigo-700 font-bold flex items-center gap-1 transition"
+                  title="Buka Halaman Preview Publik di Tab Baru"
+                >
+                  Tab Baru <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = shareLink;
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-xs text-emerald-700 font-bold flex items-center gap-1 transition cursor-pointer"
+                  title="Buka Preview Publik Langsung di Halaman Ini"
+                >
+                  Buka Langsung
+                </button>
+              </div>
               <button
+                type="button"
                 onClick={() => setShareModalOpen(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-xl"
+                className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-xl cursor-pointer"
               >
                 Tutup
               </button>

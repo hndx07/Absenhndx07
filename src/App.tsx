@@ -44,6 +44,7 @@ import {
   updateStudent,
   deleteStudent,
   batchInsertStudents,
+  resequenceStudentsAlphabetically,
   getAttendanceSessions,
   saveAttendanceSession,
   deleteAttendanceSession,
@@ -144,6 +145,22 @@ function parsePublicShareFromUrl(): {
       else if (genericShare.startsWith('age_') || genericShare.includes('agenda')) detectedType = 'agenda';
       return { type: detectedType, shareId: genericShare };
     }
+
+    const previewParam = params.get('preview') || params.get('public') || params.get('view');
+    if (previewParam) {
+      if (previewParam === 'absen' || previewParam === 'presensi') return { type: 'absen' as const, shareId: 'att_share_class_tkj_1' };
+      if (previewParam === 'nilai') return { type: 'nilai' as const, shareId: 'grade_share_class_tkj_1' };
+      if (previewParam === 'tabungan' || previewParam === 'kas') return { type: 'tabungan' as const, shareId: 'sav_share_class_tkj_1' };
+      if (previewParam === 'agenda') return { type: 'agenda' as const, shareId: 'agenda_share_class_tkj_1' };
+    }
+
+    if (params.get('type') && (params.get('id') || params.get('shareId'))) {
+      const t = params.get('type') as any;
+      const id = params.get('id') || params.get('shareId') || '';
+      if (['absen', 'nilai', 'tabungan', 'agenda'].includes(t)) {
+        return { type: t, shareId: id };
+      }
+    }
     return null;
   };
 
@@ -152,9 +169,9 @@ function parsePublicShareFromUrl(): {
   if (fromSearch) return fromSearch;
 
   // 2. Search in window.location.hash if present
-  if (window.location.hash && window.location.hash.includes('?')) {
-    const hashQuery = window.location.hash.slice(window.location.hash.indexOf('?') + 1);
-    const fromHash = checkParams(new URLSearchParams(hashQuery));
+  if (window.location.hash) {
+    const hashClean = window.location.hash.replace(/^#\??/, '');
+    const fromHash = checkParams(new URLSearchParams(hashClean));
     if (fromHash) return fromHash;
   }
 
@@ -320,14 +337,15 @@ export default function App() {
           getSavingTransactions(currentClassId),
         ]);
 
-        setStudents(loadedStudents);
+        const sequencedStudents = resequenceStudentsAlphabetically(loadedStudents, currentClassId);
+        setStudents(sequencedStudents);
         setAttendance(loadedAttendance);
         setGrades(loadedGrades);
         setGradeColumns(loadedGradeCols);
         setSavings(loadedSavings);
 
         SafeCache.set(`class_data_${currentClassId}`, {
-          students: loadedStudents,
+          students: sequencedStudents,
           attendance: loadedAttendance,
           grades: loadedGrades,
           gradeColumns: loadedGradeCols,
@@ -483,14 +501,15 @@ export default function App() {
         getSavingTransactions(clsId),
       ]);
 
-      setStudents(loadedStudents);
+      const sequencedStudents = resequenceStudentsAlphabetically(loadedStudents, clsId);
+      setStudents(sequencedStudents);
       setAttendance(loadedAttendance);
       setGrades(loadedGrades);
       setGradeColumns(loadedGradeCols);
       setSavings(loadedSavings);
 
       SafeCache.set(`class_data_${clsId}`, {
-        students: loadedStudents,
+        students: sequencedStudents,
         attendance: loadedAttendance,
         grades: loadedGrades,
         gradeColumns: loadedGradeCols,
@@ -540,14 +559,31 @@ export default function App() {
 
   // 2. Students Handlers
   const handleSaveStudent = async (std: Student) => {
+    const targetClassId = std.classId;
     const exists = students.some((s) => s.id === std.id);
+    const updatedList = exists
+      ? students.map((s) => (s.id === std.id ? std : s))
+      : [...students, std];
+
+    // Otomatis urutkan dan sesuaikan nomor absen murid berdasarkan abjad nama (A-Z)
+    const resequencedAll = resequenceStudentsAlphabetically(updatedList, targetClassId);
+    setStudents(resequencedAll);
+
+    const savedTarget = resequencedAll.find((s) => s.id === std.id) || std;
     if (exists) {
-      const updated = await updateStudent(std);
-      setStudents((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+      await updateStudent(savedTarget);
     } else {
-      const created = await createStudent(std);
-      setStudents((prev) => [...prev, created]);
+      await createStudent(savedTarget);
     }
+
+    // Sinkronkan seluruh nomor absen kelas ke database jika urutan bergeser
+    const classOnly = resequencedAll.filter((s) => s.classId === targetClassId);
+    try {
+      await batchInsertStudents(classOnly);
+    } catch (e) {
+      console.warn('Sync resequence student to cloud notice:', e);
+    }
+
     if (activeClassId) {
       SafeCache.invalidate(`class_data_${activeClassId}`);
       SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
@@ -557,8 +593,27 @@ export default function App() {
   };
 
   const handleDeleteStudent = async (stdId: string) => {
+    const deletedStd = students.find((s) => s.id === stdId);
+    const targetClassId = deletedStd?.classId || activeClassId;
+
+    // Otomatis re-sequence nomor absen siswa tersisa sesuai abjad nama (1..N) tanpa jeda
+    const remaining = students.filter((s) => s.id !== stdId);
+    const resequencedAll = resequenceStudentsAlphabetically(remaining, targetClassId);
+    setStudents(resequencedAll);
+
+    // Hapus dari cloud database
     await deleteStudent(stdId);
-    setStudents((prev) => prev.filter((s) => s.id !== stdId));
+
+    // Perbarui urutan absen murid yang tersisa di database cloud
+    const classRemaining = resequencedAll.filter((s) => s.classId === targetClassId);
+    if (classRemaining.length > 0) {
+      try {
+        await batchInsertStudents(classRemaining);
+      } catch (err) {
+        console.warn('Batch resequence after delete notice:', err);
+      }
+    }
+
     if (activeClassId) {
       SafeCache.invalidate(`class_data_${activeClassId}`);
       SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
@@ -569,13 +624,19 @@ export default function App() {
 
   const handleBatchAddStudents = async (newStds: Student[]) => {
     if (!newStds || newStds.length === 0) return;
+    const targetClassId = newStds[0].classId || activeClassId;
 
-    // 1. Immediately update application state so students are instantly visible in the UI
-    setStudents((prev) => {
-      const existingIds = new Set(prev.map((s) => s.id));
-      const filtered = newStds.filter((s) => !existingIds.has(s.id));
-      return [...prev, ...filtered];
-    });
+    const existingOther = students.filter((s) => s.classId !== targetClassId);
+    const existingClass = students.filter((s) => s.classId === targetClassId);
+    const existingIds = new Set(existingClass.map((s) => s.id));
+    const toAdd = newStds.filter((s) => !existingIds.has(s.id));
+
+    // Gabungkan dan susun nomor absen otomatis sesuai abjad nama (A-Z)
+    const combinedClass = [...existingClass, ...toAdd];
+    const resequencedClass = resequenceStudentsAlphabetically(combinedClass, targetClassId)
+      .filter((s) => s.classId === targetClassId);
+
+    setStudents([...existingOther, ...resequencedClass]);
 
     if (activeClassId) {
       SafeCache.invalidate(`class_data_${activeClassId}`);
@@ -584,13 +645,16 @@ export default function App() {
       SafeCache.invalidate(`pub_share_sav_share_${activeClassId}`);
     }
 
-    // 2. Persist to Supabase if configured and online
+    // Persist to Supabase if configured and online
     try {
-      await batchInsertStudents(newStds);
+      await batchInsertStudents(resequencedClass);
       if (activeClassId) {
         const fresh = await getStudents(activeClassId);
         if (fresh && fresh.length > 0) {
-          setStudents(fresh);
+          setStudents((prev) => {
+            const others = prev.filter((p) => p.classId !== activeClassId);
+            return [...others, ...fresh];
+          });
         }
       }
     } catch (err) {
@@ -674,12 +738,37 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  // Handler Log Out Akun Guru
+  const handleLogout = async () => {
+    try {
+      await signOutSupabase();
+    } catch (err) {
+      console.warn('Sign out notice:', err);
+    }
+    SafeCache.clear();
+    setSession(null);
+    setTeacher(null);
+    setClasses([]);
+    setStudents([]);
+    setAttendance([]);
+    setGrades([]);
+    setAgendas([]);
+    setSavings([]);
+  };
+
   // Public Share Zero-Login Route
   if (publicShare) {
     return (
       <PublicSharePage
         type={publicShare.type}
         shareId={publicShare.shareId}
+        onExit={() => {
+          setPublicShare(null);
+          if (typeof window !== 'undefined') {
+            const cleanUrl = window.location.origin + window.location.pathname;
+            window.history.pushState({}, '', cleanUrl);
+          }
+        }}
       />
     );
   }
@@ -720,15 +809,15 @@ export default function App() {
   };
 
   const activeTeacher: TeacherProfile = teacher || {
-    id: session.user.id,
-    namaGuru: session.user.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
+    id: session?.user?.id || 'guru_offline_id',
+    namaGuru: session?.user?.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
     nip: '',
     nbm: '',
     namaSekolah: 'SMK Muhammadiyah Bawang',
     mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
     tahunAjaran: '2025/2026',
     semester: 'Genap',
-    email: session.user.email,
+    email: session?.user?.email || 'guru@smkmuhbawang.sch.id',
     isLoggedIn: true,
   };
 
@@ -794,10 +883,10 @@ export default function App() {
               </button>
             </div>
 
-            {/* Penanda Cloud Supabase Aktif */}
+            {/* Penanda Cloud Supabase Aktif & Tombol Log Out */}
             <div className="flex items-center gap-2 shrink-0">
               <div
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold shadow-2xs backdrop-blur-xs"
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold shadow-2xs backdrop-blur-xs"
                 title="Database PostgreSQL Supabase Cloud Aktif & Sinkron (RLS)"
               >
                 <span className="relative flex h-2 w-2">
@@ -806,6 +895,17 @@ export default function App() {
                 </span>
                 <span>Cloud Supabase Aktif</span>
               </div>
+
+              {/* Tombol Log Out Header */}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-bold shadow-sm border border-rose-400/50 transition cursor-pointer backdrop-blur-xs hover:shadow-md"
+                title="Keluar dari akun (Log Out)"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Log Out</span>
+              </button>
             </div>
           </div>
         </div>
@@ -989,6 +1089,20 @@ export default function App() {
                   </div>
                   <Settings className="w-4 h-4 text-slate-400 shrink-0" />
                 </button>
+
+                {/* Tombol Log Out Drawer */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSideNavOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition cursor-pointer shadow-2xs"
+                  title="Keluar dari Akun (Log Out)"
+                >
+                  <LogOut className="w-4 h-4 text-rose-600" />
+                  <span>Log Out Akun</span>
+                </button>
               </div>
             </aside>
           </div>
@@ -1096,7 +1210,7 @@ export default function App() {
           </div>
 
           {/* Drawer Footer: Profil Pendidik & Akun */}
-          <div className="p-3 border-t border-slate-100 bg-slate-50/80">
+          <div className="p-3 border-t border-slate-100 bg-slate-50/80 space-y-2">
             <button
               type="button"
               onClick={() => setIsProfileModalOpen(true)}
@@ -1117,6 +1231,17 @@ export default function App() {
                 </div>
               </div>
               <Settings className="w-4 h-4 text-slate-400 shrink-0" />
+            </button>
+
+            {/* Tombol Log Out Sidebar Desktop */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 p-2.5 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition cursor-pointer shadow-2xs"
+              title="Keluar dari Akun (Log Out)"
+            >
+              <LogOut className="w-4 h-4 text-rose-600" />
+              <span>Log Out Akun</span>
             </button>
           </div>
         </aside>
@@ -1316,10 +1441,7 @@ export default function App() {
         teacher={activeTeacher}
         onSaveTeacher={handleSaveTeacherProfile}
         onUpdateTeacher={handleSaveTeacherProfile}
-        onLogout={() => {
-          signOutSupabase();
-          setSession(null);
-        }}
+        onLogout={handleLogout}
         onDataMigrated={() => loadUserData(activeClassId, true)}
         onDownloadBackup={handleDownloadBackup}
       />

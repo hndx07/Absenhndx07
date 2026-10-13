@@ -661,43 +661,177 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
     exportToWordDocument(fileName, contentHtml);
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Top Banner Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-full border border-indigo-100 dark:border-indigo-900/60">
-              {filterClassId === 'all' ? 'Semua Kelas' : selectedClassObj?.namaKelas || 'Kelas Terpilih'}
-            </span>
-            <span className="text-xs text-slate-400">&bull;</span>
-            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-              {filterClassId === 'all' ? teacher.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}
-            </span>
-            <span className="text-xs text-slate-400">&bull;</span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-              T.A. {teacher.tahunAjaran} ({teacher.semester})
-            </span>
-          </div>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-1.5">
-            Buku Jurnal / Agenda Mengajar Pendidik
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Pencatatan tatap muka, materi TP Kurikulum Merdeka, dan dinamika kelas pendidik {SCHOOL_CONFIG.namaSekolah}
+  // Render format dokumen kertas siap cetak resmi A4 Agenda Mengajar
+  const renderAgendaPrintDocument = () => (
+    <div className="bg-white text-black font-serif leading-relaxed text-xs print:p-0 print:m-0 print:w-full">
+      {/* Kop Surat Resmi Dokumen Siap Cetak */}
+      <OfficialLetterhead namaSekolah={teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah} />
+
+      {/* Document Title */}
+      <div className="text-center my-4">
+        <h2 className="text-sm sm:text-base font-bold uppercase tracking-wider underline text-black">
+          BUKU JURNAL / AGENDA MENGAJAR PENDIDIK
+        </h2>
+        <p className="text-[11px] font-sans font-semibold tracking-wide uppercase text-black mt-0.5">
+          KURIKULUM MERDEKA &bull; TAHUN PELAJARAN {teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran} ({teacher?.semester || SCHOOL_CONFIG.semester})
+        </p>
+      </div>
+
+      {/* Pendidik & Rombel Info */}
+      <div className="grid grid-cols-2 gap-4 text-xs mb-5 font-sans bg-slate-50 print:bg-white p-3 rounded-lg border border-slate-300 print:border-black text-black">
+        <div className="space-y-1">
+          <p><span className="text-slate-600 print:text-black inline-block w-28">Satuan Pendidikan:</span> <strong>{teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}</strong></p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">Nama Pendidik:</span> <strong>{teacher?.namaGuru || 'Guru Pengampu'}</strong></p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">NBM / NIP:</span> {teacher?.nbm || teacher?.nip || '-'}</p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">Mata Pelajaran:</span> {filterClassId === 'all' ? teacher?.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
+        </div>
+        <div className="space-y-1">
+          <p><span className="text-slate-600 print:text-black inline-block w-28">Kelas / Rombel:</span> <strong>{filterClassId === 'all' ? 'Semua Kelas' : selectedClassObj?.namaKelas}</strong></p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">Tahun Ajaran:</span> {teacher?.tahunAjaran || '-'}</p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">Semester:</span> {teacher?.semester || '-'}</p>
+        </div>
+      </div>
+
+      {/* Table Agendas */}
+      <div className="overflow-x-auto mb-6">
+        <table className="w-full border-collapse border border-black text-[11px] font-sans text-black">
+          <thead>
+            <tr className="bg-slate-100 print:bg-slate-100 text-black">
+              <th className="border border-black p-2 text-center w-8">No</th>
+              <th className="border border-black p-2 text-left w-24">Hari / Tanggal</th>
+              {filterClassId === 'all' && (
+                <th className="border border-black p-2 text-center w-20">Kelas</th>
+              )}
+              <th className="border border-black p-2 text-center w-14">Jam Ke</th>
+              <th className="border border-black p-2 text-left">Materi / Capaian Pembelajaran</th>
+              <th className="border border-black p-2 text-center w-12">Hadir</th>
+              <th className="border border-black p-2 text-center w-12">Absen</th>
+              <th className="border border-black p-2 text-center w-16">Paraf</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAgendas.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={filterClassId === 'all' ? 8 : 7}
+                  className="border border-black p-4 text-center text-slate-500 italic"
+                >
+                  Belum ada entri jurnal mengajar yang sesuai.
+                </td>
+              </tr>
+            ) : (
+              filteredAgendas.map((ag, idx) => (
+                <tr key={ag.id} className="hover:bg-slate-50 print:hover:bg-transparent">
+                  <td className="border border-black p-2 text-center font-mono">{idx + 1}</td>
+                  <td className="border border-black p-2 font-medium">{ag.hari?.substring(0, 3)}, {ag.tanggal}</td>
+                  {filterClassId === 'all' && (
+                    <td className="border border-black p-2 text-center font-bold">
+                      {classesMap[ag.classId] || ag.classNameSnapshot || '-'}
+                    </td>
+                  )}
+                  <td className="border border-black p-2 text-center font-mono">Ke-{ag.jamKe}</td>
+                  <td className="border border-black p-2">
+                    <p className="font-semibold text-black">{ag.materiAjar}</p>
+                    {ag.kegiatan && <p className="text-[10px] text-slate-700 print:text-black mt-0.5">{ag.kegiatan}</p>}
+                  </td>
+                  <td className="border border-black p-2 text-center font-mono font-bold text-black">{ag.hadirCount ?? 0}</td>
+                  <td className="border border-black p-2 text-center font-mono font-bold text-black">{ag.tidakHadirCount ?? 0}</td>
+                  <td className="border border-black p-2 text-center font-mono text-[9px] text-black">&#10003;</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Tanda Tangan Resmi Dokumen */}
+      <div className="pt-6 font-sans text-xs text-black break-inside-avoid print:break-inside-avoid">
+        <div className="flex justify-end mb-4">
+          <p className="text-black">
+            Bawang, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
+        <div className="grid grid-cols-2 gap-8 text-center">
+          <div>
+            <p className="font-semibold text-black">Mengetahui,</p>
+            <p className="font-semibold text-black">Kepala {teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}</p>
+            <div className="h-16 flex items-end justify-center">
+              <p className="font-bold underline text-black">
+                {teacher?.namaKepalaSekolah ? teacher.namaKepalaSekolah : '( .................................................... )'}
+              </p>
+            </div>
+            <p className="text-[10px] text-slate-700 print:text-black font-mono mt-0.5">
+              {teacher?.nipKepalaSekolah
+                ? `NIP. ${teacher.nipKepalaSekolah}`
+                : teacher?.nbmKepalaSekolah
+                ? `NBM. ${teacher.nbmKepalaSekolah}`
+                : 'NBM / NIP. ........................................'}
+            </p>
+          </div>
+          <div>
+            <p className="font-semibold text-black">Pendidik Pengampu Mata Pelajaran,</p>
+            <p className="text-slate-700 print:text-black">{filterClassId === 'all' ? teacher?.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
+            <div className="h-16 flex items-end justify-center">
+              <p className="font-bold underline text-black">{teacher?.namaGuru || 'Guru Pengampu'}</p>
+            </div>
+            <p className="text-[10px] text-slate-700 print:text-black font-mono mt-0.5">
+              NBM / NIP: {teacher?.nbm || teacher?.nip || '-'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsPreviewPdfOpen(true)}
-            className="min-h-[44px] px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/70 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Lihat format cetak PDF resmi"
-          >
-            <Eye className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-            Preview PDF
-          </button>
+  return (
+    <div>
+      {/* Tampilan Laman Web Interaktif - Sembunyikan Total Saat Print */}
+      <div className="space-y-6 no-print">
+        {/* Top Banner Card */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-full border border-indigo-100 dark:border-indigo-900/60">
+                {filterClassId === 'all' ? 'Semua Kelas' : selectedClassObj?.namaKelas || 'Kelas Terpilih'}
+              </span>
+              <span className="text-xs text-slate-400">&bull;</span>
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                {filterClassId === 'all' ? teacher.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}
+              </span>
+              <span className="text-xs text-slate-400">&bull;</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                T.A. {teacher.tahunAjaran} ({teacher.semester})
+              </span>
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-1.5">
+              Buku Jurnal / Agenda Mengajar Pendidik
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Pencatatan tatap muka, materi TP Kurikulum Merdeka, dan dinamika kelas pendidik {SCHOOL_CONFIG.namaSekolah}
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsPreviewPdfOpen(true)}
+              className="min-h-[44px] px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer"
+              title="Buka Dokumen Kertas Siap Cetak Resmi"
+            >
+              <Printer className="w-4 h-4" />
+              Dokumen Siap Cetak
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsPreviewPdfOpen(true)}
+              className="min-h-[44px] px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/70 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Lihat format cetak PDF resmi"
+            >
+              <Eye className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+              Preview PDF
+            </button>
 
           <button
             type="button"
@@ -1708,11 +1842,19 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
           </div>
         </div>
       )}
+      </div>
+
+      {/* Dokumen Siap Cetak Kertas Khusus Print Langsung (Ctrl+P saat modal tidak dibuka) */}
+      {!isPreviewPdfOpen && (
+        <div className="hidden print:block print-document bg-white text-black p-0 m-0 w-full">
+          {renderAgendaPrintDocument()}
+        </div>
+      )}
 
       {/* Modal Preview PDF Agenda Mengajar */}
       {isPreviewPdfOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto max-h-[92vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in print:static print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print-modal-active">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto max-h-[92vh] print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:max-h-none print:p-0 print:m-0 print:bg-white">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white border-b border-slate-800 no-print">
               <div className="flex items-center gap-2.5">
@@ -1754,124 +1896,9 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
             </div>
 
             {/* A4 Paper Simulation Canvas */}
-            <div className="p-4 sm:p-8 overflow-y-auto bg-slate-100 dark:bg-slate-950 flex-1">
-              <div className="bg-white mx-auto p-6 sm:p-10 shadow-lg rounded-xl border border-slate-200 text-slate-900 max-w-[210mm] font-serif leading-relaxed text-xs">
-                {/* Kop Surat Resmi Dokumen Siap Cetak */}
-                <OfficialLetterhead namaSekolah={teacher.namaSekolah} />
-
-                {/* Document Title */}
-                <div className="text-center mb-5">
-                  <h2 className="text-sm font-bold uppercase tracking-wider underline">
-                    BUKU JURNAL / AGENDA MENGAJAR PENDIDIK
-                  </h2>
-                  <p className="text-[11px] font-sans font-semibold tracking-wide uppercase text-slate-800 mt-0.5">
-                    TAHUN PELAJARAN {teacher.tahunAjaran || SCHOOL_CONFIG.tahunAjaran} ({teacher.semester || SCHOOL_CONFIG.semester})
-                  </p>
-                </div>
-
-                {/* Pendidik & Rombel Info */}
-                <div className="grid grid-cols-2 gap-4 text-xs mb-5 font-sans bg-slate-50 p-3 rounded-lg border border-slate-200">
-                  <div className="space-y-1">
-                    <p><span className="text-slate-500 inline-block w-28">Satuan Pendidikan:</span> <strong>{teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah}</strong></p>
-                    <p><span className="text-slate-500 inline-block w-28">Nama Pendidik:</span> <strong>{teacher.namaGuru}</strong></p>
-                    <p><span className="text-slate-500 inline-block w-28">NBM / NIP:</span> {teacher.nbm || teacher.nip || '-'}</p>
-                    <p><span className="text-slate-500 inline-block w-28">Mata Pelajaran:</span> {filterClassId === 'all' ? teacher.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p><span className="text-slate-500 inline-block w-28">Kelas / Rombel:</span> <strong>{filterClassId === 'all' ? 'Semua Kelas' : selectedClassObj?.namaKelas}</strong></p>
-                    <p><span className="text-slate-500 inline-block w-28">Tahun Ajaran:</span> {teacher.tahunAjaran}</p>
-                    <p><span className="text-slate-500 inline-block w-28">Semester:</span> {teacher.semester}</p>
-                  </div>
-                </div>
-
-                {/* Table Agendas */}
-                <div className="overflow-x-auto mb-6">
-                  <table className="w-full border-collapse border border-slate-300 text-[11px] font-sans">
-                    <thead>
-                      <tr className="bg-slate-100 text-slate-800">
-                        <th className="border border-slate-300 p-2 text-center w-8">No</th>
-                        <th className="border border-slate-300 p-2 text-left w-24">Hari / Tanggal</th>
-                        {filterClassId === 'all' && (
-                          <th className="border border-slate-300 p-2 text-center w-20">Kelas</th>
-                        )}
-                        <th className="border border-slate-300 p-2 text-center w-14">Jam Ke</th>
-                        <th className="border border-slate-300 p-2 text-left">Materi / Capaian Pembelajaran</th>
-                        <th className="border border-slate-300 p-2 text-center w-12">Hadir</th>
-                        <th className="border border-slate-300 p-2 text-center w-12">Absen</th>
-                        <th className="border border-slate-300 p-2 text-center w-16">Paraf</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredAgendas.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={filterClassId === 'all' ? 8 : 7}
-                            className="border border-slate-300 p-4 text-center text-slate-400 italic"
-                          >
-                            Belum ada entri jurnal mengajar yang sesuai.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredAgendas.map((ag, idx) => (
-                          <tr key={ag.id} className="hover:bg-slate-50">
-                            <td className="border border-slate-300 p-2 text-center font-mono">{idx + 1}</td>
-                            <td className="border border-slate-300 p-2 font-medium">{ag.hari?.substring(0, 3)}, {ag.tanggal}</td>
-                            {filterClassId === 'all' && (
-                              <td className="border border-slate-300 p-2 text-center font-bold">
-                                {classesMap[ag.classId] || ag.classNameSnapshot || '-'}
-                              </td>
-                            )}
-                            <td className="border border-slate-300 p-2 text-center font-mono">Ke-{ag.jamKe}</td>
-                            <td className="border border-slate-300 p-2">
-                              <p className="font-semibold text-slate-800">{ag.materiAjar}</p>
-                              {ag.kegiatan && <p className="text-[10px] text-slate-500 mt-0.5">{ag.kegiatan}</p>}
-                            </td>
-                            <td className="border border-slate-300 p-2 text-center font-mono text-emerald-700 font-bold">{ag.hadirCount ?? 0}</td>
-                            <td className="border border-slate-300 p-2 text-center font-mono text-rose-700 font-bold">{ag.tidakHadirCount ?? 0}</td>
-                            <td className="border border-slate-300 p-2 text-center text-slate-300 font-mono text-[9px]">&#10003;</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Tanda Tangan Resmi Dokumen */}
-                <div className="pt-6 font-sans text-xs">
-                  <div className="flex justify-end mb-4">
-                    <p className="text-slate-600">
-                      Bawang, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-8 text-center">
-                    <div>
-                      <p className="font-semibold text-slate-800">Mengetahui,</p>
-                      <p className="font-semibold text-slate-800">Kepala {teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah}</p>
-                      <div className="h-16 flex items-end justify-center">
-                        <p className="font-bold underline text-slate-900">
-                          {teacher.namaKepalaSekolah ? teacher.namaKepalaSekolah : '( .................................................... )'}
-                        </p>
-                      </div>
-                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                        {teacher.nipKepalaSekolah
-                          ? `NIP. ${teacher.nipKepalaSekolah}`
-                          : teacher.nbmKepalaSekolah
-                          ? `NBM. ${teacher.nbmKepalaSekolah}`
-                          : 'NBM / NIP. ........................................'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-800">Pendidik Pengampu Mata Pelajaran,</p>
-                      <p className="text-slate-600">{filterClassId === 'all' ? teacher.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
-                      <div className="h-16 flex items-end justify-center">
-                        <p className="font-bold underline text-slate-900">{teacher.namaGuru}</p>
-                      </div>
-                      <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                        NBM / NIP: {teacher.nbm || teacher.nip || '-'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+            <div className="p-4 sm:p-8 overflow-y-auto bg-slate-100 dark:bg-slate-950 flex-1 print:bg-white print:p-0 print:m-0 print:overflow-visible">
+              <div className="bg-white mx-auto p-6 sm:p-10 shadow-lg rounded-xl border border-slate-200 text-slate-900 max-w-[210mm] font-serif leading-relaxed text-xs print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0 print:max-w-none print:bg-white print-document">
+                {renderAgendaPrintDocument()}
               </div>
             </div>
 

@@ -9,13 +9,13 @@ import {
   AlertCircle,
   ShieldCheck,
   ExternalLink,
-  Play,
 } from 'lucide-react';
 import {
   signInWithEmailPassword,
   isSupabaseConfigured,
   getSupabaseUrl,
   isValidHttpUrl,
+  createOfflineSession,
 } from '../services/supabase';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
@@ -28,9 +28,9 @@ const STORAGE_SAVED_EMAIL = 'smk_saved_login_email';
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState(() => {
     try {
-      return localStorage.getItem(STORAGE_SAVED_EMAIL) || '';
+      return localStorage.getItem(STORAGE_SAVED_EMAIL) || 'guru@smkmuhbawang.sch.id';
     } catch {
-      return '';
+      return 'guru@smkmuhbawang.sch.id';
     }
   });
   const [password, setPassword] = useState('');
@@ -55,20 +55,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    if (!isConfigured) {
-      const url = getSupabaseUrl();
-      if (!isValidHttpUrl(url)) {
-        setErrorMessage(
-          'URL Supabase belum valid. Harap periksa konfigurasi VITE_SUPABASE_URL (harus berupa URL https://... bukan token rahasia).'
-        );
-      } else {
-        setErrorMessage(
-          'Supabase belum terkonfigurasi dengan benar. Harap periksa VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY.'
-        );
-      }
-      return;
-    }
-
     if (rememberMe) {
       try {
         localStorage.setItem(STORAGE_SAVED_EMAIL, cleanEmail);
@@ -79,24 +65,31 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       } catch {}
     }
 
+    // Jika Supabase belum dikonfigurasi, langsung gunakan mode lokal offline tanpa error
+    if (!isConfigured) {
+      createOfflineSession(cleanEmail, 'Guru SMK Muhammadiyah Bawang');
+      onLoginSuccess();
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const res = await signInWithEmailPassword(cleanEmail, password);
-      if (res.session) {
+      if (res?.session) {
         onLoginSuccess();
       } else {
-        setErrorMessage('Sesi login tidak ditemukan. Silakan coba kembali.');
+        setErrorMessage('Gagal memverifikasi sesi login. Silakan coba lagi.');
       }
     } catch (err: any) {
-      console.error('Supabase Auth error:', err);
-      const rawMsg = err?.message || 'Gagal masuk ke sistem Supabase.';
-      if (rawMsg.includes('Invalid login credentials')) {
-        setErrorMessage('Alamat email atau kata sandi salah. Silakan periksa kembali.');
+      console.warn('Supabase Auth error:', err);
+      const rawMsg = err?.message || '';
+      if (rawMsg.includes('Invalid login credentials') || rawMsg.includes('invalid_credentials')) {
+        setErrorMessage('Alamat email atau kata sandi tidak cocok. Silakan periksa kembali.');
       } else if (rawMsg.includes('Email not confirmed')) {
-        setErrorMessage('Email Anda belum dikonfirmasi di Supabase. Silakan periksa email.');
+        setErrorMessage('Alamat email belum dikonfirmasi di Supabase Auth.');
       } else {
-        setErrorMessage(rawMsg);
+        setErrorMessage(err?.message || 'Gagal masuk akun. Periksa koneksi internet atau kredensial Anda.');
       }
     } finally {
       setIsSubmitting(false);

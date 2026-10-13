@@ -38,7 +38,7 @@ import {
 } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { exportGradesToExcel, downloadGradesTemplateExcel } from '../utils/exportUtils';
-import { createOrUpdatePublicShare } from '../services/data';
+import { createOrUpdatePublicShare, resequenceStudentsAlphabetically } from '../services/data';
 import { getKurikulumMerdekaAssessment } from '../utils/gradeCalculations';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
 import { OfficialLetterhead } from './OfficialLetterhead';
@@ -110,9 +110,8 @@ export const GradesView: React.FC<GradesViewProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const classStudents = useMemo(() => {
-    return students
-      .filter((s) => s.classId === currentClass.id)
-      .sort((a, b) => a.no - b.no);
+    const raw = students.filter((s) => s.classId === currentClass.id);
+    return resequenceStudentsAlphabetically(raw, currentClass.id);
   }, [students, currentClass.id]);
 
   // Sync prop grades into local state ONLY when switching classes or on initial mount
@@ -1953,6 +1952,17 @@ export const GradesView: React.FC<GradesViewProps> = ({
 
               <button
                 type="button"
+                onClick={() => {
+                  window.location.href = shareLink;
+                }}
+                className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-2xl transition flex items-center justify-center gap-1.5 shadow-sm shadow-purple-600/20 cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                Buka Preview Langsung di Halaman Ini
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setShareModalOpen(false)}
                 className="w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-2xl cursor-pointer"
               >
@@ -1965,8 +1975,8 @@ export const GradesView: React.FC<GradesViewProps> = ({
 
       {/* Modal Dokumen Siap Cetak Leger Nilai Asesmen Kurikulum Merdeka */}
       {isPrintPreviewOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-auto max-h-[95vh] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:static print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print-modal-active">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden my-auto max-h-[95vh] flex flex-col print:border-none print:shadow-none print:rounded-none print:w-full print:max-w-none print:max-h-none print:p-0 print:m-0 print:bg-white">
             {/* Header Modal - no-print */}
             <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white border-b border-slate-800 no-print">
               <div className="flex items-center gap-2.5">
@@ -2019,8 +2029,8 @@ export const GradesView: React.FC<GradesViewProps> = ({
             </div>
 
             {/* Document Body */}
-            <div className="p-4 sm:p-8 overflow-y-auto flex-1 bg-slate-100 dark:bg-slate-950">
-              <div className="bg-white text-black p-6 sm:p-10 font-serif leading-relaxed max-w-[210mm] mx-auto shadow-sm rounded-xl print:border-none print:shadow-none print:p-0 print:m-0 text-xs">
+            <div className="p-4 sm:p-8 overflow-y-auto flex-1 bg-slate-100 dark:bg-slate-950 print:bg-white print:p-0 print:m-0 print:overflow-visible">
+              <div className="bg-white text-black p-6 sm:p-10 font-serif leading-relaxed max-w-[210mm] mx-auto shadow-sm rounded-xl print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0 print:max-w-none print:bg-white text-xs">
                 {/* Kop Surat Resmi */}
                 <OfficialLetterhead namaSekolah={teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah} />
 

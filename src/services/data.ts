@@ -1,4 +1,4 @@
-import { getSupabaseClient, getSafeSupabaseClient, getAuthUser } from './supabase';
+import { getSafeSupabaseClient, getAuthUser } from './supabase';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { SafeCache } from '../utils/storageCache';
 import {
@@ -19,6 +19,262 @@ import {
 } from '../types';
 
 // ============================================================================
+// DEFAULT SEED DATA (SMK MUHAMMADIYAH BAWANG - FALLBACK & OFFLINE FIRST)
+// ============================================================================
+
+export const DEFAULT_TEACHER: TeacherProfile = {
+  id: 'teacher_default',
+  namaGuru: 'Guru SMK Muhammadiyah Bawang',
+  nip: '19880512 201504 1 002',
+  nbm: '1122334',
+  namaSekolah: SCHOOL_CONFIG.namaSekolah,
+  namaKepalaSekolah: 'Imam Santoso, S.T., M.Pd.',
+  nipKepalaSekolah: '19750810 200501 1 005',
+  nbmKepalaSekolah: '998877',
+  mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
+  tahunAjaran: '2025/2026',
+  semester: 'Genap',
+  email: 'guru@smkmuhbawang.sch.id',
+  activeClassId: 'class_tkj_1',
+  isLoggedIn: true,
+};
+
+export const DEFAULT_CLASSES: ClassRoom[] = [
+  {
+    id: 'class_tkj_1',
+    namaKelas: 'XII TKJ 1',
+    mataPelajaran: 'Administrasi Infrastruktur Jaringan',
+    kkm: 75,
+    jurusan: 'TKJ',
+    keterangan: 'Konsentrasi Keahlian Teknik Komputer & Jaringan',
+    createdAt: '2026-01-05T07:00:00.000Z',
+  },
+  {
+    id: 'class_tkj_2',
+    namaKelas: 'XII TKJ 2',
+    mataPelajaran: 'Administrasi Sistem Jaringan',
+    kkm: 75,
+    jurusan: 'TKJ',
+    keterangan: 'Konsentrasi Keahlian Teknik Komputer & Jaringan',
+    createdAt: '2026-01-05T07:00:00.000Z',
+  },
+];
+
+export const DEFAULT_STUDENTS: Student[] = [
+  // Murid Kelas XII TKJ 1
+  { id: 'std_1', classId: 'class_tkj_1', no: 1, nisn: '0071234561', nama: 'Ahmad Fauzi', gender: 'L', catatanUmum: 'Aktif dalam praktik jaringan' },
+  { id: 'std_2', classId: 'class_tkj_1', no: 2, nisn: '0071234562', nama: 'Anisa Rahmawati', gender: 'P', catatanUmum: 'Teliti & rajin' },
+  { id: 'std_3', classId: 'class_tkj_1', no: 3, nisn: '0071234563', nama: 'Bagas Pratama', gender: 'L', catatanUmum: 'Paham konfigurasi mikrotik' },
+  { id: 'std_4', classId: 'class_tkj_1', no: 4, nisn: '0071234564', nama: 'Dewi Anggraeni', gender: 'P', catatanUmum: 'Pengurus kas kelas' },
+  { id: 'std_5', classId: 'class_tkj_1', no: 5, nisn: '0071234565', nama: 'Dimas Setiawan', gender: 'L', catatanUmum: 'Bagus dalam troubleshooting' },
+  { id: 'std_6', classId: 'class_tkj_1', no: 6, nisn: '0071234566', nama: 'Fajar Hidayat', gender: 'L', catatanUmum: 'Disiplin hadir' },
+  { id: 'std_7', classId: 'class_tkj_1', no: 7, nisn: '0071234567', nama: 'Nabila Putri', gender: 'P', catatanUmum: 'Sekretaris kelas' },
+  { id: 'std_8', classId: 'class_tkj_1', no: 8, nisn: '0071234568', nama: 'Rizky Ramadhan', gender: 'L', catatanUmum: 'Terampil dynamic routing' },
+  { id: 'std_9', classId: 'class_tkj_1', no: 9, nisn: '0071234569', nama: 'Siti Nurhaliza', gender: 'P', catatanUmum: 'Sangat rapi dalam dokumentasi' },
+  { id: 'std_10', classId: 'class_tkj_1', no: 10, nisn: '0071234570', nama: 'Yusuf Maulana', gender: 'L', catatanUmum: 'Ketua kelas XII TKJ 1' },
+  // Murid Kelas XII TKJ 2
+  { id: 'std_201', classId: 'class_tkj_2', no: 1, nisn: '0071234581', nama: 'Aditya Pratama', gender: 'L', catatanUmum: 'Mahir sistem operasi jaringan' },
+  { id: 'std_202', classId: 'class_tkj_2', no: 2, nisn: '0071234582', nama: 'Bella Safitri', gender: 'P', catatanUmum: 'Aktif diskusi & administrasi server' },
+  { id: 'std_203', classId: 'class_tkj_2', no: 3, nisn: '0071234583', nama: 'Daffa Al-Ghifari', gender: 'L', catatanUmum: 'Terampil konfigurasi Linux' },
+  { id: 'std_204', classId: 'class_tkj_2', no: 4, nisn: '0071234584', nama: 'Eka Nurjanah', gender: 'P', catatanUmum: 'Disiplin dan bertanggung jawab' },
+  { id: 'std_205', classId: 'class_tkj_2', no: 5, nisn: '0071234585', nama: 'Galang Saputra', gender: 'L', catatanUmum: 'Cepat tanggap dalam troubleshooting' },
+  { id: 'std_206', classId: 'class_tkj_2', no: 6, nisn: '0071234586', nama: 'Hana Maulida', gender: 'P', catatanUmum: 'Teliti dalam pembukuan kelas' },
+  { id: 'std_207', classId: 'class_tkj_2', no: 7, nisn: '0071234587', nama: 'Irfan Hakim', gender: 'L', catatanUmum: 'Pengurus perlengkapan lab komputer' },
+  { id: 'std_208', classId: 'class_tkj_2', no: 8, nisn: '0071234588', nama: 'Nadya Lutfiani', gender: 'P', catatanUmum: 'Rajin menyelesaikan tugas proyek' },
+  { id: 'std_209', classId: 'class_tkj_2', no: 9, nisn: '0071234589', nama: 'Rian Syahputra', gender: 'L', catatanUmum: 'Aktif dalam konfigurasi server DNS & Web' },
+  { id: 'std_210', classId: 'class_tkj_2', no: 10, nisn: '0071234590', nama: 'Zahra Aulia', gender: 'P', catatanUmum: 'Ketua kelas XII TKJ 2' },
+];
+
+const currentYear = new Date().getFullYear();
+
+export const DEFAULT_ATTENDANCE_SESSIONS: AttendanceSession[] = [
+  // Triwulan 1 - Bulan Januari
+  {
+    id: 'att_sess_1',
+    classId: 'class_tkj_1',
+    tanggal: `${currentYear}-01-12`,
+    pertemuanKe: 1,
+    topikMateri: 'Pengenalan Routing Statis & Mikrotik RouterOS',
+    records: {
+      std_1: { status: 'H' },
+      std_2: { status: 'H' },
+      std_3: { status: 'H' },
+      std_4: { status: 'H' },
+      std_5: { status: 'H' },
+      std_6: { status: 'H' },
+      std_7: { status: 'H' },
+      std_8: { status: 'H' },
+      std_9: { status: 'H' },
+      std_10: { status: 'H' },
+    },
+  },
+  {
+    id: 'att_sess_2',
+    classId: 'class_tkj_1',
+    tanggal: `${currentYear}-01-26`,
+    pertemuanKe: 2,
+    topikMateri: 'Konfigurasi VLAN Trunking pada Cisco Catalyst',
+    records: {
+      std_1: { status: 'H' },
+      std_2: { status: 'H' },
+      std_3: { status: 'I', catatan: 'Izin urusan keluarga' },
+      std_4: { status: 'H' },
+      std_5: { status: 'H' },
+      std_6: { status: 'H' },
+      std_7: { status: 'H' },
+      std_8: { status: 'H' },
+      std_9: { status: 'H' },
+      std_10: { status: 'H' },
+    },
+  },
+  // Triwulan 1 - Bulan Februari
+  {
+    id: 'att_sess_3',
+    classId: 'class_tkj_1',
+    tanggal: `${currentYear}-02-09`,
+    pertemuanKe: 3,
+    topikMateri: 'Praktikum Routing Dinamis OSPF Single Area',
+    records: {
+      std_1: { status: 'H' },
+      std_2: { status: 'H' },
+      std_3: { status: 'H' },
+      std_4: { status: 'S', catatan: 'Sakit flu' },
+      std_5: { status: 'H' },
+      std_6: { status: 'H' },
+      std_7: { status: 'H' },
+      std_8: { status: 'H' },
+      std_9: { status: 'H' },
+      std_10: { status: 'H' },
+    },
+  },
+  {
+    id: 'att_sess_4',
+    classId: 'class_tkj_1',
+    tanggal: `${currentYear}-02-23`,
+    pertemuanKe: 4,
+    topikMateri: 'Konfigurasi Firewall Filter Rules & NAT',
+    records: {
+      std_1: { status: 'H' },
+      std_2: { status: 'H' },
+      std_3: { status: 'H' },
+      std_4: { status: 'H' },
+      std_5: { status: 'H' },
+      std_6: { status: 'D', catatan: 'Dispensasi Lomba LKS IT Network' },
+      std_7: { status: 'H' },
+      std_8: { status: 'H' },
+      std_9: { status: 'H' },
+      std_10: { status: 'H' },
+    },
+  },
+  // Triwulan 1 - Bulan Maret
+  {
+    id: 'att_sess_5',
+    classId: 'class_tkj_1',
+    tanggal: `${currentYear}-03-08`,
+    pertemuanKe: 5,
+    topikMateri: 'Manajemen Bandwidth Simple Queue & PCQ',
+    records: {
+      std_1: { status: 'H' },
+      std_2: { status: 'H' },
+      std_3: { status: 'H' },
+      std_4: { status: 'H' },
+      std_5: { status: 'H' },
+      std_6: { status: 'H' },
+      std_7: { status: 'H' },
+      std_8: { status: 'H' },
+      std_9: { status: 'H' },
+      std_10: { status: 'H' },
+    },
+  },
+  {
+    id: 'att_sess_6',
+    classId: 'class_tkj_1',
+    tanggal: `${currentYear}-03-22`,
+    pertemuanKe: 6,
+    topikMateri: 'Evaluasi & Uji Kompetensi Jaringan Triwulan 1',
+    records: {
+      std_1: { status: 'H' },
+      std_2: { status: 'H' },
+      std_3: { status: 'H' },
+      std_4: { status: 'H' },
+      std_5: { status: 'H' },
+      std_6: { status: 'H' },
+      std_7: { status: 'H' },
+      std_8: { status: 'H' },
+      std_9: { status: 'H' },
+      std_10: { status: 'H' },
+    },
+  },
+];
+
+export const DEFAULT_GRADES: StudentGrade[] = DEFAULT_STUDENTS.map((std, i) => ({
+  id: `grade_${std.id}`,
+  studentId: std.id,
+  classId: 'class_tkj_1',
+  formatif1: 85 + (i % 8),
+  formatif2: 80 + (i % 10),
+  formatif3: 82 + (i % 7),
+  formatif4: 88 + (i % 5),
+  formatif5: 84 + (i % 9),
+  formatif6: null,
+  formatif7: null,
+  formatif8: null,
+  formatif9: null,
+  formatif10: null,
+  sumatifTengah: 84 + (i % 8),
+  sumatifAkhir: 86 + (i % 6),
+  catatan: 'Kompeten dalam praktik konfigurasi jaringan',
+}));
+
+export const DEFAULT_AGENDAS: TeachingAgenda[] = [
+  {
+    id: 'agenda_1',
+    classId: 'class_tkj_1',
+    tanggal: `${currentYear}-01-12`,
+    hari: 'Senin',
+    jamKe: '1 - 4',
+    rentangJam: '07.00 - 10.00',
+    materiAjar: 'Konsep Dasar Routing Statis & MikroTik',
+    kegiatan: 'Penyampaian materi dan praktik simulasi Cisco Packet Tracer',
+    catatan: 'Seluruh siswa antusias dan tuntas konfigurasi',
+    hadirCount: 10,
+    tidakHadirCount: 0,
+  },
+  {
+    id: 'agenda_2',
+    classId: 'class_tkj_1',
+    tanggal: `${currentYear}-02-09`,
+    hari: 'Senin',
+    jamKe: '1 - 4',
+    rentangJam: '07.00 - 10.00',
+    materiAjar: 'Praktikum Routing Dinamis OSPF Single Area',
+    kegiatan: 'Konfigurasi router MikroTik RB750Gr3 di laboratorium komputer',
+    catatan: '1 siswa sakit, materi dilanjutkan pendampingan tutor sebaya',
+    hadirCount: 9,
+    tidakHadirCount: 1,
+  },
+];
+
+// LocalStorage Helper Helpers
+function getLocalItem<T>(key: string, defaultValue: T): T {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return defaultValue;
+    return JSON.parse(raw) as T;
+  } catch {
+    return defaultValue;
+  }
+}
+
+function setLocalItem<T>(key: string, value: T): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
+// ============================================================================
 // 1. TEACHER PROFILE SERVICE
 // ============================================================================
 
@@ -28,167 +284,105 @@ export async function getTeacherProfile(force = false): Promise<TeacherProfile |
     if (cached) return cached;
   }
 
-  const supabase = getSupabaseClient();
+  const supabase = getSafeSupabaseClient();
   const user = await getAuthUser();
-  if (!user) return null;
 
-  const { data, error } = await supabase
-    .from('teacher_profiles')
-    .select('*')
-    .eq('user_id', user.id)
-    .maybeSingle();
+  if (supabase && user) {
+    try {
+      const { data, error } = await supabase
+        .from('teacher_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-  if (error) {
-    console.error('Error fetching teacher profile:', error);
-    throw error;
+      if (!error && data) {
+        const profile: TeacherProfile = {
+          id: data.id,
+          namaGuru: data.nama_guru || user.user_metadata?.nama_guru || DEFAULT_TEACHER.namaGuru,
+          nip: data.nip || '',
+          nbm: data.nbm || '',
+          namaSekolah: data.nama_sekolah || SCHOOL_CONFIG.namaSekolah,
+          namaKepalaSekolah: data.nama_kepala_sekolah || user.user_metadata?.nama_kepala_sekolah || DEFAULT_TEACHER.namaKepalaSekolah,
+          nipKepalaSekolah: data.nip_kepala_sekolah || user.user_metadata?.nip_kepala_sekolah || DEFAULT_TEACHER.nipKepalaSekolah,
+          nbmKepalaSekolah: data.nbm_kepala_sekolah || user.user_metadata?.nbm_kepala_sekolah || DEFAULT_TEACHER.nbmKepalaSekolah,
+          mataPelajaranUtama: data.mata_pelajaran_utama || 'Konsentrasi Keahlian TKJ',
+          tahunAjaran: data.tahun_ajaran || '2025/2026',
+          semester: (data.semester as 'Ganjil' | 'Genap') || 'Genap',
+          email: data.email || user.email || '',
+          avatarUrl: data.avatar_url,
+          activeClassId: data.active_class_id,
+          isLoggedIn: true,
+        };
+        SafeCache.set('teacher_profile', profile);
+        setLocalItem('muhiba_teacher_profile', profile);
+        return profile;
+      }
+    } catch (e) {
+      console.warn('Supabase profile fetch notice, using local profile:', e);
+    }
   }
 
-  if (!data) return null;
-
-  const profile: TeacherProfile = {
-    id: data.id,
-    namaGuru: data.nama_guru || user.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
-    nip: data.nip || '',
-    nbm: data.nbm || '',
-    namaSekolah: data.nama_sekolah || SCHOOL_CONFIG.namaSekolah,
-    namaKepalaSekolah: data.nama_kepala_sekolah || user.user_metadata?.nama_kepala_sekolah || '',
-    nipKepalaSekolah: data.nip_kepala_sekolah || user.user_metadata?.nip_kepala_sekolah || '',
-    nbmKepalaSekolah: data.nbm_kepala_sekolah || user.user_metadata?.nbm_kepala_sekolah || '',
-    mataPelajaranUtama: data.mata_pelajaran_utama || 'Konsentrasi Keahlian TKJ',
-    tahunAjaran: data.tahun_ajaran || '2025/2026',
-    semester: (data.semester as 'Ganjil' | 'Genap') || 'Genap',
-    email: data.email || user.email || '',
-    avatarUrl: data.avatar_url,
-    activeClassId: data.active_class_id,
-    isLoggedIn: true,
+  // Fallback to local profile or default
+  const localProfile = getLocalItem<TeacherProfile | null>('muhiba_teacher_profile', null);
+  const result = localProfile || {
+    ...DEFAULT_TEACHER,
+    namaGuru: user?.user_metadata?.nama_guru || DEFAULT_TEACHER.namaGuru,
+    email: user?.email || DEFAULT_TEACHER.email,
   };
 
-  SafeCache.set('teacher_profile', profile);
-  try {
-    localStorage.setItem('muhiba_teacher_profile', JSON.stringify(profile));
-  } catch {}
-
-  return profile;
+  SafeCache.set('teacher_profile', result);
+  setLocalItem('muhiba_teacher_profile', result);
+  return result;
 }
 
 export async function createOrUpdateTeacherProfile(
   profile: Partial<TeacherProfile>
 ): Promise<TeacherProfile> {
-  const supabase = getSupabaseClient();
+  const current = (await getTeacherProfile()) || DEFAULT_TEACHER;
   const user = await getAuthUser();
-  if (!user) throw new Error('User belum terautentikasi');
+  const userId = user?.id || 'guru_offline_id';
 
-  const { data: existing } = await supabase
-    .from('teacher_profiles')
-    .select('*')
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  const profileId = profile.id || existing?.id || `teacher_${user.id.slice(0, 8)}`;
-  const namaKepala = profile.namaKepalaSekolah ?? existing?.nama_kepala_sekolah ?? user.user_metadata?.nama_kepala_sekolah ?? '';
-  const nipKepala = profile.nipKepalaSekolah ?? existing?.nip_kepala_sekolah ?? user.user_metadata?.nip_kepala_sekolah ?? '';
-  const nbmKepala = profile.nbmKepalaSekolah ?? existing?.nbm_kepala_sekolah ?? user.user_metadata?.nbm_kepala_sekolah ?? '';
-
-  // Synchronize to Auth user metadata in cloud as resilient backup
-  try {
-    await supabase.auth.updateUser({
-      data: {
-        nama_guru: profile.namaGuru ?? existing?.nama_guru ?? user.user_metadata?.nama_guru,
-        nama_sekolah: profile.namaSekolah ?? existing?.nama_sekolah ?? SCHOOL_CONFIG.namaSekolah,
-        nama_kepala_sekolah: namaKepala,
-        nip_kepala_sekolah: nipKepala,
-        nbm_kepala_sekolah: nbmKepala,
-        tahun_ajaran: profile.tahunAjaran ?? existing?.tahun_ajaran ?? '2025/2026',
-        semester: profile.semester ?? existing?.semester ?? 'Genap',
-      },
-    });
-  } catch (authErr) {
-    console.warn('Auth user_metadata sync notice:', authErr);
-  }
-
-  const payload: Record<string, any> = {
-    id: profileId,
-    user_id: user.id,
-    nama_guru:
-      profile.namaGuru ??
-      existing?.nama_guru ??
-      user.user_metadata?.nama_guru ??
-      'Guru SMK Muhammadiyah Bawang',
-    nip: profile.nip ?? existing?.nip ?? '',
-    nbm: profile.nbm ?? existing?.nbm ?? '',
-    nama_sekolah: profile.namaSekolah ?? existing?.nama_sekolah ?? SCHOOL_CONFIG.namaSekolah,
-    nama_kepala_sekolah: namaKepala,
-    nip_kepala_sekolah: nipKepala,
-    nbm_kepala_sekolah: nbmKepala,
-    mata_pelajaran_utama:
-      profile.mataPelajaranUtama ?? existing?.mata_pelajaran_utama ?? 'Konsentrasi Keahlian TKJ',
-    tahun_ajaran: profile.tahunAjaran ?? existing?.tahun_ajaran ?? '2025/2026',
-    semester: profile.semester ?? existing?.semester ?? 'Genap',
-    email: user.email || profile.email || existing?.email || '',
-    avatar_url: profile.avatarUrl ?? existing?.avatar_url ?? '',
-    active_class_id:
-      profile.activeClassId !== undefined ? profile.activeClassId : (existing?.active_class_id || null),
-    updated_at: new Date().toISOString(),
-  };
-
-  let data: any = null;
-  const { data: upsertData, error } = await supabase
-    .from('teacher_profiles')
-    .upsert(payload, { onConflict: 'user_id' })
-    .select()
-    .single();
-
-  if (error) {
-    // If the columns do not exist yet in postgres table, retry without them
-    if (error.message?.includes('nama_kepala_sekolah') || error.code === '42703') {
-      const fallbackPayload = { ...payload };
-      delete fallbackPayload.nama_kepala_sekolah;
-      delete fallbackPayload.nip_kepala_sekolah;
-      delete fallbackPayload.nbm_kepala_sekolah;
-
-      const { data: retryData, error: retryError } = await supabase
-        .from('teacher_profiles')
-        .upsert(fallbackPayload, { onConflict: 'user_id' })
-        .select()
-        .single();
-
-      if (retryError) {
-        console.error('Error saving teacher profile retry:', retryError);
-        throw retryError;
-      }
-      data = retryData;
-    } else {
-      console.error('Error saving teacher profile:', error);
-      throw error;
-    }
-  } else {
-    data = upsertData;
-  }
-
-  const result: TeacherProfile = {
-    id: data.id,
-    namaGuru: data.nama_guru,
-    nip: data.nip || '',
-    nbm: data.nbm || '',
-    namaSekolah: data.nama_sekolah || SCHOOL_CONFIG.namaSekolah,
-    namaKepalaSekolah: data.nama_kepala_sekolah || namaKepala || '',
-    nipKepalaSekolah: data.nip_kepala_sekolah || nipKepala || '',
-    nbmKepalaSekolah: data.nbm_kepala_sekolah || nbmKepala || '',
-    mataPelajaranUtama: data.mata_pelajaran_utama,
-    tahunAjaran: data.tahun_ajaran,
-    semester: data.semester as 'Ganjil' | 'Genap',
-    email: data.email,
-    avatarUrl: data.avatar_url,
-    activeClassId: data.active_class_id,
+  const updated: TeacherProfile = {
+    ...current,
+    ...profile,
+    id: profile.id || current.id || `teacher_${userId.slice(0, 8)}`,
+    namaGuru: profile.namaGuru ?? current.namaGuru,
+    email: user?.email || profile.email || current.email,
     isLoggedIn: true,
   };
 
-  SafeCache.set('teacher_profile', result);
-  try {
-    localStorage.setItem('muhiba_teacher_profile', JSON.stringify(result));
-  } catch {}
+  SafeCache.set('teacher_profile', updated);
+  setLocalItem('muhiba_teacher_profile', updated);
 
-  return result;
+  const supabase = getSafeSupabaseClient();
+  if (supabase && user) {
+    try {
+      const payload: Record<string, any> = {
+        id: updated.id,
+        user_id: user.id,
+        nama_guru: updated.namaGuru,
+        nip: updated.nip || '',
+        nbm: updated.nbm || '',
+        nama_sekolah: updated.namaSekolah,
+        nama_kepala_sekolah: updated.namaKepalaSekolah || '',
+        nip_kepala_sekolah: updated.nipKepalaSekolah || '',
+        nbm_kepala_sekolah: updated.nbmKepalaSekolah || '',
+        mata_pelajaran_utama: updated.mataPelajaranUtama,
+        tahun_ajaran: updated.tahunAjaran,
+        semester: updated.semester,
+        email: updated.email,
+        avatar_url: updated.avatarUrl || '',
+        active_class_id: updated.activeClassId || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      await supabase.from('teacher_profiles').upsert(payload, { onConflict: 'user_id' });
+    } catch (e) {
+      console.warn('Could not sync teacher profile to Supabase, saved locally:', e);
+    }
+  }
+
+  return updated;
 }
 
 // ============================================================================
@@ -196,302 +390,330 @@ export async function createOrUpdateTeacherProfile(
 // ============================================================================
 
 export async function getClasses(): Promise<ClassRoom[]> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('classes')
-    .select('*')
-    .order('created_at', { ascending: true });
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('classes')
+        .select('*')
+        .order('created_at', { ascending: true });
 
-  if (error) {
-    console.error('Error fetching classes:', error);
-    throw error;
+      if (!error && data && data.length > 0) {
+        const classes: ClassRoom[] = data.map((c: any) => ({
+          id: c.id,
+          namaKelas: c.nama_kelas,
+          mataPelajaran: c.mata_pelajaran,
+          kkm: Number(c.kkm) || 75,
+          jurusan: c.jurusan || 'TKJ',
+          keterangan: c.keterangan,
+          createdAt: c.created_at,
+        }));
+        setLocalItem('smk_classes', classes);
+        return classes;
+      }
+    } catch (e) {
+      console.warn('Supabase classes fetch notice, using local classes:', e);
+    }
   }
 
-  return (data || []).map((c: any) => ({
-    id: c.id,
-    namaKelas: c.nama_kelas,
-    mataPelajaran: c.mata_pelajaran,
-    kkm: Number(c.kkm),
-    jurusan: c.jurusan,
-    keterangan: c.keterangan,
-    createdAt: c.created_at,
-  }));
+  // Fallback to local storage
+  let localClasses = getLocalItem<ClassRoom[]>('smk_classes', []);
+  if (localClasses.length === 0) {
+    localClasses = [...DEFAULT_CLASSES];
+    setLocalItem('smk_classes', localClasses);
+  }
+  return localClasses;
 }
 
 export async function createClass(cls: ClassRoom): Promise<ClassRoom> {
-  const supabase = getSupabaseClient();
+  const localClasses = getLocalItem<ClassRoom[]>('smk_classes', DEFAULT_CLASSES);
+  const updatedClasses = [...localClasses.filter((c) => c.id !== cls.id), cls];
+  setLocalItem('smk_classes', updatedClasses);
+
+  const supabase = getSafeSupabaseClient();
   const user = await getAuthUser();
-  if (!user) throw new Error('User belum login');
-
-  const { data, error } = await supabase
-    .from('classes')
-    .insert({
-      id: cls.id,
-      user_id: user.id,
-      nama_kelas: cls.namaKelas,
-      mata_pelajaran: cls.mataPelajaran,
-      kkm: cls.kkm,
-      jurusan: cls.jurusan,
-      keterangan: cls.keterangan || '',
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating class:', error);
-    throw error;
+  if (supabase && user) {
+    try {
+      await supabase.from('classes').insert({
+        id: cls.id,
+        user_id: user.id,
+        nama_kelas: cls.namaKelas,
+        mataPelajaran: cls.mataPelajaran,
+        kkm: cls.kkm,
+        jurusan: cls.jurusan,
+        keterangan: cls.keterangan || '',
+      });
+    } catch (e) {
+      console.warn('Could not sync class to cloud, saved locally:', e);
+    }
   }
 
-  return {
-    id: data.id,
-    namaKelas: data.nama_kelas,
-    mataPelajaran: data.mata_pelajaran,
-    kkm: Number(data.kkm),
-    jurusan: data.jurusan,
-    keterangan: data.keterangan,
-    createdAt: data.created_at,
-  };
+  return cls;
 }
 
 export async function updateClass(cls: ClassRoom): Promise<ClassRoom> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('classes')
-    .update({
-      nama_kelas: cls.namaKelas,
-      mata_pelajaran: cls.mataPelajaran,
-      kkm: cls.kkm,
-      jurusan: cls.jurusan,
-      keterangan: cls.keterangan || '',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', cls.id)
-    .select()
-    .single();
+  const localClasses = getLocalItem<ClassRoom[]>('smk_classes', DEFAULT_CLASSES);
+  const updatedClasses = localClasses.map((c) => (c.id === cls.id ? cls : c));
+  setLocalItem('smk_classes', updatedClasses);
 
-  if (error) {
-    console.error('Error updating class:', error);
-    throw error;
-  }
-
-  return {
-    id: data.id,
-    namaKelas: data.nama_kelas,
-    mataPelajaran: data.mata_pelajaran,
-    kkm: Number(data.kkm),
-    jurusan: data.jurusan,
-    keterangan: data.keterangan,
-    createdAt: data.created_at,
-  };
-}
-
-export async function saveClass(cls: ClassRoom): Promise<ClassRoom> {
-  if (cls.id && !cls.id.startsWith('temp_')) {
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
     try {
-      return await updateClass(cls);
-    } catch {
-      return await createClass(cls);
+      await supabase
+        .from('classes')
+        .update({
+          nama_kelas: cls.namaKelas,
+          mata_pelajaran: cls.mataPelajaran,
+          kkm: cls.kkm,
+          jurusan: cls.jurusan,
+          keterangan: cls.keterangan || '',
+        })
+        .eq('id', cls.id);
+    } catch (e) {
+      console.warn('Could not sync updateClass to cloud:', e);
     }
   }
-  return createClass(cls);
+
+  return cls;
+}
+
+export async function deleteClass(classId: string): Promise<void> {
+  const localClasses = getLocalItem<ClassRoom[]>('smk_classes', DEFAULT_CLASSES);
+  const updatedClasses = localClasses.filter((c) => c.id !== classId);
+  setLocalItem('smk_classes', updatedClasses);
+
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('classes').delete().eq('id', classId);
+    } catch (e) {
+      console.warn('Could not sync deleteClass to cloud:', e);
+    }
+  }
 }
 
 export async function getClassDependencyCounts(classId: string): Promise<{
   studentsCount: number;
   attendanceCount: number;
   gradesCount: number;
-  agendasCount: number;
 }> {
-  const supabase = getSupabaseClient();
-  const [studentsRes, attendanceRes, gradesRes, agendasRes] = await Promise.all([
-    supabase.from('students').select('id', { count: 'exact', head: true }).eq('class_id', classId),
-    supabase.from('attendance_sessions').select('id', { count: 'exact', head: true }).eq('class_id', classId),
-    supabase.from('student_grades').select('id', { count: 'exact', head: true }).eq('class_id', classId),
-    supabase.from('teaching_agendas').select('id', { count: 'exact', head: true }).eq('class_id', classId),
-  ]);
-
-  return {
-    studentsCount: studentsRes.count || 0,
-    attendanceCount: attendanceRes.count || 0,
-    gradesCount: gradesRes.count || 0,
-    agendasCount: agendasRes.count || 0,
-  };
-}
-
-export async function deleteClass(classId: string): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase.from('classes').delete().eq('id', classId);
-  if (error) {
-    console.error('Error deleting class:', error);
-    throw error;
+  try {
+    const students = await getStudents(classId);
+    const attendance = await getAttendanceSessions(classId);
+    const grades = await getStudentGrades(classId);
+    return {
+      studentsCount: students.length,
+      attendanceCount: attendance.length,
+      gradesCount: grades.length,
+    };
+  } catch {
+    return { studentsCount: 0, attendanceCount: 0, gradesCount: 0 };
   }
 }
 
+
 // ============================================================================
-// 3. STUDENTS SERVICE
+// 3. STUDENTS SERVICE & RESEQUENCING
 // ============================================================================
+
+/**
+ * Urutkan dan sesuaikan nomor absen murid berdasarkan abjad nama (A-Z).
+ * Menjamin nomor absen otomatis berurutan dari 1 sampai N tanpa jeda jika ada siswa ditambah atau dihapus.
+ * Menghilangkan nomor absen yang kosong / acak secara otomatis (contoh: 1-10 dihapus no 6, maka no 7 otomatis jadi 6).
+ */
+export function resequenceStudentsAlphabetically(students: Student[], classId?: string): Student[] {
+  if (!students || !Array.isArray(students) || students.length === 0) return [];
+
+  const validStudents = students.filter((s) => Boolean(s && typeof s === 'object'));
+  if (validStudents.length === 0) return [];
+
+  const distinctClassIds = Array.from(new Set(validStudents.map((s) => s.classId).filter(Boolean)));
+  const classIds = classId ? [classId] : (distinctClassIds.length > 0 ? distinctClassIds : ['__all__']);
+
+  let result = [...validStudents];
+
+  for (const cId of classIds) {
+    const classStudents = cId === '__all__'
+      ? [...result]
+      : result.filter((s) => s.classId === cId);
+    const otherStudents = cId === '__all__'
+      ? []
+      : result.filter((s) => s.classId !== cId);
+
+    if (classStudents.length === 0) continue;
+
+    const sorted = [...classStudents].sort((a, b) => {
+      const nameA = String(a?.nama || '').trim();
+      const nameB = String(b?.nama || '').trim();
+      return nameA.localeCompare(nameB, 'id', { sensitivity: 'base' });
+    });
+
+    const resequenced = sorted.map((std, index) => ({
+      ...std,
+      nama: std?.nama || 'Tanpa Nama',
+      no: index + 1,
+    }));
+
+    result = [...otherStudents, ...resequenced];
+  }
+
+  return result;
+}
 
 export async function getStudents(classId?: string): Promise<Student[]> {
-  const supabase = getSupabaseClient();
-  let query = supabase.from('students').select('*').order('no', { ascending: true });
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      let query = supabase.from('students').select('*');
+      if (classId) {
+        query = query.eq('class_id', classId);
+      }
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        const raw: Student[] = data.map((s: any) => ({
+          id: s.id,
+          classId: s.class_id,
+          no: Number(s.no) || 0,
+          nisn: s.nisn || '',
+          nama: s.nama || 'Tanpa Nama',
+          gender: (s.gender === 'P' ? 'P' : 'L') as 'L' | 'P',
+          catatanUmum: s.catatan_umum || '',
+          noHpOrangTua: s.no_hp_orang_tua || '',
+        }));
+        const resequenced = resequenceStudentsAlphabetically(raw, classId);
 
-  if (classId) {
-    query = query.eq('class_id', classId);
+        // Update local store for offline use
+        const existingLocal = getLocalItem<Student[]>('smk_students', DEFAULT_STUDENTS);
+        const merged = classId
+          ? [...existingLocal.filter((s) => s.classId !== classId), ...resequenced]
+          : resequenced;
+        setLocalItem('smk_students', merged);
+
+        return resequenced;
+      }
+    } catch (e) {
+      console.warn('Supabase students fetch notice, using local students:', e);
+    }
   }
 
-  const { data, error } = await query;
-  if (error) {
-    console.error('Error fetching students:', error);
-    throw error;
+  // Fallback local storage
+  let localStudents = getLocalItem<Student[]>('smk_students', []);
+  if (localStudents.length === 0) {
+    localStudents = [...DEFAULT_STUDENTS];
+    setLocalItem('smk_students', localStudents);
   }
 
-  return (data || []).map((s: any) => ({
-    id: s.id,
-    classId: s.class_id,
-    no: Number(s.no),
-    nisn: s.nisn || '',
-    nama: s.nama,
-    gender: s.gender as 'L' | 'P',
-    catatanUmum: s.catatan_umum,
-    noHpOrangTua: s.no_hp_orang_tua,
-  }));
+  const filtered = classId ? localStudents.filter((s) => s.classId === classId) : localStudents;
+  return resequenceStudentsAlphabetically(filtered, classId);
 }
 
 export async function createStudent(std: Student): Promise<Student> {
-  const supabase = getSupabaseClient();
   const id = std.id || `std_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const newStd = { ...std, id };
 
-  const { data, error } = await supabase
-    .from('students')
-    .insert({
-      id,
-      class_id: std.classId,
-      no: std.no,
-      nisn: std.nisn || '',
-      nama: std.nama,
-      gender: std.gender,
-      catatan_umum: std.catatanUmum || '',
-      no_hp_orang_tua: std.noHpOrangTua || '',
-    })
-    .select()
-    .single();
+  const localStudents = getLocalItem<Student[]>('smk_students', DEFAULT_STUDENTS);
+  const updated = [...localStudents.filter((s) => s.id !== id), newStd];
+  const resequenced = resequenceStudentsAlphabetically(updated, std.classId);
+  setLocalItem('smk_students', resequenced);
 
-  if (error) {
-    console.error('Error creating student:', error);
-    throw error;
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('students').insert({
+        id,
+        class_id: std.classId,
+        no: newStd.no,
+        nisn: std.nisn || '',
+        nama: std.nama,
+        gender: std.gender,
+        catatan_umum: std.catatanUmum || '',
+        no_hp_orang_tua: std.noHpOrangTua || '',
+      });
+    } catch (e) {
+      console.warn('Could not sync student to cloud, saved locally:', e);
+    }
   }
 
-  return {
-    id: data.id,
-    classId: data.class_id,
-    no: Number(data.no),
-    nisn: data.nisn || '',
-    nama: data.nama,
-    gender: data.gender,
-    catatanUmum: data.catatan_umum,
-    noHpOrangTua: data.no_hp_orang_tua,
-  };
+  return resequenced.find((s) => s.id === id) || newStd;
 }
 
 export async function updateStudent(std: Student): Promise<Student> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('students')
-    .update({
-      no: std.no,
-      nisn: std.nisn || '',
-      nama: std.nama,
-      gender: std.gender,
-      catatan_umum: std.catatanUmum || '',
-      no_hp_orang_tua: std.noHpOrangTua || '',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', std.id)
-    .select()
-    .single();
+  const localStudents = getLocalItem<Student[]>('smk_students', DEFAULT_STUDENTS);
+  const updated = localStudents.map((s) => (s.id === std.id ? std : s));
+  const resequenced = resequenceStudentsAlphabetically(updated, std.classId);
+  setLocalItem('smk_students', resequenced);
 
-  if (error) {
-    console.error('Error updating student:', error);
-    throw error;
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase
+        .from('students')
+        .update({
+          no: std.no,
+          nisn: std.nisn || '',
+          nama: std.nama,
+          gender: std.gender,
+          catatan_umum: std.catatanUmum || '',
+          no_hp_orang_tua: std.noHpOrangTua || '',
+        })
+        .eq('id', std.id);
+    } catch (e) {
+      console.warn('Could not sync updateStudent to cloud:', e);
+    }
   }
 
-  return {
-    id: data.id,
-    classId: data.class_id,
-    no: Number(data.no),
-    nisn: data.nisn || '',
-    nama: data.nama,
-    gender: data.gender,
-    catatanUmum: data.catatan_umum,
-    noHpOrangTua: data.no_hp_orang_tua,
-  };
-}
-
-export async function saveStudent(std: Student): Promise<Student> {
-  const supabase = getSupabaseClient();
-  const id = std.id || `std_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-  const payload = {
-    id,
-    class_id: std.classId,
-    no: std.no,
-    nisn: std.nisn || '',
-    nama: std.nama,
-    gender: std.gender,
-    catatan_umum: std.catatanUmum || '',
-    no_hp_orang_tua: std.noHpOrangTua || '',
-  };
-
-  const { data, error } = await supabase
-    .from('students')
-    .upsert(payload, { onConflict: 'id' })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error saving student:', error);
-    throw error;
-  }
-
-  return {
-    id: data.id,
-    classId: data.class_id,
-    no: Number(data.no),
-    nisn: data.nisn || '',
-    nama: data.nama,
-    gender: data.gender,
-    catatanUmum: data.catatan_umum,
-    noHpOrangTua: data.no_hp_orang_tua,
-  };
+  return resequenced.find((s) => s.id === std.id) || std;
 }
 
 export async function deleteStudent(studentId: string): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase.from('students').delete().eq('id', studentId);
-  if (error) {
-    console.error('Error deleting student:', error);
-    throw error;
+  const localStudents = getLocalItem<Student[]>('smk_students', DEFAULT_STUDENTS);
+  const target = localStudents.find((s) => s.id === studentId);
+  const classId = target?.classId;
+
+  const remaining = localStudents.filter((s) => s.id !== studentId);
+  const resequenced = classId ? resequenceStudentsAlphabetically(remaining, classId) : remaining;
+  setLocalItem('smk_students', resequenced);
+
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('students').delete().eq('id', studentId);
+      if (classId) {
+        const classRemaining = resequenced.filter((s) => s.classId === classId);
+        await batchInsertStudents(classRemaining);
+      }
+    } catch (e) {
+      console.warn('Could not sync deleteStudent to cloud:', e);
+    }
   }
 }
 
-export async function batchInsertStudents(students: Student[]): Promise<void> {
-  if (students.length === 0) return;
-  const supabase = getSupabaseClient();
+export async function batchInsertStudents(studentsList: Student[]): Promise<void> {
+  if (studentsList.length === 0) return;
 
-  const rows = students.map((std) => ({
-    id: std.id,
-    class_id: std.classId,
-    no: std.no,
-    nisn: std.nisn,
-    nama: std.nama,
-    gender: std.gender,
-    catatan_umum: std.catatanUmum || '',
-    no_hp_orang_tua: std.noHpOrangTua || '',
-  }));
+  const localStudents = getLocalItem<Student[]>('smk_students', DEFAULT_STUDENTS);
+  const ids = new Set(studentsList.map((s) => s.id));
+  const others = localStudents.filter((s) => !ids.has(s.id));
+  const merged = [...others, ...studentsList];
+  setLocalItem('smk_students', merged);
 
-  const { error } = await supabase.from('students').upsert(rows, { onConflict: 'id' });
-  if (error) {
-    console.error('Error batch inserting students:', error);
-    throw error;
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      const rows = studentsList.map((std) => ({
+        id: std.id,
+        class_id: std.classId,
+        no: std.no,
+        nisn: std.nisn,
+        nama: std.nama,
+        gender: std.gender,
+        catatan_umum: std.catatanUmum || '',
+        no_hp_orang_tua: std.noHpOrangTua || '',
+      }));
+      await supabase.from('students').upsert(rows, { onConflict: 'id' });
+    } catch (e) {
+      console.warn('Could not sync batch students to cloud, saved locally:', e);
+    }
   }
 }
 
@@ -500,72 +722,90 @@ export async function batchInsertStudents(students: Student[]): Promise<void> {
 // ============================================================================
 
 export async function getAttendanceSessions(classId?: string): Promise<AttendanceSession[]> {
-  const supabase = getSupabaseClient();
-  let query = supabase.from('attendance_sessions').select('*').order('tanggal', { ascending: false });
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      let query = supabase.from('attendance_sessions').select('*').order('tanggal', { ascending: false });
+      if (classId) {
+        query = query.eq('class_id', classId);
+      }
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        const sessions: AttendanceSession[] = data.map((row: any) => ({
+          id: row.id,
+          classId: row.class_id,
+          tanggal: row.tanggal,
+          pertemuanKe: Number(row.pertemuan_ke),
+          topikMateri: row.topik_materi || '',
+          records: row.records || {},
+        }));
+
+        const existingLocal = getLocalItem<AttendanceSession[]>('smk_attendance', DEFAULT_ATTENDANCE_SESSIONS);
+        const merged = classId
+          ? [...existingLocal.filter((s) => s.classId !== classId), ...sessions]
+          : sessions;
+        setLocalItem('smk_attendance', merged);
+
+        return sessions;
+      }
+    } catch (e) {
+      console.warn('Supabase attendance fetch notice, using local attendance:', e);
+    }
+  }
+
+  // Fallback local storage
+  let localAttendance = getLocalItem<AttendanceSession[]>('smk_attendance', []);
+  if (localAttendance.length === 0) {
+    localAttendance = [...DEFAULT_ATTENDANCE_SESSIONS];
+    setLocalItem('smk_attendance', localAttendance);
+  }
 
   if (classId) {
-    query = query.eq('class_id', classId);
+    return localAttendance.filter((s) => s.classId === classId);
   }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('Error fetching attendance sessions:', error);
-    throw error;
-  }
-
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    classId: row.class_id,
-    tanggal: row.tanggal,
-    pertemuanKe: Number(row.pertemuan_ke),
-    topikMateri: row.topik_materi || '',
-    records: row.records || {},
-  }));
+  return localAttendance;
 }
 
 export async function saveAttendanceSession(session: AttendanceSession): Promise<AttendanceSession> {
-  const supabase = getSupabaseClient();
+  const localAttendance = getLocalItem<AttendanceSession[]>('smk_attendance', DEFAULT_ATTENDANCE_SESSIONS);
+  const updated = [...localAttendance.filter((s) => s.id !== session.id), session];
+  setLocalItem('smk_attendance', updated);
+
+  const supabase = getSafeSupabaseClient();
   const user = await getAuthUser();
-  if (!user) throw new Error('User belum login');
-
-  const payload = {
-    id: session.id,
-    class_id: session.classId,
-    user_id: user.id,
-    tanggal: session.tanggal,
-    pertemuan_ke: session.pertemuanKe,
-    topik_materi: session.topikMateri || '',
-    records: session.records || {},
-    updated_at: new Date().toISOString(),
-  };
-
-  const { data, error } = await supabase
-    .from('attendance_sessions')
-    .upsert(payload, { onConflict: 'id' })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error saving attendance session:', error);
-    throw error;
+  if (supabase && user) {
+    try {
+      const payload = {
+        id: session.id,
+        class_id: session.classId,
+        user_id: user.id,
+        tanggal: session.tanggal,
+        pertemuan_ke: session.pertemuanKe,
+        topik_materi: session.topikMateri || '',
+        records: session.records || {},
+        updated_at: new Date().toISOString(),
+      };
+      await supabase.from('attendance_sessions').upsert(payload, { onConflict: 'id' });
+    } catch (e) {
+      console.warn('Could not sync attendance session to cloud, saved locally:', e);
+    }
   }
 
-  return {
-    id: data.id,
-    classId: data.class_id,
-    tanggal: data.tanggal,
-    pertemuanKe: Number(data.pertemuan_ke),
-    topikMateri: data.topik_materi || '',
-    records: data.records || {},
-  };
+  return session;
 }
 
 export async function deleteAttendanceSession(sessionId: string): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase.from('attendance_sessions').delete().eq('id', sessionId);
-  if (error) {
-    console.error('Error deleting attendance session:', error);
-    throw error;
+  const localAttendance = getLocalItem<AttendanceSession[]>('smk_attendance', DEFAULT_ATTENDANCE_SESSIONS);
+  const updated = localAttendance.filter((s) => s.id !== sessionId);
+  setLocalItem('smk_attendance', updated);
+
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('attendance_sessions').delete().eq('id', sessionId);
+    } catch (e) {
+      console.warn('Could not sync delete attendance to cloud:', e);
+    }
   }
 }
 
@@ -574,128 +814,136 @@ export async function deleteAttendanceSession(sessionId: string): Promise<void> 
 // ============================================================================
 
 export async function getStudentGrades(classId?: string): Promise<StudentGrade[]> {
-  const supabase = getSupabaseClient();
-  let query = supabase.from('student_grades').select('*');
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      let query = supabase.from('student_grades').select('*');
+      if (classId) {
+        query = query.eq('class_id', classId);
+      }
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        const grades: StudentGrade[] = data.map((row: any) => ({
+          id: row.id,
+          studentId: row.student_id,
+          classId: row.class_id,
+          formatif1: row.formatif1 !== null ? Number(row.formatif1) : null,
+          formatif2: row.formatif2 !== null ? Number(row.formatif2) : null,
+          formatif3: row.formatif3 !== null ? Number(row.formatif3) : null,
+          formatif4: row.formatif4 !== null ? Number(row.formatif4) : null,
+          formatif5: row.formatif5 !== null ? Number(row.formatif5) : null,
+          formatif6: row.formatif6 !== null ? Number(row.formatif6) : null,
+          formatif7: row.formatif7 !== null ? Number(row.formatif7) : null,
+          formatif8: row.formatif8 !== null ? Number(row.formatif8) : null,
+          formatif9: row.formatif9 !== null ? Number(row.formatif9) : null,
+          formatif10: row.formatif10 !== null ? Number(row.formatif10) : null,
+          sumatifTengah: row.sumatif_tengah !== null ? Number(row.sumatif_tengah) : null,
+          sumatifAkhir: row.sumatif_akhir !== null ? Number(row.sumatif_akhir) : null,
+          catatan: row.catatan || '',
+        }));
+
+        const existingLocal = getLocalItem<StudentGrade[]>('smk_grades', DEFAULT_GRADES);
+        const merged = classId
+          ? [...existingLocal.filter((g) => g.classId !== classId), ...grades]
+          : grades;
+        setLocalItem('smk_grades', merged);
+
+        return grades;
+      }
+    } catch (e) {
+      console.warn('Supabase grades fetch notice, using local grades:', e);
+    }
+  }
+
+  // Fallback local storage
+  let localGrades = getLocalItem<StudentGrade[]>('smk_grades', []);
+  if (localGrades.length === 0) {
+    localGrades = [...DEFAULT_GRADES];
+    setLocalItem('smk_grades', localGrades);
+  }
 
   if (classId) {
-    query = query.eq('class_id', classId);
+    return localGrades.filter((g) => g.classId === classId);
   }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('Error fetching grades:', error);
-    throw error;
-  }
-
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    studentId: row.student_id,
-    classId: row.class_id,
-    formatif1: row.formatif1 !== null ? Number(row.formatif1) : null,
-    formatif2: row.formatif2 !== null ? Number(row.formatif2) : null,
-    formatif3: row.formatif3 !== null ? Number(row.formatif3) : null,
-    formatif4: row.formatif4 !== null ? Number(row.formatif4) : null,
-    formatif5: row.formatif5 !== null ? Number(row.formatif5) : null,
-    formatif6: row.formatif6 !== null ? Number(row.formatif6) : null,
-    formatif7: row.formatif7 !== null ? Number(row.formatif7) : null,
-    formatif8: row.formatif8 !== null ? Number(row.formatif8) : null,
-    formatif9: row.formatif9 !== null ? Number(row.formatif9) : null,
-    formatif10: row.formatif10 !== null ? Number(row.formatif10) : null,
-    sumatifTengah: row.sumatif_tengah !== null ? Number(row.sumatif_tengah) : null,
-    sumatifAkhir: row.sumatif_akhir !== null ? Number(row.sumatif_akhir) : null,
-    catatan: row.catatan || '',
-  }));
+  return localGrades;
 }
 
 export async function saveStudentGrade(grade: StudentGrade): Promise<StudentGrade> {
-  const supabase = getSupabaseClient();
+  const localGrades = getLocalItem<StudentGrade[]>('smk_grades', DEFAULT_GRADES);
+  const updated = [...localGrades.filter((g) => g.id !== grade.id), grade];
+  setLocalItem('smk_grades', updated);
+
+  const supabase = getSafeSupabaseClient();
   const user = await getAuthUser();
-  if (!user) throw new Error('User belum login');
-
-  const payload = {
-    id: grade.id,
-    student_id: grade.studentId,
-    class_id: grade.classId,
-    user_id: user.id,
-    formatif1: grade.formatif1,
-    formatif2: grade.formatif2,
-    formatif3: grade.formatif3,
-    formatif4: grade.formatif4,
-    formatif5: grade.formatif5,
-    formatif6: grade.formatif6,
-    formatif7: grade.formatif7,
-    formatif8: grade.formatif8,
-    formatif9: grade.formatif9,
-    formatif10: grade.formatif10,
-    sumatif_tengah: grade.sumatifTengah,
-    sumatif_akhir: grade.sumatifAkhir,
-    catatan: grade.catatan || '',
-    updated_at: new Date().toISOString(),
-  };
-
-  const { data, error } = await supabase
-    .from('student_grades')
-    .upsert(payload, { onConflict: 'id' })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error saving grade:', error);
-    throw error;
+  if (supabase && user) {
+    try {
+      const payload = {
+        id: grade.id,
+        student_id: grade.studentId,
+        class_id: grade.classId,
+        user_id: user.id,
+        formatif1: grade.formatif1,
+        formatif2: grade.formatif2,
+        formatif3: grade.formatif3,
+        formatif4: grade.formatif4,
+        formatif5: grade.formatif5,
+        formatif6: grade.formatif6,
+        formatif7: grade.formatif7,
+        formatif8: grade.formatif8,
+        formatif9: grade.formatif9,
+        formatif10: grade.formatif10,
+        sumatif_tengah: grade.sumatifTengah,
+        sumatif_akhir: grade.sumatifAkhir,
+        catatan: grade.catatan || '',
+        updated_at: new Date().toISOString(),
+      };
+      await supabase.from('student_grades').upsert(payload, { onConflict: 'id' });
+    } catch (e) {
+      console.warn('Could not sync grade to cloud, saved locally:', e);
+    }
   }
 
-  return {
-    id: data.id,
-    studentId: data.student_id,
-    classId: data.class_id,
-    formatif1: data.formatif1,
-    formatif2: data.formatif2,
-    formatif3: data.formatif3,
-    formatif4: data.formatif4,
-    formatif5: data.formatif5,
-    formatif6: data.formatif6,
-    formatif7: data.formatif7,
-    formatif8: data.formatif8,
-    formatif9: data.formatif9,
-    formatif10: data.formatif10,
-    sumatifTengah: data.sumatif_tengah,
-    sumatifAkhir: data.sumatif_akhir,
-    catatan: data.catatan,
-  };
+  return grade;
 }
 
 export async function batchUpsertStudentGrades(gradesList: StudentGrade[]): Promise<void> {
   if (gradesList.length === 0) return;
-  const supabase = getSupabaseClient();
+
+  const localGrades = getLocalItem<StudentGrade[]>('smk_grades', DEFAULT_GRADES);
+  const ids = new Set(gradesList.map((g) => g.id));
+  const others = localGrades.filter((g) => !ids.has(g.id));
+  const merged = [...others, ...gradesList];
+  setLocalItem('smk_grades', merged);
+
+  const supabase = getSafeSupabaseClient();
   const user = await getAuthUser();
-  if (!user) throw new Error('User belum login');
-
-  const now = new Date().toISOString();
-  const rows = gradesList.map((g) => ({
-    id: g.id,
-    student_id: g.studentId,
-    class_id: g.classId,
-    user_id: user.id,
-    formatif1: g.formatif1,
-    formatif2: g.formatif2,
-    formatif3: g.formatif3,
-    formatif4: g.formatif4,
-    formatif5: g.formatif5,
-    formatif6: g.formatif6,
-    formatif7: g.formatif7,
-    formatif8: g.formatif8,
-    formatif9: g.formatif9,
-    formatif10: g.formatif10,
-    sumatif_tengah: g.sumatifTengah,
-    sumatif_akhir: g.sumatifAkhir,
-    catatan: g.catatan || '',
-    updated_at: now,
-  }));
-
-  const { error } = await supabase.from('student_grades').upsert(rows, { onConflict: 'id' });
-  if (error) {
-    console.error('Error batch upserting grades:', error);
-    throw error;
+  if (supabase && user) {
+    try {
+      const now = new Date().toISOString();
+      const rows = gradesList.map((g) => ({
+        id: g.id,
+        student_id: g.studentId,
+        class_id: g.classId,
+        user_id: user.id,
+        formatif1: g.formatif1,
+        formatif2: g.formatif2,
+        formatif3: g.formatif3,
+        formatif4: g.formatif4,
+        formatif5: g.formatif5,
+        formatif6: g.formatif6,
+        formatif7: g.formatif7,
+        formatif8: g.formatif8,
+        formatif9: g.formatif9,
+        formatif10: g.formatif10,
+        sumatif_tengah: g.sumatifTengah,
+        sumatif_akhir: g.sumatifAkhir,
+        catatan: g.catatan || '',
+        updated_at: now,
+      }));
+      await supabase.from('student_grades').upsert(rows, { onConflict: 'id' });
+    } catch (e) {
+      console.warn('Could not sync batch grades to cloud, saved locally:', e);
+    }
   }
 }
 
@@ -716,51 +964,47 @@ export async function getGradeColumns(classId?: string): Promise<GradeColumn[]> 
     }
   } catch {}
 
-  try {
-    const supabase = getSafeSupabaseClient();
-    if (supabase) {
-      let query = supabase.from('grade_columns').select('*').order('created_at', { ascending: true });
+  const supabase = getSafeSupabaseClient();
+  if (supabase && classId) {
+    try {
+      const { data, error } = await supabase
+        .from('grade_columns')
+        .select('*')
+        .eq('class_id', classId)
+        .order('id', { ascending: true });
 
-      if (classId) {
-        query = query.eq('class_id', classId);
-      }
-
-      const { data, error } = await query;
       if (!error && data && data.length > 0) {
-        return data.map((row: any) => ({
-          id: row.id,
-          key: row.key,
-          label: row.label,
-          tanggal: row.tanggal || undefined,
-          keterangan: row.keterangan || '',
-          bobot: row.bobot ? Number(row.bobot) : undefined,
+        const cols: GradeColumn[] = data.map((d: any) => ({
+          id: d.id,
+          key: d.key,
+          label: d.label,
+          tanggal: d.tanggal || undefined,
+          keterangan: d.keterangan || undefined,
+          bobot: d.bobot ? Number(d.bobot) : undefined,
         }));
+        return cols;
       }
+    } catch (e) {
+      console.warn('Could not fetch grade columns from Supabase:', e);
     }
-  } catch (err) {
-    console.warn('Falling back to local grade columns:', err);
   }
 
   return getLocalGradeColumns(classId);
 }
 
-export async function saveGradeColumns(
-  columns: GradeColumn[],
-  classId: string
-): Promise<void> {
+export async function saveGradeColumns(columns: GradeColumn[], classId?: string): Promise<void> {
   try {
-    const raw = localStorage.getItem('muhiba_grade_columns');
-    const all = raw ? JSON.parse(raw) : {};
-    all[classId] = columns;
-    localStorage.setItem('muhiba_grade_columns', JSON.stringify(all));
-  } catch {}
+    if (classId) {
+      const raw = localStorage.getItem('muhiba_grade_columns');
+      const all = raw ? JSON.parse(raw) : {};
+      all[classId] = columns;
+      localStorage.setItem('muhiba_grade_columns', JSON.stringify(all));
+    }
+    setLocalGradeColumns(columns, classId);
 
-  setLocalGradeColumns(columns, classId);
-
-  try {
     const supabase = getSafeSupabaseClient();
     const user = await getAuthUser();
-    if (supabase && user) {
+    if (supabase && user && classId) {
       const rows = columns.map((c) => ({
         id: c.id.startsWith('col_') ? `${c.id}_${classId}` : c.id,
         user_id: user.id,
@@ -773,13 +1017,10 @@ export async function saveGradeColumns(
         updated_at: new Date().toISOString(),
       }));
 
-      const { error } = await supabase.from('grade_columns').upsert(rows, { onConflict: 'id' });
-      if (error) {
-        console.warn('Could not sync grade columns to cloud:', error.message);
-      }
+      await supabase.from('grade_columns').upsert(rows, { onConflict: 'id' });
     }
   } catch (err) {
-    console.warn('Supabase offline, saved grade columns locally only:', err);
+    console.warn('Grade columns saved locally:', err);
   }
 }
 
@@ -788,87 +1029,95 @@ export async function saveGradeColumns(
 // ============================================================================
 
 export async function getTeachingAgendas(classId?: string): Promise<TeachingAgenda[]> {
-  const supabase = getSupabaseClient();
-  let query = supabase.from('teaching_agendas').select('*').order('tanggal', { ascending: false });
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      let query = supabase.from('teaching_agendas').select('*').order('tanggal', { ascending: false });
+      if (classId) {
+        query = query.eq('class_id', classId);
+      }
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        const agendas: TeachingAgenda[] = data.map((row: any) => ({
+          id: row.id,
+          classId: row.class_id,
+          tanggal: row.tanggal,
+          hari: row.hari,
+          jamKe: row.jam_ke,
+          rentangJam: row.rentang_jam,
+          materiAjar: row.materi_ajar,
+          kegiatan: row.kegiatan || '',
+          catatan: row.catatan || '',
+          hadirCount: Number(row.hadir_count || 0),
+          tidakHadirCount: Number(row.tidak_hadir_count || 0),
+        }));
+
+        setLocalItem('smk_agendas', agendas);
+        return agendas;
+      }
+    } catch (e) {
+      console.warn('Supabase agendas fetch notice, using local agendas:', e);
+    }
+  }
+
+  // Fallback local storage
+  let localAgendas = getLocalItem<TeachingAgenda[]>('smk_agendas', []);
+  if (localAgendas.length === 0) {
+    localAgendas = [...DEFAULT_AGENDAS];
+    setLocalItem('smk_agendas', localAgendas);
+  }
 
   if (classId) {
-    query = query.eq('class_id', classId);
+    return localAgendas.filter((a) => a.classId === classId);
   }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('Error fetching agendas:', error);
-    throw error;
-  }
-
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    classId: row.class_id,
-    tanggal: row.tanggal,
-    hari: row.hari,
-    jamKe: row.jam_ke,
-    rentangJam: row.rentang_jam,
-    materiAjar: row.materi_ajar,
-    kegiatan: row.kegiatan || '',
-    catatan: row.catatan || '',
-    hadirCount: Number(row.hadir_count || 0),
-    tidakHadirCount: Number(row.tidak_hadir_count || 0),
-  }));
+  return localAgendas;
 }
 
 export async function saveTeachingAgenda(agenda: TeachingAgenda): Promise<TeachingAgenda> {
-  const supabase = getSupabaseClient();
+  const localAgendas = getLocalItem<TeachingAgenda[]>('smk_agendas', DEFAULT_AGENDAS);
+  const updated = [...localAgendas.filter((a) => a.id !== agenda.id), agenda];
+  setLocalItem('smk_agendas', updated);
+
+  const supabase = getSafeSupabaseClient();
   const user = await getAuthUser();
-  if (!user) throw new Error('User belum login');
-
-  const payload = {
-    id: agenda.id,
-    class_id: agenda.classId,
-    user_id: user.id,
-    tanggal: agenda.tanggal,
-    hari: agenda.hari,
-    jam_ke: agenda.jamKe,
-    rentang_jam: agenda.rentangJam,
-    materi_ajar: agenda.materiAjar,
-    kegiatan: agenda.kegiatan || '',
-    catatan: agenda.catatan || '',
-    hadir_count: agenda.hadirCount || 0,
-    tidak_hadir_count: agenda.tidakHadirCount || 0,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { data, error } = await supabase
-    .from('teaching_agendas')
-    .upsert(payload, { onConflict: 'id' })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error saving agenda:', error);
-    throw error;
+  if (supabase && user) {
+    try {
+      const payload = {
+        id: agenda.id,
+        class_id: agenda.classId,
+        user_id: user.id,
+        tanggal: agenda.tanggal,
+        hari: agenda.hari,
+        jam_ke: agenda.jamKe,
+        rentang_jam: agenda.rentangJam,
+        materi_ajar: agenda.materiAjar,
+        kegiatan: agenda.kegiatan || '',
+        catatan: agenda.catatan || '',
+        hadir_count: agenda.hadirCount || 0,
+        tidak_hadir_count: agenda.tidakHadirCount || 0,
+        updated_at: new Date().toISOString(),
+      };
+      await supabase.from('teaching_agendas').upsert(payload, { onConflict: 'id' });
+    } catch (e) {
+      console.warn('Could not sync teaching agenda to cloud, saved locally:', e);
+    }
   }
 
-  return {
-    id: data.id,
-    classId: data.class_id,
-    tanggal: data.tanggal,
-    hari: data.hari,
-    jamKe: data.jam_ke,
-    rentangJam: data.rentang_jam,
-    materiAjar: data.materi_ajar,
-    kegiatan: data.kegiatan || '',
-    catatan: data.catatan || '',
-    hadirCount: Number(data.hadir_count || 0),
-    tidakHadirCount: Number(data.tidak_hadir_count || 0),
-  };
+  return agenda;
 }
 
 export async function deleteTeachingAgenda(agendaId: string): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase.from('teaching_agendas').delete().eq('id', agendaId);
-  if (error) {
-    console.error('Error deleting agenda:', error);
-    throw error;
+  const localAgendas = getLocalItem<TeachingAgenda[]>('smk_agendas', DEFAULT_AGENDAS);
+  const updated = localAgendas.filter((a) => a.id !== agendaId);
+  setLocalItem('smk_agendas', updated);
+
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('teaching_agendas').delete().eq('id', agendaId);
+    } catch (e) {
+      console.warn('Could not sync delete agenda to cloud:', e);
+    }
   }
 }
 
@@ -877,81 +1126,84 @@ export async function deleteTeachingAgenda(agendaId: string): Promise<void> {
 // ============================================================================
 
 export async function getSavingTransactions(classId?: string): Promise<SavingTransaction[]> {
-  const supabase = getSupabaseClient();
-  let query = supabase.from('saving_transactions').select('*').order('tanggal', { ascending: false });
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      let query = supabase.from('saving_transactions').select('*').order('tanggal', { ascending: false });
+      if (classId) {
+        query = query.eq('class_id', classId);
+      }
+      const { data, error } = await query;
+      if (!error && data) {
+        const txs: SavingTransaction[] = data.map((row: any) => ({
+          id: row.id,
+          classId: row.class_id,
+          studentId: row.student_id || undefined,
+          isClassCash: Boolean(row.is_class_cash),
+          tanggal: row.tanggal,
+          tipe: row.tipe as 'masuk' | 'keluar',
+          jumlah: Number(row.jumlah),
+          keterangan: row.keterangan || '',
+          pencatat: row.pencatat || '',
+        }));
+        setLocalItem('smk_savings', txs);
+        return txs;
+      }
+    } catch (e) {
+      console.warn('Supabase savings fetch notice, using local savings:', e);
+    }
+  }
 
+  const localSavings = getLocalItem<SavingTransaction[]>('smk_savings', []);
   if (classId) {
-    query = query.eq('class_id', classId);
+    return localSavings.filter((s) => s.classId === classId);
   }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error('Error fetching saving transactions:', error);
-    throw error;
-  }
-
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    classId: row.class_id,
-    studentId: row.student_id || undefined,
-    isClassCash: Boolean(row.is_class_cash),
-    tanggal: row.tanggal,
-    tipe: row.tipe as 'masuk' | 'keluar',
-    jumlah: Number(row.jumlah),
-    keterangan: row.keterangan || '',
-    pencatat: row.pencatat || '',
-  }));
+  return localSavings;
 }
 
 export async function saveSavingTransaction(tx: SavingTransaction): Promise<SavingTransaction> {
-  const supabase = getSupabaseClient();
+  const localSavings = getLocalItem<SavingTransaction[]>('smk_savings', []);
+  const updated = [...localSavings.filter((s) => s.id !== tx.id), tx];
+  setLocalItem('smk_savings', updated);
+
+  const supabase = getSafeSupabaseClient();
   const user = await getAuthUser();
-  if (!user) throw new Error('User belum login');
-
-  const payload = {
-    id: tx.id,
-    class_id: tx.classId,
-    user_id: user.id,
-    student_id: tx.isClassCash ? null : (tx.studentId || null),
-    is_class_cash: tx.isClassCash,
-    tanggal: tx.tanggal,
-    tipe: tx.tipe,
-    jumlah: tx.jumlah,
-    keterangan: tx.keterangan || '',
-    pencatat: tx.pencatat || '',
-    updated_at: new Date().toISOString(),
-  };
-
-  const { data, error } = await supabase
-    .from('saving_transactions')
-    .upsert(payload, { onConflict: 'id' })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error saving transaction:', error);
-    throw error;
+  if (supabase && user) {
+    try {
+      const payload = {
+        id: tx.id,
+        class_id: tx.classId,
+        user_id: user.id,
+        student_id: tx.isClassCash ? null : (tx.studentId || null),
+        is_class_cash: tx.isClassCash,
+        tanggal: tx.tanggal,
+        tipe: tx.tipe,
+        jumlah: tx.jumlah,
+        keterangan: tx.keterangan || '',
+        pencatat: tx.pencatat || '',
+        updated_at: new Date().toISOString(),
+      };
+      await supabase.from('saving_transactions').upsert(payload, { onConflict: 'id' });
+    } catch (e) {
+      console.warn('Could not sync saving tx to cloud, saved locally:', e);
+    }
   }
 
-  return {
-    id: data.id,
-    classId: data.class_id,
-    studentId: data.student_id || undefined,
-    isClassCash: Boolean(data.is_class_cash),
-    tanggal: data.tanggal,
-    tipe: data.tipe as 'masuk' | 'keluar',
-    jumlah: Number(data.jumlah),
-    keterangan: data.keterangan || '',
-    pencatat: data.pencatat || '',
-  };
+  return tx;
 }
 
 export async function deleteSavingTransaction(txId: string): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase.from('saving_transactions').delete().eq('id', txId);
-  if (error) {
-    console.error('Error deleting saving transaction:', error);
-    throw error;
+  const localSavings = getLocalItem<SavingTransaction[]>('smk_savings', []);
+  const updated = localSavings.filter((s) => s.id !== txId);
+  setLocalItem('smk_savings', updated);
+
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('saving_transactions').delete().eq('id', txId);
+    } catch (e) {
+      console.warn('Could not sync delete saving tx to cloud:', e);
+    }
   }
 }
 
@@ -961,42 +1213,62 @@ export async function deleteSavingTransaction(txId: string): Promise<void> {
 
 export async function createOrUpdatePublicShare(record: PublicShareRecord): Promise<void> {
   const content = record.payload || record.data || {};
+  const strippedClassId = record.id.replace(/^(att_share_|grade_share_|nilai_share_|sav_share_|tabungan_share_|age_share_|agenda_share_|share_)/, '');
+  const extractedClassId =
+    record.classId ||
+    (content as any).classId ||
+    (strippedClassId !== record.id ? strippedClassId : undefined);
+
   const fullPayload = {
-    ...content,
-    shareType: record.type,
-    shareTitle: record.title,
-    classId: record.classId,
-    created_at: record.createdAt || record.created_at || new Date().toISOString(),
+    id: record.id,
+    type: record.type,
+    classId: extractedClassId,
+    title: record.title || 'Data Publik SMK Muhammadiyah Bawang',
+    data: {
+      ...content,
+      classId: extractedClassId,
+    },
+    payload: {
+      ...content,
+      classId: extractedClassId,
+    },
+    created_at: record.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
-  SafeCache.set(`pub_share_${record.id}`, fullPayload, 24 * 60 * 60 * 1000);
+  SafeCache.set(`pub_share_${record.id}`, fullPayload);
   try {
     localStorage.setItem(`pub_share_${record.id}`, JSON.stringify(fullPayload));
+    if (extractedClassId) {
+      localStorage.setItem(`pub_share_${record.type}_${extractedClassId}`, JSON.stringify(fullPayload));
+      localStorage.setItem(`pub_share_class_${extractedClassId}`, JSON.stringify(fullPayload));
+    }
   } catch {}
 
   const supabase = getSafeSupabaseClient();
-  const user = await getAuthUser();
   if (supabase) {
     try {
-      const payloadRow = {
+      const row = {
         id: record.id,
-        user_id: user?.id || null,
-        class_id: record.classId,
         type: record.type,
         title: record.title,
-        payload: fullPayload,
+        payload: {
+          ...content,
+          classId: extractedClassId,
+        },
         updated_at: new Date().toISOString(),
       };
-      await supabase.from('public_shares').upsert(payloadRow, { onConflict: 'id' });
-    } catch (err) {
-      console.warn('Could not sync public share to cloud:', err);
+      await supabase.from('public_shares').upsert(row, { onConflict: 'id' });
+    } catch (err: any) {
+      console.warn('Could not upsert public share to Supabase:', err.message);
     }
   }
 }
 
-export async function getPublicShare(shareId: string): Promise<any | null> {
-  // 1. Check Supabase first for real-time fresh data
+export async function getPublicShare(shareId: string): Promise<PublicShareRecord | null> {
+  const cached = SafeCache.get<PublicShareRecord>(`pub_share_${shareId}`);
+  if (cached) return cached;
+
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
@@ -1007,50 +1279,56 @@ export async function getPublicShare(shareId: string): Promise<any | null> {
         .maybeSingle();
 
       if (!error && data) {
-        const payloadData = {
-          ...(data.payload || {}),
-          shareType: data.type,
-          shareTitle: data.title,
-          classId: data.class_id,
+        const payloadData = data.payload || data.data || {};
+        const strippedClassId = data.id.replace(/^(att_share_|grade_share_|nilai_share_|sav_share_|tabungan_share_|age_share_|agenda_share_|share_)/, '');
+        const extractedClassId =
+          data.class_id ||
+          payloadData.classId ||
+          (strippedClassId !== data.id ? strippedClassId : undefined);
+
+        const rec: PublicShareRecord = {
+          id: data.id,
+          type: data.type,
+          classId: extractedClassId,
+          title: data.title,
+          data: payloadData,
+          payload: payloadData,
           created_at: data.created_at,
           updated_at: data.updated_at,
         };
-        SafeCache.set(`pub_share_${shareId}`, payloadData, 24 * 60 * 60 * 1000);
-        try {
-          localStorage.setItem(`pub_share_${shareId}`, JSON.stringify(payloadData));
-        } catch {}
-        return payloadData;
+        SafeCache.set(`pub_share_${shareId}`, rec);
+        return rec;
       }
     } catch (err) {
-      console.warn('Error fetching public share from cloud:', err);
+      console.warn('Supabase fetch public share notice:', err);
     }
   }
 
-  // 2. Fallback to cache and localStorage
-  const cached = SafeCache.get<any>(`pub_share_${shareId}`);
-  if (cached) return cached;
+  const raw = getLocalItem<PublicShareRecord | null>(`pub_share_${shareId}`, null);
+  if (raw) {
+    SafeCache.set(`pub_share_${shareId}`, raw);
+    return raw;
+  }
 
-  try {
-    const raw = localStorage.getItem(`pub_share_${shareId}`);
-    if (raw) return JSON.parse(raw);
-  } catch (err) {
-    console.warn('Could not read public share from localStorage', err);
+  // Fallback: Check if shareId has extracted classId and check by type and class
+  const strippedClassId = shareId.replace(/^(att_share_|grade_share_|nilai_share_|sav_share_|tabungan_share_|age_share_|agenda_share_|share_)/, '');
+  if (strippedClassId && strippedClassId !== shareId) {
+    for (const t of ['absen', 'nilai', 'tabungan', 'agenda']) {
+      const byClass = getLocalItem<PublicShareRecord | null>(`pub_share_${t}_${strippedClassId}`, null);
+      if (byClass) return byClass;
+    }
+    const genericByClass = getLocalItem<PublicShareRecord | null>(`pub_share_class_${strippedClassId}`, null);
+    if (genericByClass) return genericByClass;
+  }
+
+  const classMatch = shareId.match(/class_[a-zA-Z0-9_-]+/);
+  if (classMatch) {
+    const classId = classMatch[0];
+    for (const t of ['absen', 'nilai', 'tabungan', 'agenda']) {
+      const byClass = getLocalItem<PublicShareRecord | null>(`pub_share_${t}_${classId}`, null);
+      if (byClass) return byClass;
+    }
   }
 
   return null;
 }
-
-// ============================================================================
-// COMPATIBILITY ALIASES FOR APP.TSX AND EXTERNAL CONSUMERS
-// ============================================================================
-
-export const fetchTeacherProfile = getTeacherProfile;
-export const saveTeacherProfile = createOrUpdateTeacherProfile;
-export const fetchClasses = getClasses;
-export const fetchStudents = getStudents;
-export const saveStudentsBulk = batchInsertStudents;
-export const fetchAttendanceSessions = getAttendanceSessions;
-export const fetchGrades = getStudentGrades;
-export const saveGrade = saveStudentGrade;
-export const fetchTeachingAgendas = getTeachingAgendas;
-export const fetchSavingTransactions = getSavingTransactions;

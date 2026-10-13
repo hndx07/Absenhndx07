@@ -32,10 +32,22 @@ import {
   FileText,
   Download,
   FileSpreadsheet,
+  History,
+  ArrowLeft,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { getSafeSupabaseClient } from '../services/supabase';
-import { getPublicShare, getTeacherProfile } from '../services/data';
+import {
+  getPublicShare,
+  getTeacherProfile,
+  getClasses,
+  getStudents,
+  getAttendanceSessions,
+  getStudentGrades,
+  getGradeColumns,
+  getSavingTransactions,
+  getTeachingAgendas,
+} from '../services/data';
 import { TeacherProfile } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { getKurikulumMerdekaAssessment } from '../utils/gradeCalculations';
@@ -48,6 +60,7 @@ import { ExcelDownloadToast } from './ExcelDownloadToast';
 interface PublicSharePageProps {
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
   shareId: string;
+  onExit?: () => void;
 }
 
 function formatIndonesianDate(isoStr?: string): string {
@@ -81,6 +94,7 @@ function formatIndonesianDateTime(isoStr?: string): string {
 export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   type: initialType,
   shareId,
+  onExit,
 }) => {
   const [data, setData] = useState<any>(null);
   const [cloudTeacher, setCloudTeacher] = useState<TeacherProfile | null>(null);
@@ -123,11 +137,85 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         getPublicShare(shareId).catch(() => null),
         getTeacherProfile().catch(() => null),
       ]);
-      if (sharePayload) {
-        setData(sharePayload);
-      }
       if (teacherData) {
         setCloudTeacher(teacherData);
+      }
+
+      if (sharePayload) {
+        const payloadContent =
+          (sharePayload as any).payload || (sharePayload as any).data || sharePayload;
+        setData({
+          ...payloadContent,
+          shareType: (sharePayload as any).type || payloadContent.shareType || initialType,
+          title: (sharePayload as any).title || payloadContent.title,
+          created_at: (sharePayload as any).created_at || payloadContent.created_at,
+          updated_at: (sharePayload as any).updated_at || payloadContent.updated_at,
+        });
+      } else {
+        // Fallback cerdas: ekstrak ID kelas jika ada dan load data langsung dari database/cache
+        const cleanClassId = shareId
+          .replace(/^(att_share_|grade_share_|sav_share_|agenda_share_|att_|grade_|sav_|agenda_)/, '')
+          .trim();
+        const loadedClasses = await getClasses().catch(() => []);
+        const targetClass =
+          loadedClasses.find((c) => c.id === cleanClassId) || loadedClasses[0] || null;
+        const clsId = targetClass?.id || cleanClassId || 'class_tkj_1';
+
+        if (initialType === 'absen') {
+          const [stds, sess] = await Promise.all([
+            getStudents(clsId).catch(() => []),
+            getAttendanceSessions(clsId).catch(() => []),
+          ]);
+          setData({
+            className: targetClass?.namaKelas || 'XII TKJ 1',
+            subject: targetClass?.mataPelajaran || 'Administrasi Infrastruktur Jaringan',
+            teacher: teacherData?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+            teacherName: teacherData?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+            namaSekolah: teacherData?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+            tahunAjaran: teacherData?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
+            semester: teacherData?.semester || SCHOOL_CONFIG.semester,
+            students: stds,
+            sessions: sess,
+            shareType: 'absen',
+          });
+        } else if (initialType === 'nilai') {
+          const [stds, grds, cols] = await Promise.all([
+            getStudents(clsId).catch(() => []),
+            getStudentGrades(clsId).catch(() => []),
+            getGradeColumns(clsId).catch(() => []),
+          ]);
+          setData({
+            className: targetClass?.namaKelas || 'XII TKJ 1',
+            subject: targetClass?.mataPelajaran || 'Administrasi Infrastruktur Jaringan',
+            teacherName: teacherData?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+            namaSekolah: teacherData?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+            tahunAjaran: teacherData?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
+            semester: teacherData?.semester || SCHOOL_CONFIG.semester,
+            kkm: targetClass?.kkm || 75,
+            students: stds,
+            grades: grds,
+            gradeColumns: cols,
+            shareType: 'nilai',
+          });
+        } else if (initialType === 'tabungan') {
+          const [stds, txs] = await Promise.all([
+            getStudents(clsId).catch(() => []),
+            getSavingTransactions(clsId).catch(() => []),
+          ]);
+          setData({
+            className: targetClass?.namaKelas || 'XII TKJ 1',
+            students: stds,
+            transactions: txs,
+            shareType: 'tabungan',
+          });
+        } else if (initialType === 'agenda') {
+          const ags = await getTeachingAgendas(clsId).catch(() => []);
+          setData({
+            className: targetClass?.namaKelas || 'Semua Kelas',
+            agendas: ags,
+            shareType: 'agenda',
+          });
+        }
       }
     } catch (err) {
       console.warn('Could not load public share from supabase', err);
@@ -540,14 +628,28 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
               Tautan publik ini mungkin belum dibagikan atau tautan yang Anda masukkan kurang tepat. Pastikan Anda membuka link resmi yang dibagikan oleh pendidik mata pelajaran SMK Muhammadiyah Bawang.
             </p>
           </div>
-          <div className="pt-2">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2">
             <button
               type="button"
               onClick={loadData}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 mx-auto cursor-pointer shadow-sm shadow-indigo-600/20"
+              className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-indigo-600/20"
             >
               <RefreshCw className="w-4 h-4" />
               Coba Segarkan Lagi
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (onExit) {
+                  onExit();
+                } else if (typeof window !== 'undefined') {
+                  window.location.href = window.location.origin + window.location.pathname;
+                }
+              }}
+              className="w-full sm:w-auto px-5 py-2.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Kembali ke Aplikasi Utama
             </button>
           </div>
         </div>
@@ -561,13 +663,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
 
     const rows = computedGrades.map((g: any, idx: number) => {
       const fVals: number[] = g.fVals || [];
-      const sumFormatif = fVals.length > 0 ? fVals.reduce((a, b) => a + b, 0) : null;
+      const avgF = g.avgF !== null ? g.avgF : (fVals.length > 0 ? Math.round(fVals.reduce((a: number, b: number) => a + b, 0) / fVals.length) : null);
       const sts = typeof g.sts === 'number' && !isNaN(g.sts) ? g.sts : null;
       const sas = typeof g.sas === 'number' && !isNaN(g.sas) ? g.sas : null;
-      let sumSumatif: number | null = null;
-      if (sts !== null || sas !== null) {
-        sumSumatif = (sts !== null ? sts : 0) + (sas !== null ? sas : 0);
-      }
+      const sumatifVals = [sts, sas].filter((v): v is number => v !== null);
+      const avgSumatif = sumatifVals.length > 0 ? Math.round(sumatifVals.reduce((a, b) => a + b, 0) / sumatifVals.length) : null;
 
       const m = getKurikulumMerdekaAssessment(
         g.hasAnyScore ? g.finalScore : null,
@@ -577,13 +677,18 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       );
       const deskripsiLengkap = g.merdekaDeskripsi || m.deskripsi || '-';
 
+      // Kolom Total Formatif adalah nilai rata-rata (bukan raw sum ratusan)
+      const totalFormatifVal = avgF !== null ? avgF : (avgSumatif !== null ? avgSumatif : '-');
+      // Kolom Total Sumatif adalah nilai rata-rata semua nilai sumatif
+      const totalSumatifVal = avgSumatif !== null ? avgSumatif : (avgF !== null ? avgF : '-');
+
       const rowObj: Record<string, any> = {
         No: idx + 1,
         NISN: g.student.nisn || '-',
         'Nama Peserta Didik': g.student.nama,
         'L/P': g.student.gender || '-',
-        'Jumlah Total Nilai Formatif': sumFormatif !== null ? sumFormatif : '-',
-        'Jumlah Total Nilai Sumatif': sumSumatif !== null ? sumSumatif : '-',
+        'Total Formatif': totalFormatifVal,
+        'Total Sumatif': totalSumatifVal,
         'Nilai Akhir (NA)': g.hasAnyScore ? g.finalScore : '-',
         'Predikat': g.predikat,
         'Status Ketuntasan': g.isTuntas ? 'TUNTAS' : 'REMEDIAL',
@@ -618,13 +723,14 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     );
 
     const fVals: number[] = studentGrade.fVals || [];
-    const sumFormatif = fVals.length > 0 ? fVals.reduce((a, b) => a + b, 0) : null;
+    const avgF = studentGrade.avgF !== null ? studentGrade.avgF : (fVals.length > 0 ? Math.round(fVals.reduce((a: number, b: number) => a + b, 0) / fVals.length) : null);
     const sts = typeof studentGrade.sts === 'number' && !isNaN(studentGrade.sts) ? studentGrade.sts : null;
     const sas = typeof studentGrade.sas === 'number' && !isNaN(studentGrade.sas) ? studentGrade.sas : null;
-    let sumSumatif: number | null = null;
-    if (sts !== null || sas !== null) {
-      sumSumatif = (sts !== null ? sts : 0) + (sas !== null ? sas : 0);
-    }
+    const sumatifVals = [sts, sas].filter((v): v is number => v !== null);
+    const avgSumatif = sumatifVals.length > 0 ? Math.round(sumatifVals.reduce((a, b) => a + b, 0) / sumatifVals.length) : null;
+
+    const totalFormatifVal = avgF !== null ? avgF : (avgSumatif !== null ? avgSumatif : '-');
+    const totalSumatifVal = avgSumatif !== null ? avgSumatif : (avgF !== null ? avgF : '-');
 
     const rows: Record<string, any>[] = [
       { 'Komponen Asesmen': 'Satuan Pendidikan', Nilai: satuanPendidikan, Keterangan: '-' },
@@ -633,8 +739,8 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       { 'Komponen Asesmen': 'Mata Pelajaran', Nilai: data?.subject || 'Muatan Kejuruan', Keterangan: `KKM: ${data?.kkm || 75}` },
       { 'Komponen Asesmen': 'Pendidik Pengampu', Nilai: guruPengampu, Keterangan: nbmGuru || nipGuru ? `NIP/NBM: ${nbmGuru || nipGuru}` : '-' },
       { 'Komponen Asesmen': 'Tahun Pelajaran', Nilai: `${tahunAjaran} (${semester})`, Keterangan: '-' },
-      { 'Komponen Asesmen': 'Jumlah Total Nilai Formatif', Nilai: sumFormatif !== null ? sumFormatif : '-', Keterangan: 'Total Asesmen Formatif' },
-      { 'Komponen Asesmen': 'Jumlah Total Nilai Sumatif', Nilai: sumSumatif !== null ? sumSumatif : '-', Keterangan: 'Total Asesmen Sumatif (STS + SAS)' },
+      { 'Komponen Asesmen': 'Total Formatif', Nilai: totalFormatifVal, Keterangan: 'Rata-rata Asesmen Formatif' },
+      { 'Komponen Asesmen': 'Total Sumatif', Nilai: totalSumatifVal, Keterangan: 'Rata-rata Asesmen Sumatif (STS + SAS)' },
       { 'Komponen Asesmen': 'Nilai Akhir (NA)', Nilai: studentGrade.hasAnyScore ? studentGrade.finalScore : '-', Keterangan: `Skala 0-100 (KKM: ${data?.kkm || 75})` },
       { 'Komponen Asesmen': 'Predikat Capaian', Nilai: studentGrade.predikat, Keterangan: m.predikatLabel },
       { 'Komponen Asesmen': 'Status Ketuntasan', Nilai: studentGrade.isTuntas ? 'TUNTAS' : 'REMEDIAL', Keterangan: '-' },
@@ -696,6 +802,21 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
+              onClick={() => {
+                if (onExit) {
+                  onExit();
+                } else if (typeof window !== 'undefined') {
+                  window.location.href = window.location.origin + window.location.pathname;
+                }
+              }}
+              className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white transition text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-white/25 shadow-xs"
+              title="Kembali ke Aplikasi Utama / Dashboard Pendidik"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Kembali ke Aplikasi</span>
+            </button>
+            <button
+              type="button"
               onClick={handleCopyLink}
               className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition text-xs font-semibold flex items-center gap-1 cursor-pointer border border-white/15"
               title="Salin Tautan Publik"
@@ -739,7 +860,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       {/* Main Content */}
       <main className="relative z-10 max-w-5xl mx-auto px-4 py-6 space-y-6">
         {/* Official Isolated Read-Only Assurance Notice */}
-        <div className="bg-gradient-to-r from-indigo-900/10 via-purple-900/10 to-indigo-900/10 dark:from-indigo-950/50 dark:via-purple-950/40 dark:to-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/80 rounded-3xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+        <div className="bg-gradient-to-r from-indigo-900/10 via-purple-900/10 to-indigo-900/10 dark:from-indigo-950/50 dark:via-purple-950/40 dark:to-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/80 rounded-3xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs no-print">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-600/30">
               <Lock className="w-5 h-5" />
@@ -1907,8 +2028,8 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
 
             {/* Modal Detail Rapor Capaian Individu Murid (Read-Only) */}
             {selectedStudentGrade && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-                <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 space-y-4 my-auto max-h-[94vh] overflow-y-auto print:border-none print:shadow-none print:p-0 print:max-w-none print:max-h-none print:overflow-visible">
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in print:static print:p-0 print:m-0 print:bg-white print:overflow-visible print:block print-modal-active">
+                <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 space-y-4 my-auto max-h-[94vh] overflow-y-auto print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0 print:max-w-none print:max-h-none print:overflow-visible print:bg-white">
                   {/* Modal Header */}
                   <div className="flex flex-wrap items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 gap-3 no-print">
                     <div className="flex items-center gap-2.5">
@@ -2375,6 +2496,9 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                           )}
                         </div>
                       </th>
+                      <th className="py-3 px-4 text-center min-w-[160px]">
+                        Tanggal Terakhir Diinput
+                      </th>
                       <th className="py-3 px-4 text-right min-w-[150px]">Saldo Tabungan</th>
                     </tr>
                   </thead>
@@ -2387,6 +2511,16 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                           <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
                             {std.nama}
                           </td>
+                          <td className="py-3 px-4 text-center font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                            {std.tanggalInput || std.lastTransactionDate ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold border border-slate-200/60 dark:border-slate-700">
+                                <Calendar className="w-3 h-3 text-indigo-500 shrink-0" />
+                                <span>{formatIndonesianDate(std.tanggalInput || std.lastTransactionDate)}</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 italic text-[11px]">-</span>
+                            )}
+                          </td>
                           <td className="py-3 px-4 text-right font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
                             {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(std.saldo || 0)}
                           </td>
@@ -2396,6 +2530,75 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                 </table>
               </div>
             </div>
+
+            {/* Laporan Riwayat Mutasi & Tanggal Input Tabungan */}
+            {((data?.allTransactions || data?.transactions || data?.cashTransactions || []).length > 0) && (
+              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="p-4 bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <History className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <h3 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
+                      Laporan Riwayat Tanggal Input Tabungan & Kas
+                    </h3>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 rounded-full border border-indigo-200/80 dark:border-indigo-800">
+                    {(data?.allTransactions || data?.transactions || []).length} Mutasi Tercatat
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-750 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                        <th className="py-3 px-3 text-center w-12">No</th>
+                        <th className="py-3 px-4 min-w-[160px]">Tanggal Diinput</th>
+                        <th className="py-3 px-4 min-w-[180px]">Nama Murid / Akun</th>
+                        <th className="py-3 px-3 text-center w-28">Jenis</th>
+                        <th className="py-3 px-4 text-right min-w-[140px]">Nominal (Rp)</th>
+                        <th className="py-3 px-4">Keterangan / Pencatat</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {(data?.allTransactions || data?.transactions || []).map((tx: any, idx: number) => (
+                        <tr key={tx.id || idx} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
+                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-400 dark:text-slate-500">
+                            {idx + 1}
+                          </td>
+                          <td className="py-3 px-4 font-mono font-bold text-slate-800 dark:text-slate-200">
+                            <span className="inline-flex items-center gap-1.5 text-xs">
+                              <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                              <span>{formatIndonesianDate(tx.tanggal)}</span>
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                            {tx.namaMurid || tx.namaSiswa || (tx.isClassCash ? 'Kas Kelas' : 'Murid')}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span
+                              className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                tx.tipe === 'masuk'
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
+                                  : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300'
+                              }`}
+                            >
+                              {tx.tipe === 'masuk' ? 'Setoran' : 'Penarikan'}
+                            </span>
+                          </td>
+                          <td className={`py-3 px-4 text-right font-mono font-bold ${
+                            tx.tipe === 'masuk' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                          }`}>
+                            {tx.tipe === 'masuk' ? '+' : '-'}{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(tx.jumlah || 0)}
+                          </td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
+                            {tx.keterangan || '-'} {tx.pencatat ? `• Pencatat: ${tx.pencatat}` : ''}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2467,7 +2670,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         id="public-document-view"
         className={`${
           isDocumentViewMode ? 'block' : 'hidden print:block'
-        } bg-white text-black border border-slate-300 p-6 sm:p-10 font-serif leading-relaxed max-w-[210mm] mx-auto shadow-sm rounded-xl print:border-none print:shadow-none print:p-0 print:m-0 print:max-w-none text-xs`}
+        } bg-white text-black border border-slate-300 p-6 sm:p-10 font-serif leading-relaxed max-w-[210mm] mx-auto shadow-sm rounded-xl print:border-none print:shadow-none print:rounded-none print:p-0 print:m-0 print:max-w-none print:bg-white text-xs`}
       >
         {/* Kop Surat Resmi Dokumen Siap Cetak (Serupa dengan Agenda Mengajar) */}
         <OfficialLetterhead namaSekolah={satuanPendidikan} />
@@ -2765,27 +2968,79 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
 
         {/* 5. Tipe Tabungan & Kas */}
         {effectiveType === 'tabungan' && (
-          <div className="mb-4">
-            <table className="w-full border-collapse border border-black text-center text-[11px] font-sans">
-              <thead>
-                <tr className="bg-slate-100 print:bg-slate-100">
-                  <th className="border border-black p-2 w-8">No</th>
-                  <th className="border border-black p-2 text-left">Nama Peserta Didik</th>
-                  <th className="border border-black p-2 w-40 text-right">Saldo Tabungan (Rp)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedStudents.map((std: any, idx: number) => (
-                  <tr key={std.id}>
-                    <td className="border border-black p-1.5 font-mono">{idx + 1}</td>
-                    <td className="border border-black p-1.5 text-left font-medium">{std.nama}</td>
-                    <td className="border border-black p-1.5 text-right font-mono font-bold">
-                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(std.saldo || 0)}
-                    </td>
+          <div className="mb-4 space-y-4">
+            <div>
+              <p className="font-bold text-[11px] uppercase mb-1 font-sans text-left">
+                A. Daftar Rekapitulasi Saldo Tabungan Peserta Didik
+              </p>
+              <table className="w-full border-collapse border border-black text-center text-[11px] font-sans">
+                <thead>
+                  <tr className="bg-slate-100 print:bg-slate-100">
+                    <th className="border border-black p-2 w-8">No</th>
+                    <th className="border border-black p-2 text-left">Nama Peserta Didik</th>
+                    <th className="border border-black p-2 w-36 text-center">Tanggal Terakhir Diinput</th>
+                    <th className="border border-black p-2 w-40 text-right">Saldo Tabungan (Rp)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {sortedStudents.map((std: any, idx: number) => (
+                    <tr key={std.id}>
+                      <td className="border border-black p-1.5 font-mono">{idx + 1}</td>
+                      <td className="border border-black p-1.5 text-left font-medium">{std.nama}</td>
+                      <td className="border border-black p-1.5 text-center font-mono text-[10px]">
+                        {std.tanggalInput || std.lastTransactionDate ? formatIndonesianDate(std.tanggalInput || std.lastTransactionDate) : '-'}
+                      </td>
+                      <td className="border border-black p-1.5 text-right font-mono font-bold">
+                        {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(std.saldo || 0)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* B. Rincian Laporan Tanggal Input Mutasi Tabungan */}
+            {((data?.allTransactions || data?.transactions || data?.cashTransactions || []).length > 0) && (
+              <div className="mt-4">
+                <p className="font-bold text-[11px] uppercase mb-1 font-sans text-left">
+                  B. Rincian Laporan Tanggal Input Mutasi Tabungan & Kas Kelas
+                </p>
+                <table className="w-full border-collapse border border-black text-center text-[10px] font-sans">
+                  <thead>
+                    <tr className="bg-slate-100 print:bg-slate-100">
+                      <th className="border border-black p-1.5 w-8">No</th>
+                      <th className="border border-black p-1.5 w-28 text-center">Tanggal Diinput</th>
+                      <th className="border border-black p-1.5 text-left">Nama Murid / Akun</th>
+                      <th className="border border-black p-1.5 w-20 text-center">Jenis</th>
+                      <th className="border border-black p-1.5 w-28 text-right">Nominal (Rp)</th>
+                      <th className="border border-black p-1.5 text-left">Keterangan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data?.allTransactions || data?.transactions || data?.cashTransactions || []).map((tx: any, idx: number) => (
+                      <tr key={tx.id || idx}>
+                        <td className="border border-black p-1 font-mono">{idx + 1}</td>
+                        <td className="border border-black p-1 text-center font-mono">
+                          {formatIndonesianDate(tx.tanggal)}
+                        </td>
+                        <td className="border border-black p-1 text-left">
+                          {tx.namaMurid || tx.namaSiswa || (tx.isClassCash ? 'Kas Kelas' : '-')}
+                        </td>
+                        <td className="border border-black p-1 text-center font-semibold">
+                          {tx.tipe === 'masuk' ? 'Setoran' : 'Penarikan'}
+                        </td>
+                        <td className="border border-black p-1 text-right font-mono font-bold">
+                          {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(tx.jumlah || 0)}
+                        </td>
+                        <td className="border border-black p-1 text-left">
+                          {tx.keterangan || '-'} {tx.pencatat ? `(${tx.pencatat})` : ''}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

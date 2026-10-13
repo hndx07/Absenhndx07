@@ -44,7 +44,7 @@ import {
   PublicShareRecord,
 } from '../types';
 import { exportAttendanceToExcel, exportAttendanceToPDF } from '../utils/exportUtils';
-import { createOrUpdatePublicShare, getStudents, getAttendanceSessions } from '../services/data';
+import { createOrUpdatePublicShare, getStudents, getAttendanceSessions, resequenceStudentsAlphabetically } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
 
@@ -65,9 +65,10 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   onSaveSession,
   onDeleteSession,
 }) => {
-  const classStudents = students
-    .filter((s) => s.classId === currentClass.id)
-    .sort((a, b) => a.no - b.no);
+  const classStudents = useMemo(() => {
+    const raw = students.filter((s) => s.classId === currentClass.id);
+    return resequenceStudentsAlphabetically(raw, currentClass.id);
+  }, [students, currentClass.id]);
 
   const classSessions = sessions
     .filter((s) => s.classId === currentClass.id)
@@ -1553,18 +1554,33 @@ Pendidik ${currentClass.mataPelajaran}
               </button>
             </div>
 
-            <div className="flex justify-between items-center pt-2">
-              <a
-                href={shareLink}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1"
-              >
-                Buka Halaman Publik <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 pt-2">
+              <div className="flex items-center gap-2">
+                <a
+                  href={shareLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-xs text-indigo-700 font-bold flex items-center gap-1 transition"
+                  title="Buka Halaman Preview Publik di Tab Baru"
+                >
+                  Tab Baru <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = shareLink;
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-xs text-emerald-700 font-bold flex items-center gap-1 transition cursor-pointer"
+                  title="Buka Preview Publik Langsung di Halaman Ini"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  Buka Langsung
+                </button>
+              </div>
               <button
+                type="button"
                 onClick={() => setShareModalOpen(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-xl"
+                className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-xl cursor-pointer"
               >
                 Tutup
               </button>
