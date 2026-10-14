@@ -30,14 +30,43 @@ import {
   AlertCircle,
   HelpCircle,
   Printer,
+  Upload,
+  FileUp,
+  AlertTriangle,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { TeachingAgenda, ClassRoom, TeacherProfile, Student, AttendanceSession } from '../types';
-import { exportAgendasToExcel, exportToWordDocument, exportAgendaToPDF } from '../utils/exportUtils';
+import {
+  exportAgendasToExcel,
+  exportToWordDocument,
+  exportAgendaToPDF,
+  downloadAgendaTemplateExcel,
+} from '../utils/exportUtils';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { OfficialLetterhead } from './OfficialLetterhead';
 import { SearchableClassSelect } from './SearchableClassSelect';
 import { UiStatePersistence } from '../utils/storageCache';
-import { getStudents, getAttendanceSessions } from '../services/data';
+import { getStudents, getAttendanceSessions, batchSaveTeachingAgendas } from '../services/data';
+
+export interface ParsedAgendaRow {
+  rowNum: number;
+  id: string;
+  classId: string;
+  classNameSnapshot: string;
+  mataPelajaran: string;
+  guruName: string;
+  tanggal: string;
+  hari: string;
+  jamKe: string;
+  rentangJam: string;
+  materiAjar: string;
+  kegiatan: string;
+  catatan: string;
+  hadirCount: number;
+  tidakHadirCount: number;
+  isValid: boolean;
+  errors: string[];
+}
 
 // 12 Jam Pelajaran Sesuai Jadwal Resmi Sekolah
 export const TEACHING_PERIODS = [
@@ -111,6 +140,7 @@ interface TeachingAgendaViewProps {
   sessions?: AttendanceSession[];
   onSaveAgenda: (agenda: TeachingAgenda) => Promise<void> | void;
   onDeleteAgenda: (id: string) => Promise<void> | void;
+  onBatchSaveAgendas?: (agendas: TeachingAgenda[]) => Promise<void> | void;
 }
 
 export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
@@ -122,6 +152,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
   sessions = [],
   onSaveAgenda,
   onDeleteAgenda,
+  onBatchSaveAgendas,
 }) => {
   // Safe persisted filters
   const [filterClassId, setFilterClassId] = useState<string>(() =>
@@ -144,6 +175,17 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [editingAgenda, setEditingAgenda] = useState<Partial<TeachingAgenda> | null>(null);
+
+  // Excel Upload Parser State
+  const [isUploadExcelOpen, setIsUploadExcelOpen] = useState(false);
+  const [importFileName, setImportFileName] = useState('');
+  const [parsedImportRows, setParsedImportRows] = useState<ParsedAgendaRow[]>([]);
+  const [selectedImportIndices, setSelectedImportIndices] = useState<Set<number>>(new Set());
+  const [isParsingExcel, setIsParsingExcel] = useState(false);
+  const [isSavingImport, setIsSavingImport] = useState(false);
+  const [uploadTargetClassId, setUploadTargetClassId] = useState<string>(() => classes[0]?.id || '');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Hour Period Picker State (Accordion / Roll Down)
   const [isPeriodsExpanded, setIsPeriodsExpanded] = useState<boolean>(true);
@@ -583,6 +625,303 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
     }
   };
 
+  // ============================================================================
+  // EXCEL AGENDA UPLOAD & PARSER LOGIC
+  // ============================================================================
+
+  const handleExcelFileUpload = (file: File) => {
+    setImportFileName(file.name);
+    setUploadError(null);
+    setIsParsingExcel(true);
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const buffer = e.target?.result as ArrayBuffer;
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          setUploadError('Berkas Excel kosong atau tidak memiliki lembar kerja.');
+          setIsParsingExcel(false);
+          return;
+        }
+
+        // Cari sheet yang memiliki baris data
+        let foundRows: any[][] = [];
+        let chosenSheet = workbook.SheetNames[0];
+        for (const sName of workbook.SheetNames) {
+          const ws = workbook.Sheets[sName];
+          const raw = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][];
+          if (raw && raw.length > 0) {
+            foundRows = raw;
+            chosenSheet = sName;
+            break;
+          }
+        }
+
+        if (foundRows.length === 0) {
+          setUploadError(`Lembar kerja "${chosenSheet}" tidak memiliki data agenda yang dapat dibaca.`);
+          setIsParsingExcel(false);
+          return;
+        }
+
+        parseRawExcelRows(foundRows);
+      } catch (err: any) {
+        console.error('Error parsing excel:', err);
+        setUploadError('Gagal membaca berkas Excel. Pastikan berkas berformat .xlsx, .xls, atau .csv yang valid.');
+      } finally {
+        setIsParsingExcel(false);
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  const parseRawExcelRows = (rawRows: any[][]) => {
+    if (!rawRows || rawRows.length === 0) return;
+
+    // Deteksi baris header (maksimal hingga baris ke-5)
+    let headerIdx = 0;
+    const headerKeywords = ['tanggal', 'tgl', 'date', 'materi', 'topik', 'kelas', 'jam', 'hari', 'kegiatan'];
+    for (let i = 0; i < Math.min(rawRows.length, 5); i++) {
+      const row = rawRows[i].map((c) => String(c || '').toLowerCase().trim());
+      const matchCount = row.filter((c) => headerKeywords.some((kw) => c.includes(kw))).length;
+      if (matchCount >= 2) {
+        headerIdx = i;
+        break;
+      }
+    }
+
+    const headers = rawRows[headerIdx].map((c) => String(c || '').toLowerCase().trim());
+
+    const findColIdx = (keywords: string[]) => {
+      return headers.findIndex((h) => keywords.some((kw) => h === kw || h.includes(kw)));
+    };
+
+    const tanggalIdx = findColIdx(['tanggal', 'tgl', 'date']);
+    const hariIdx = findColIdx(['hari', 'day']);
+    const kelasIdx = findColIdx(['kelas', 'class', 'rombel']);
+    const mapelIdx = findColIdx(['mata pelajaran', 'mapel', 'pelajaran', 'subject']);
+    const jamKeIdx = findColIdx(['jam ke', 'jamke', 'jam', 'periode', 'period']);
+    const rentangJamIdx = findColIdx(['rentang jam', 'rentang', 'waktu', 'time']);
+    const materiIdx = findColIdx(['materi ajar', 'materi', 'topik', 'capaian pembelajaran', 'tp', 'materi pokok', 'kompetensi']);
+    const kegiatanIdx = findColIdx(['kegiatan pembelajaran', 'kegiatan', 'aktivitas', 'deskripsi']);
+    const catatanIdx = findColIdx(['catatan', 'keterangan', 'kendala', 'notes']);
+    const hadirIdx = findColIdx(['hadir', 'jumlah hadir', 'h']);
+    const tidakHadirIdx = findColIdx(['absen', 'tidak hadir', 'th', 'a', 'jumlah absen']);
+
+    const defaultClass =
+      classes.find((c) => c.id === uploadTargetClassId) ||
+      classes.find((c) => c.id === filterClassId) ||
+      (currentClass ? currentClass : classes[0]);
+
+    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const parsed: ParsedAgendaRow[] = [];
+    const validIndices = new Set<number>();
+
+    for (let r = headerIdx + 1; r < rawRows.length; r++) {
+      const row = rawRows[r];
+      if (!row || row.every((c) => String(c || '').trim() === '')) continue;
+
+      const errors: string[] = [];
+      const rawDate = tanggalIdx !== -1 ? row[tanggalIdx] : '';
+
+      // 1. Parsing Tanggal
+      let tanggal = '';
+      if (typeof rawDate === 'number' && rawDate > 1000) {
+        const jsDate = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+        if (!isNaN(jsDate.getTime())) {
+          tanggal = jsDate.toISOString().split('T')[0];
+        }
+      } else if (rawDate) {
+        const str = String(rawDate).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+          tanggal = str;
+        } else if (/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/.test(str)) {
+          const m = str.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
+          if (m) {
+            const day = m[1].padStart(2, '0');
+            const month = m[2].padStart(2, '0');
+            const year = m[3];
+            tanggal = `${year}-${month}-${day}`;
+          }
+        } else {
+          const d = new Date(str);
+          if (!isNaN(d.getTime())) {
+            tanggal = d.toISOString().split('T')[0];
+          }
+        }
+      }
+
+      if (!tanggal) {
+        tanggal = new Date().toISOString().split('T')[0];
+        errors.push('Tanggal tidak dikenali');
+      }
+
+      // 2. Hari
+      let hari = hariIdx !== -1 ? String(row[hariIdx] || '').trim() : '';
+      if (!hari || !dayNames.includes(hari)) {
+        try {
+          const d = new Date(tanggal);
+          if (!isNaN(d.getTime())) {
+            hari = dayNames[d.getDay()] || 'Senin';
+          } else {
+            hari = 'Senin';
+          }
+        } catch {
+          hari = 'Senin';
+        }
+      }
+
+      // 3. Kelas
+      const rawKelas = kelasIdx !== -1 ? String(row[kelasIdx] || '').trim() : '';
+      let matchedClass = defaultClass;
+      if (rawKelas) {
+        const found = classes.find(
+          (c) =>
+            c.namaKelas.toLowerCase().trim() === rawKelas.toLowerCase() ||
+            c.id === rawKelas ||
+            c.namaKelas.toLowerCase().replace(/\s+/g, '') === rawKelas.toLowerCase().replace(/\s+/g, '')
+        );
+        if (found) {
+          matchedClass = found;
+        }
+      }
+
+      const classId = matchedClass?.id || classes[0]?.id || '';
+      const classNameSnapshot = matchedClass?.namaKelas || rawKelas || '-';
+
+      // 4. Mata Pelajaran
+      const rawMapel = mapelIdx !== -1 ? String(row[mapelIdx] || '').trim() : '';
+      const mataPelajaran = rawMapel || matchedClass?.mataPelajaran || teacher.mataPelajaranUtama || 'Umum';
+
+      // 5. Jam Ke & Rentang Jam
+      const rawJamKe = jamKeIdx !== -1 ? String(row[jamKeIdx] || '').trim() : '';
+      const rawRentang = rentangJamIdx !== -1 ? String(row[rentangJamIdx] || '').trim() : '';
+
+      const periods = parsePeriodsFromJamKe(rawJamKe || '1 - 4');
+      const formattedPeriods = formatPeriodsToJamKe(periods);
+      const jamKe = formattedPeriods.jamKe;
+      const rentangJam = rawRentang || formattedPeriods.rentangJam;
+
+      // 6. Materi Ajar
+      const materiAjar = materiIdx !== -1 ? String(row[materiIdx] || '').trim() : '';
+      if (!materiAjar) {
+        errors.push('Materi Ajar wajib diisi');
+      }
+
+      // 7. Kegiatan & Catatan
+      const kegiatan = kegiatanIdx !== -1 ? String(row[kegiatanIdx] || '').trim() : 'Pembelajaran tatap muka';
+      const catatan = catatanIdx !== -1 ? String(row[catatanIdx] || '').trim() : 'Seluruh siswa hadir tertib';
+
+      // 8. Hadir & Tidak Hadir
+      const rawHadir = hadirIdx !== -1 ? parseInt(String(row[hadirIdx]), 10) : NaN;
+      const rawTidakHadir = tidakHadirIdx !== -1 ? parseInt(String(row[tidakHadirIdx]), 10) : NaN;
+
+      const hadirCount = !isNaN(rawHadir) ? rawHadir : 32;
+      const tidakHadirCount = !isNaN(rawTidakHadir) ? rawTidakHadir : 0;
+
+      const isValid = errors.length === 0 && Boolean(materiAjar);
+      const rowItem: ParsedAgendaRow = {
+        rowNum: r + 1,
+        id: `ag_imp_${Date.now()}_${r}`,
+        classId,
+        classNameSnapshot,
+        mataPelajaran,
+        guruName: teacher.namaGuru,
+        tanggal,
+        hari,
+        jamKe,
+        rentangJam,
+        materiAjar: materiAjar || 'Topik Pembelajaran',
+        kegiatan,
+        catatan,
+        hadirCount,
+        tidakHadirCount,
+        isValid,
+        errors,
+      };
+
+      parsed.push(rowItem);
+      if (isValid) {
+        validIndices.add(r + 1);
+      }
+    }
+
+    setParsedImportRows(parsed);
+    setSelectedImportIndices(validIndices);
+  };
+
+  const toggleImportRow = (rowNum: number) => {
+    setSelectedImportIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowNum)) next.delete(rowNum);
+      else next.add(rowNum);
+      return next;
+    });
+  };
+
+  const selectAllValidImportRows = () => {
+    const valid = new Set<number>();
+    parsedImportRows.forEach((r) => {
+      if (r.isValid) valid.add(r.rowNum);
+    });
+    setSelectedImportIndices(valid);
+  };
+
+  const deselectAllImportRows = () => {
+    setSelectedImportIndices(new Set());
+  };
+
+  const handleExecuteImport = async () => {
+    const selectedRows = parsedImportRows.filter((r) => selectedImportIndices.has(r.rowNum));
+    if (selectedRows.length === 0) {
+      alert('Pilih minimal satu baris agenda yang akan diimpor.');
+      return;
+    }
+
+    setIsSavingImport(true);
+    try {
+      const agendasToSave: TeachingAgenda[] = selectedRows.map((r) => ({
+        id: r.id,
+        classId: r.classId,
+        classNameSnapshot: r.classNameSnapshot,
+        mataPelajaran: r.mataPelajaran,
+        guruName: r.guruName,
+        tanggal: r.tanggal,
+        hari: r.hari,
+        jamKe: r.jamKe,
+        rentangJam: r.rentangJam,
+        materiAjar: r.materiAjar,
+        kegiatan: r.kegiatan,
+        catatan: r.catatan,
+        hadirCount: r.hadirCount,
+        tidakHadirCount: r.tidakHadirCount,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      if (onBatchSaveAgendas) {
+        await onBatchSaveAgendas(agendasToSave);
+      } else {
+        await batchSaveTeachingAgendas(agendasToSave);
+        for (const ag of agendasToSave) {
+          await onSaveAgenda(ag);
+        }
+      }
+
+      setSyncStatusMsg(`Berhasil mengimpor ${agendasToSave.length} agenda mengajar dari berkas Excel!`);
+      setTimeout(() => setSyncStatusMsg(null), 5000);
+      setIsUploadExcelOpen(false);
+      setParsedImportRows([]);
+      setSelectedImportIndices(new Set());
+      setImportFileName('');
+    } catch (err: any) {
+      alert('Gagal mengimpor agenda: ' + (err.message || 'Terjadi kesalahan sistem'));
+    } finally {
+      setIsSavingImport(false);
+    }
+  };
+
   const handleExportWord = () => {
     const isMultiClass = filterClassId === 'all';
     const classNameHeader = isMultiClass ? 'Semua Kelas' : selectedClassObj?.namaKelas || 'Kelas';
@@ -843,13 +1182,32 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
             Unduh PDF
           </button>
 
+          {/* Tombol Unggah / Impor Excel Agenda Mengajar */}
+          <button
+            type="button"
+            onClick={() => {
+              setUploadTargetClassId(filterClassId !== 'all' ? filterClassId : (classes[0]?.id || ''));
+              setParsedImportRows([]);
+              setSelectedImportIndices(new Set());
+              setImportFileName('');
+              setUploadError(null);
+              setIsUploadExcelOpen(true);
+            }}
+            className="min-h-[44px] px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer"
+            title="Unggah dan impor berkas Excel agenda mengajar"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Unggah Excel</span>
+          </button>
+
           <button
             type="button"
             onClick={() => exportAgendasToExcel(filteredAgendas, selectedClassObj, teacher, classesMap)}
             className="min-h-[44px] px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 border border-emerald-200 dark:border-emerald-900 cursor-pointer"
+            title="Unduh data agenda ke berkas Excel"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            Excel
+            <span>Unduh Excel</span>
           </button>
 
           <button
@@ -1932,6 +2290,322 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                   Unduh PDF
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Unggah / Impor Excel Agenda Mengajar */}
+      {isUploadExcelOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col my-auto max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center shrink-0">
+                  <FileSpreadsheet className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base tracking-tight">
+                    Unggah & Impor Agenda Mengajar Excel
+                  </h3>
+                  <p className="text-xs text-emerald-100">
+                    Parser cerdas berkas .xlsx, .xls, .csv dengan deteksi tanggal, kelas, jam, dan kehadiran otomatis
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsUploadExcelOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+              {/* Guidance & Template Download */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                    <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    Format Kolom Excel yang Didukung
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Kolom: <strong>No, Tanggal, Hari, Kelas, Mapel, Jam Ke, Rentang Jam, Materi Ajar, Kegiatan, Catatan, Hadir, Absen</strong>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => downloadAgendaTemplateExcel(classes, teacher)}
+                  className="px-3.5 py-2 bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Unduh Template Excel</span>
+                </button>
+              </div>
+
+              {/* Target Class Default Selector */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/50">
+                <div className="text-xs">
+                  <span className="font-bold text-emerald-950 dark:text-emerald-200 block">
+                    Kelas Default untuk Baris Tanpa Nama Kelas:
+                  </span>
+                  <span className="text-[11px] text-emerald-800/80 dark:text-emerald-400">
+                    Jika kolom kelas di Excel kosong, baris otomatis diasosiasikan ke kelas ini.
+                  </span>
+                </div>
+                <select
+                  value={uploadTargetClassId}
+                  onChange={(e) => setUploadTargetClassId(e.target.value)}
+                  className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                >
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.namaKelas} ({c.mataPelajaran})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Drag and Drop / File Input Zone */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(true);
+                }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleExcelFileUpload(e.dataTransfer.files[0]);
+                  }
+                }}
+                className={`border-2 border-dashed rounded-3xl p-6 text-center transition ${
+                  isDragOver
+                    ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30'
+                    : 'border-slate-300 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-800/30 hover:border-emerald-400'
+                }`}
+              >
+                <div className="max-w-md mx-auto space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-xs">
+                    {isParsingExcel ? (
+                      <RefreshCw className="w-6 h-6 animate-spin" />
+                    ) : (
+                      <FileUp className="w-6 h-6" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                      Tarik & Letakkan Berkas Excel ke sini, atau klik tombol di bawah
+                    </p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                      Mendukung berkas Microsoft Excel (.xlsx, .xls) dan CSV
+                    </p>
+                  </div>
+
+                  <label className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Pilih Berkas Excel</span>
+                    <input
+                      type="file"
+                      accept=".xlsx, .xls, .csv"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleExcelFileUpload(e.target.files[0]);
+                        }
+                      }}
+                    />
+                  </label>
+
+                  {importFileName && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold pt-1">
+                      Berkas terpilih: {importFileName}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Upload Error Banner */}
+              {uploadError && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-xs font-medium flex items-center gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
+
+              {/* Parsed Rows Preview Table */}
+              {parsedImportRows.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                        Hasil Analisis Berkas:
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-mono font-bold">
+                        {parsedImportRows.length} baris
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
+                        {selectedImportIndices.size} terpilih untuk diimpor
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={selectAllValidImportRows}
+                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 cursor-pointer"
+                      >
+                        Pilih Semua Valid
+                      </button>
+                      <span className="text-slate-300 dark:text-slate-700">&bull;</span>
+                      <button
+                        type="button"
+                        onClick={deselectAllImportRows}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 cursor-pointer"
+                      >
+                        Batal Pilih
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden max-h-80 overflow-y-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold sticky top-0 z-10">
+                        <tr>
+                          <th className="p-3 w-10 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedImportIndices.size === parsedImportRows.filter((r) => r.isValid).length && parsedImportRows.filter((r) => r.isValid).length > 0}
+                              onChange={(e) => {
+                                if (e.target.checked) selectAllValidImportRows();
+                                else deselectAllImportRows();
+                              }}
+                              className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                            />
+                          </th>
+                          <th className="p-3 w-12 text-center">No</th>
+                          <th className="p-3 w-28">Tanggal</th>
+                          <th className="p-3 w-24">Kelas</th>
+                          <th className="p-3 w-24">Jam Ke</th>
+                          <th className="p-3">Materi Ajar</th>
+                          <th className="p-3 w-24 text-center">Kehadiran</th>
+                          <th className="p-3 w-28 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {parsedImportRows.map((row) => {
+                          const isSelected = selectedImportIndices.has(row.rowNum);
+                          return (
+                            <tr
+                              key={row.rowNum}
+                              onClick={() => toggleImportRow(row.rowNum)}
+                              className={`transition cursor-pointer select-none ${
+                                isSelected
+                                  ? 'bg-emerald-50/50 dark:bg-emerald-950/30'
+                                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                              } ${!row.isValid ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}`}
+                            >
+                              <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleImportRow(row.rowNum)}
+                                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                />
+                              </td>
+                              <td className="p-3 text-center font-mono text-slate-400">
+                                {row.rowNum}
+                              </td>
+                              <td className="p-3 whitespace-nowrap">
+                                <span className="font-bold text-slate-800 dark:text-slate-200 block">
+                                  {row.hari}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  {row.tanggal}
+                                </span>
+                              </td>
+                              <td className="p-3 whitespace-nowrap font-bold text-slate-700 dark:text-slate-300">
+                                {row.classNameSnapshot}
+                              </td>
+                              <td className="p-3 whitespace-nowrap font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                                {row.jamKe}
+                              </td>
+                              <td className="p-3">
+                                <p className="font-semibold text-slate-900 dark:text-white line-clamp-1">
+                                  {row.materiAjar}
+                                </p>
+                                {row.kegiatan && (
+                                  <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                                    {row.kegiatan}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="p-3 text-center whitespace-nowrap font-mono text-[11px]">
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                  H: {row.hadirCount}
+                                </span>{' '}
+                                <span className="text-rose-600 dark:text-rose-400">
+                                  A: {row.tidakHadirCount}
+                                </span>
+                              </td>
+                              <td className="p-3 text-center whitespace-nowrap">
+                                {row.isValid ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 text-[10px] font-bold">
+                                    <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                    Siap Impor
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 text-[10px] font-bold"
+                                    title={row.errors.join(', ')}
+                                  >
+                                    <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                                    Periksa
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setIsUploadExcelOpen(false)}
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                Batal
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteImport}
+                disabled={isSavingImport || selectedImportIndices.size === 0}
+                className="px-5 py-2.5 bg-gradient-to-r from-[#009B62] to-[#008276] hover:brightness-110 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isSavingImport ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Menyimpan ke Agenda...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Impor {selectedImportIndices.size} Agenda Terpilih</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

@@ -1121,6 +1121,166 @@ export async function deleteTeachingAgenda(agendaId: string): Promise<void> {
   }
 }
 
+/**
+ * Sinkronisasi instan & otomatis dari penginputan absen ke Agenda Mengajar Pendidik.
+ * Menghitung hadir, sakit, izin, alpa, serta rangkuman catatan murid secara otomatis.
+ */
+export async function syncAttendanceSessionToAgenda(
+  session: AttendanceSession,
+  classRoom?: ClassRoom,
+  teacher?: TeacherProfile,
+  students: Student[] = []
+): Promise<TeachingAgenda> {
+  const localAgendas = getLocalItem<TeachingAgenda[]>('smk_agendas', DEFAULT_AGENDAS);
+
+  // 1. Hitung Kehadiran dan Ketidakhadiran
+  let hadirCount = 0;
+  let tidakHadirCount = 0;
+  const absentDetails: string[] = [];
+
+  const records = session.records || {};
+  const recordStudentIds = Object.keys(records);
+
+  if (students && students.length > 0) {
+    students.forEach((std) => {
+      const rec = records[std.id];
+      const status = rec?.status || 'H';
+      if (status === 'H' || status === 'D') {
+        hadirCount++;
+      } else {
+        tidakHadirCount++;
+        const label = status === 'S' ? 'Sakit' : status === 'I' ? 'Izin' : 'Alpa';
+        const note = rec?.catatan ? `: ${rec.catatan}` : '';
+        absentDetails.push(`${std.nama} (${label}${note})`);
+      }
+    });
+  } else if (recordStudentIds.length > 0) {
+    recordStudentIds.forEach((stdId) => {
+      const rec = records[stdId];
+      const status = rec?.status || 'H';
+      if (status === 'H' || status === 'D') {
+        hadirCount++;
+      } else {
+        tidakHadirCount++;
+        const label = status === 'S' ? 'Sakit' : status === 'I' ? 'Izin' : 'Alpa';
+        absentDetails.push(`Murid #${stdId} (${label})`);
+      }
+    });
+  }
+
+  let summaryCatatan = 'Seluruh siswa hadir tertib.';
+  if (absentDetails.length > 0) {
+    summaryCatatan = `Tidak hadir: ${absentDetails.join(', ')}`;
+  }
+
+  // Hari dalam bahasa Indonesia
+  const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  let hari = 'Senin';
+  try {
+    const d = new Date(session.tanggal);
+    if (!isNaN(d.getTime())) {
+      hari = dayNames[d.getDay()] || 'Senin';
+    }
+  } catch {}
+
+  const topic = session.topikMateri?.trim() || `Pertemuan Pembelajaran Rutin Ke-${session.pertemuanKe}`;
+
+  // Cari apakah agenda untuk kelas dan tanggal atau pertemuan ini sudah ada
+  const linkedId = `ag_att_${session.id}`;
+  let existing = localAgendas.find((a) => a.id === linkedId);
+  if (!existing) {
+    existing = localAgendas.find((a) => a.classId === session.classId && a.tanggal === session.tanggal);
+  }
+  if (!existing) {
+    existing = localAgendas.find((a) => a.classId === session.classId && a.pertemuanKe === session.pertemuanKe);
+  }
+
+  let agendaToSave: TeachingAgenda;
+
+  if (existing) {
+    let updatedCatatan = existing.catatan || '';
+    if (!updatedCatatan || updatedCatatan === 'Seluruh siswa hadir tertib.' || updatedCatatan.startsWith('Tidak hadir:')) {
+      updatedCatatan = summaryCatatan;
+    }
+
+    agendaToSave = {
+      ...existing,
+      pertemuanKe: session.pertemuanKe,
+      tanggal: session.tanggal,
+      hari: hari || existing.hari,
+      materiAjar: session.topikMateri?.trim() ? session.topikMateri.trim() : (existing.materiAjar || topic),
+      hadirCount,
+      tidakHadirCount,
+      catatan: updatedCatatan,
+      classNameSnapshot: classRoom?.namaKelas || existing.classNameSnapshot || '',
+      mataPelajaran: classRoom?.mataPelajaran || existing.mataPelajaran || teacher?.mataPelajaranUtama || '',
+      guruName: teacher?.namaGuru || existing.guruName,
+      updated_at: new Date().toISOString(),
+    };
+  } else {
+    agendaToSave = {
+      id: linkedId,
+      classId: session.classId,
+      classNameSnapshot: classRoom?.namaKelas || '',
+      mataPelajaran: classRoom?.mataPelajaran || teacher?.mataPelajaranUtama || '',
+      guruName: teacher?.namaGuru || 'Pendidik',
+      tanggal: session.tanggal,
+      hari,
+      jamKe: '1 - 4',
+      rentangJam: '07:15 - 09:15 WIB',
+      materiAjar: topic,
+      kegiatan: `Pembelajaran tatap muka pertemuan ke-${session.pertemuanKe}`,
+      catatan: summaryCatatan,
+      hadirCount,
+      tidakHadirCount,
+      pertemuanKe: session.pertemuanKe,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  return await saveTeachingAgenda(agendaToSave);
+}
+
+/**
+ * Menyimpan banyak entri agenda sekaligus (Batch Save dari parser Excel)
+ */
+export async function batchSaveTeachingAgendas(agendas: TeachingAgenda[]): Promise<TeachingAgenda[]> {
+  const localAgendas = getLocalItem<TeachingAgenda[]>('smk_agendas', DEFAULT_AGENDAS);
+  const newMap = new Map<string, TeachingAgenda>();
+  localAgendas.forEach((a) => newMap.set(a.id, a));
+  agendas.forEach((a) => newMap.set(a.id, a));
+  const merged = Array.from(newMap.values());
+  setLocalItem('smk_agendas', merged);
+
+  const supabase = getSafeSupabaseClient();
+  const user = await getAuthUser();
+  if (supabase && user && agendas.length > 0) {
+    try {
+      const payloads = agendas.map((agenda) => ({
+        id: agenda.id,
+        class_id: agenda.classId,
+        user_id: user.id,
+        tanggal: agenda.tanggal,
+        hari: agenda.hari,
+        jam_ke: agenda.jamKe,
+        rentang_jam: agenda.rentangJam,
+        materi_ajar: agenda.materiAjar,
+        kegiatan: agenda.kegiatan || '',
+        catatan: agenda.catatan || '',
+        hadir_count: agenda.hadirCount || 0,
+        tidak_hadir_count: agenda.tidakHadirCount || 0,
+        updated_at: new Date().toISOString(),
+      }));
+      await supabase.from('teaching_agendas').upsert(payloads, { onConflict: 'id' });
+    } catch (e) {
+      console.warn('Could not batch sync teaching agendas to cloud, saved locally:', e);
+    }
+  }
+
+  return merged;
+}
+
 // ============================================================================
 // 8. SAVING TRANSACTIONS SERVICE
 // ============================================================================

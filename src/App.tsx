@@ -55,6 +55,8 @@ import {
   getTeachingAgendas,
   saveTeachingAgenda,
   deleteTeachingAgenda,
+  syncAttendanceSessionToAgenda,
+  batchSaveTeachingAgendas,
   getSavingTransactions,
   saveSavingTransaction,
   deleteSavingTransaction,
@@ -671,6 +673,24 @@ export default function App() {
     const saved = await saveAttendanceSession(sessionData);
     setAttendance((prev) => [saved, ...prev.filter((s) => s.id !== saved.id)]);
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+
+    // Sinkronisasi Langsung & Efektif ke Agenda Mengajar
+    try {
+      const cls = classes.find((c) => c.id === sessionData.classId);
+      const clsStudents = students.filter((s) => s.classId === sessionData.classId);
+      const syncedAgenda = await syncAttendanceSessionToAgenda(
+        saved,
+        cls,
+        teacher || undefined,
+        clsStudents
+      );
+      if (syncedAgenda) {
+        setAgendas((prev) => [syncedAgenda, ...prev.filter((a) => a.id !== syncedAgenda.id)]);
+        SafeCache.invalidate('all_agendas');
+      }
+    } catch (syncErr) {
+      console.warn('Sinkronisasi otomatis agenda mengajar notice:', syncErr);
+    }
   };
 
   const handleDeleteAttendance = async (sessionId: string) => {
@@ -697,6 +717,12 @@ export default function App() {
   const handleSaveAgenda = async (agendaData: TeachingAgenda) => {
     const saved = await saveTeachingAgenda(agendaData);
     setAgendas((prev) => [saved, ...prev.filter((a) => a.id !== saved.id)]);
+    SafeCache.invalidate('all_agendas');
+  };
+
+  const handleBatchSaveAgendas = async (newAgendas: TeachingAgenda[]) => {
+    const updatedAll = await batchSaveTeachingAgendas(newAgendas);
+    setAgendas(updatedAll);
     SafeCache.invalidate('all_agendas');
   };
 
@@ -1295,6 +1321,8 @@ export default function App() {
                 students={students}
                 sessions={attendance}
                 teacher={activeTeacher}
+                agendas={agendas}
+                onNavigateToAgenda={() => setActiveTab('agendas')}
                 onSaveSession={handleSaveAttendance}
                 onDeleteSession={handleDeleteAttendance}
               />
@@ -1344,6 +1372,7 @@ export default function App() {
                 sessions={attendance}
                 onSaveAgenda={handleSaveAgenda}
                 onDeleteAgenda={handleDeleteAgenda}
+                onBatchSaveAgendas={handleBatchSaveAgendas}
               />
             )}
 

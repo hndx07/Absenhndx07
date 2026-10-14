@@ -33,6 +33,7 @@ import {
   Phone,
   UserCheck,
   MessageCircle,
+  BookMarked,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import {
@@ -42,6 +43,7 @@ import {
   Student,
   TeacherProfile,
   PublicShareRecord,
+  TeachingAgenda,
 } from '../types';
 import { exportAttendanceToExcel, exportAttendanceToPDF } from '../utils/exportUtils';
 import { createOrUpdatePublicShare, getStudents, getAttendanceSessions, resequenceStudentsAlphabetically } from '../services/data';
@@ -53,6 +55,8 @@ interface AttendanceViewProps {
   students: Student[];
   sessions: AttendanceSession[];
   teacher: TeacherProfile;
+  agendas?: TeachingAgenda[];
+  onNavigateToAgenda?: () => void;
   onSaveSession: (session: AttendanceSession) => void;
   onDeleteSession: (sessionId: string) => void;
 }
@@ -62,6 +66,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   students,
   sessions,
   teacher,
+  agendas = [],
+  onNavigateToAgenda,
   onSaveSession,
   onDeleteSession,
 }) => {
@@ -139,6 +145,17 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     classSessions.find((s) => s.id === activeSessionId) ||
     classSessions[0];
 
+  // Agenda Mengajar yang tersinkronisasi otomatis dengan sesi presensi ini
+  const syncedAgenda = useMemo(() => {
+    if (!currentSession || !agendas) return null;
+    return (
+      agendas.find((a) => a.id === `ag_att_${currentSession.id}`) ||
+      agendas.find((a) => a.classId === currentClass.id && a.tanggal === currentSession.tanggal) ||
+      agendas.find((a) => a.classId === currentClass.id && a.pertemuanKe === currentSession.pertemuanKe) ||
+      null
+    );
+  }, [agendas, currentSession, currentClass.id]);
+
   // Background debounced cloud sync (prevents network wait and race conditions)
   const scheduleSessionCloudSave = (sessionToSave: AttendanceSession) => {
     setHasUnsavedChanges(true);
@@ -171,7 +188,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       }) + ' WIB';
       setLastSavedTime(timeStr);
       setHasUnsavedChanges(false);
-      setSaveSuccessMsg(`Presensi Pertemuan Ke-${targetSession.pertemuanKe} Berhasil Disimpan Real-Time ke Cloud Supabase!`);
+      setSaveSuccessMsg(`Presensi Pertemuan Ke-${targetSession.pertemuanKe} Berhasil Disimpan Real-Time & Tersinkronisasi Otomatis ke Agenda Mengajar!`);
       setTimeout(() => setSaveSuccessMsg(null), 4000);
     } catch (err: any) {
       alert(`Gagal menyimpan ke cloud: ${err.message || 'Koneksi terputus'}`);
@@ -871,10 +888,25 @@ Pendidik ${currentClass.mataPelajaran}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="md:col-span-2 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white p-5 rounded-3xl shadow-md flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-0.5 bg-white/20 border border-white/30 rounded-full text-[11px] font-bold text-emerald-100">
-                  Pertemuan Ke-{currentSession.pertemuanKe}
-                </span>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 bg-white/20 border border-white/30 rounded-full text-[11px] font-bold text-emerald-100">
+                    Pertemuan Ke-{currentSession.pertemuanKe}
+                  </span>
+                  {/* Badge Status Sinkronisasi Langsung ke Agenda Mengajar */}
+                  <div
+                    onClick={onNavigateToAgenda}
+                    className="flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-500/40 hover:bg-emerald-500/60 border border-emerald-300/40 rounded-full text-[10px] font-bold text-white transition cursor-pointer backdrop-blur-xs"
+                    title="Penginputan absen otomatis tersinkronisasi langsung ke Agenda Mengajar Pendidik"
+                  >
+                    <BookMarked className="w-3 h-3 text-emerald-200" />
+                    <span>Sinkron Agenda Mengajar</span>
+                    <span className="px-1.5 py-0.2 rounded-md bg-emerald-300 text-emerald-950 text-[9px] font-black">
+                      {syncedAgenda ? 'Tersinkron' : 'Otomatis'}
+                    </span>
+                  </div>
+                </div>
+
                 <span className="text-xs text-emerald-100 font-mono flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
                   {currentSession.tanggal}
@@ -901,7 +933,7 @@ Pendidik ${currentClass.mataPelajaran}
                   onClick={() => handleSaveToCloud()}
                   disabled={isSavingToCloud}
                   className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-                  title="Simpan data sesi ini ke database cloud Supabase secara real-time"
+                  title="Simpan data sesi ini ke database cloud Supabase secara real-time dan sinkron ke agenda"
                 >
                   {isSavingToCloud ? (
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -910,6 +942,18 @@ Pendidik ${currentClass.mataPelajaran}
                   )}
                   <span>Simpan ke Cloud</span>
                 </button>
+
+                {onNavigateToAgenda && (
+                  <button
+                    type="button"
+                    onClick={onNavigateToAgenda}
+                    className="px-3 py-1.5 bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer border border-indigo-300/40"
+                    title="Buka Buku Jurnal & Agenda Mengajar yang otomatis tersinkron"
+                  >
+                    <BookMarked className="w-3.5 h-3.5 text-indigo-200" />
+                    <span>Buka Agenda Mengajar</span>
+                  </button>
+                )}
 
                 <button
                   type="button"

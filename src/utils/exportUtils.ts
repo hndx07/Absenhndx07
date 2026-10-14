@@ -547,6 +547,66 @@ export function exportAgendasToExcel(
   saveExcelFileWithNotification(wb, fname, 'Jurnal & Agenda Mengajar Pendidik');
 }
 
+export function downloadAgendaTemplateExcel(
+  classes: ClassRoom[],
+  teacher?: TeacherProfile
+) {
+  const sampleClass = classes[0]?.namaKelas || 'X TO 1';
+  const sampleMapel = classes[0]?.mataPelajaran || teacher?.mataPelajaranUtama || 'Dasar Program Keahlian';
+
+  const sampleRows = [
+    {
+      'No': 1,
+      'Tanggal': '2026-07-20',
+      'Hari': 'Senin',
+      'Kelas': sampleClass,
+      'Mata Pelajaran': sampleMapel,
+      'Jam Ke': '1 - 4',
+      'Rentang Jam': '07:15 - 09:15 WIB',
+      'Materi Ajar': 'Pengenalan Keselamatan dan Kesehatan Kerja (K3)',
+      'Kegiatan': 'Pemaparan materi K3 dan simulasi SOP bengkel kerja',
+      'Catatan': 'Seluruh siswa hadir tertib',
+      'Hadir': 32,
+      'Absen': 0,
+    },
+    {
+      'No': 2,
+      'Tanggal': '2026-07-27',
+      'Hari': 'Senin',
+      'Kelas': sampleClass,
+      'Mata Pelajaran': sampleMapel,
+      'Jam Ke': '1 - 4',
+      'Rentang Jam': '07:15 - 09:15 WIB',
+      'Materi Ajar': 'Peralatan Tangan dan Alat Ukur Presisi',
+      'Kegiatan': 'Praktik penggunaan jangka sorong dan mikrometer sekrup',
+      'Catatan': 'Tidak hadir: Ahmad (Sakit)',
+      'Hadir': 31,
+      'Absen': 1,
+    },
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(sampleRows);
+  ws['!cols'] = [
+    { wch: 6 },
+    { wch: 14 },
+    { wch: 10 },
+    { wch: 14 },
+    { wch: 24 },
+    { wch: 12 },
+    { wch: 18 },
+    { wch: 42 },
+    { wch: 38 },
+    { wch: 28 },
+    { wch: 8 },
+    { wch: 8 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Template Agenda');
+  const fname = `Template_Agenda_Mengajar_${Date.now()}.xlsx`;
+  saveExcelFileWithNotification(wb, fname, 'Template Excel Jurnal & Agenda Mengajar');
+}
+
 export function exportAgendaToPDF(
   agendas: TeachingAgenda[],
   classRoom: ClassRoom | null,
