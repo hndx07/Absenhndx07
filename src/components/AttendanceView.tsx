@@ -15,6 +15,7 @@ import {
   ExternalLink,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   TrendingUp,
   Save,
   Cloud,
@@ -49,6 +50,28 @@ import { exportAttendanceToExcel, exportAttendanceToPDF } from '../utils/exportU
 import { createOrUpdatePublicShare, getStudents, getAttendanceSessions, resequenceStudentsAlphabetically } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
+import { TEACHING_PERIODS, formatPeriodsToJamKe } from './TeachingAgendaView';
+
+const INDO_DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+function getIndoDay(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return INDO_DAYS[d.getDay()] || 'Senin';
+    }
+  } catch {}
+  return 'Senin';
+}
+
+function parseTimeRangeHelper(rentangJam?: string): { start: string; end: string } {
+  if (!rentangJam) return { start: '07:15', end: '09:15' };
+  const parts = rentangJam.replace('WIB', '').trim().split('-');
+  return {
+    start: parts[0]?.trim() || '07:15',
+    end: parts[1]?.trim() || '09:15',
+  };
+}
 
 interface AttendanceViewProps {
   currentClass: ClassRoom;
@@ -87,15 +110,27 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   );
   const [isMeetingsPanelOpen, setIsMeetingsPanelOpen] = useState(false);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [newSelectedPeriods, setNewSelectedPeriods] = useState<number[]>([1, 2, 3, 4]);
+  const [isNewTimeSectionExpanded, setIsNewTimeSectionExpanded] = useState(false);
+  const [isNewPeriodsExpanded, setIsNewPeriodsExpanded] = useState(false);
+
   const [newSessionData, setNewSessionData] = useState({
     tanggal: new Date().toISOString().split('T')[0],
+    hari: getIndoDay(new Date().toISOString().split('T')[0]),
     pertemuanKe: (classSessions.length > 0 ? Math.max(...classSessions.map((s) => s.pertemuanKe)) : 0) + 1,
+    jamKe: '1 - 4',
+    rentangJam: '07:15 - 09:15 WIB',
     topikMateri: '',
+    kegiatan: '',
+    catatan: '',
   });
 
   // Edit Existing Session States
   const [editingSessionData, setEditingSessionData] = useState<AttendanceSession | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editSelectedPeriods, setEditSelectedPeriods] = useState<number[]>([1, 2, 3, 4]);
+  const [isEditTimeSectionExpanded, setIsEditTimeSectionExpanded] = useState(false);
+  const [isEditPeriodsExpanded, setIsEditPeriodsExpanded] = useState(false);
 
   const [filterQuery, setFilterQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
@@ -237,10 +272,85 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     scheduleSessionCloudSave(updated);
   };
 
-  const handleCreateSession = (e: React.FormEvent) => {
+  const handleOpenCreateSessionModal = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nextPertemuan = (classSessions.length > 0 ? Math.max(...classSessions.map((s) => s.pertemuanKe)) : 0) + 1;
+    const dayStr = getIndoDay(todayStr);
+
+    // Cek apakah sudah ada agenda untuk kelas dan tanggal atau pertemuan ini
+    const existingAgenda = agendas.find(
+      (a) => a.classId === currentClass.id && (a.tanggal === todayStr || a.pertemuanKe === nextPertemuan)
+    );
+
+    setNewSessionData({
+      tanggal: todayStr,
+      hari: existingAgenda?.hari || dayStr,
+      pertemuanKe: nextPertemuan,
+      jamKe: existingAgenda?.jamKe || '1 - 4',
+      rentangJam: existingAgenda?.rentangJam || '07:15 - 09:15 WIB',
+      topikMateri: existingAgenda?.materiAjar || '',
+      kegiatan: existingAgenda?.kegiatan || '',
+      catatan: existingAgenda?.catatan || '',
+    });
+    setNewSelectedPeriods([1, 2, 3, 4]);
+    setIsNewTimeSectionExpanded(false);
+    setIsNewPeriodsExpanded(false);
+    setIsNewModalOpen(true);
+  };
+
+  const handleStartTimeChangeNew = (startVal: string) => {
+    const curEnd = parseTimeRangeHelper(newSessionData.rentangJam).end;
+    setNewSessionData((prev) => ({
+      ...prev,
+      rentangJam: `${startVal} - ${curEnd} WIB`,
+    }));
+  };
+
+  const handleEndTimeChangeNew = (endVal: string) => {
+    const curStart = parseTimeRangeHelper(newSessionData.rentangJam).start;
+    setNewSessionData((prev) => ({
+      ...prev,
+      rentangJam: `${curStart} - ${endVal} WIB`,
+    }));
+  };
+
+  const isPeriodActiveNew = (periods: number[]) => {
+    if (newSelectedPeriods.length !== periods.length) return false;
+    return periods.every((p) => newSelectedPeriods.includes(p));
+  };
+
+  const handleQuickSelectPeriodsNew = (periods: number[]) => {
+    setNewSelectedPeriods(periods);
+    const { jamKe, rentangJam } = formatPeriodsToJamKe(periods);
+    setNewSessionData((prev) => ({
+      ...prev,
+      jamKe,
+      rentangJam,
+    }));
+  };
+
+  const handleTogglePeriodNew = (periodNo: number) => {
+    setNewSelectedPeriods((prev) => {
+      let next: number[];
+      if (prev.includes(periodNo)) {
+        if (prev.length === 1) return prev;
+        next = prev.filter((p) => p !== periodNo);
+      } else {
+        next = [...prev, periodNo].sort((a, b) => a - b);
+      }
+      const { jamKe, rentangJam } = formatPeriodsToJamKe(next);
+      setNewSessionData((prevData) => ({
+        ...prevData,
+        jamKe,
+        rentangJam,
+      }));
+      return next;
+    });
+  };
+
+  const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     const newId = `att_${Date.now()}`;
-    // Records kosong: status belum diisi. Guru mengisi manual atau lewat tombol "Set Semua Hadir".
     const initialRecords: Record<string, { status: AttendanceStatus; catatan: string }> = {};
 
     const created: AttendanceSession = {
@@ -248,18 +358,88 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       classId: currentClass.id,
       tanggal: newSessionData.tanggal,
       pertemuanKe: Number(newSessionData.pertemuanKe),
-      topikMateri: newSessionData.topikMateri || 'Pertemuan Pembelajaran Rutin',
+      topikMateri: newSessionData.topikMateri?.trim() || `Pertemuan Pembelajaran Rutin Ke-${newSessionData.pertemuanKe}`,
+      hari: newSessionData.hari?.trim() || getIndoDay(newSessionData.tanggal),
+      jamKe: newSessionData.jamKe?.trim() || '1 - 4',
+      rentangJam: newSessionData.rentangJam?.trim() || '07:15 - 09:15 WIB',
+      kegiatan: newSessionData.kegiatan?.trim() || `Pembelajaran tatap muka pertemuan ke-${newSessionData.pertemuanKe}`,
+      catatan: newSessionData.catatan?.trim() || '',
       records: initialRecords,
     };
 
-    onSaveSession(created);
-    setActiveSessionId(newId);
-    setIsNewModalOpen(false);
+    setIsSavingToCloud(true);
+    try {
+      await onSaveSession(created);
+      setActiveSessionId(newId);
+      setIsNewModalOpen(false);
+      setSaveSuccessMsg(`Pertemuan Ke-${created.pertemuanKe} Berhasil Dibuat & Tersinkronisasi Langsung ke Agenda Mengajar!`);
+      setTimeout(() => setSaveSuccessMsg(null), 4000);
+    } catch (err: any) {
+      alert(`Gagal membuat pertemuan baru: ${err?.message || 'Error'}`);
+    } finally {
+      setIsSavingToCloud(false);
+    }
   };
 
   const handleStartEditSession = (sess: AttendanceSession) => {
-    setEditingSessionData({ ...sess });
+    const matchedAgenda = agendas.find(
+      (a) =>
+        a.id === `ag_att_${sess.id}` ||
+        (a.classId === sess.classId && a.tanggal === sess.tanggal) ||
+        (a.classId === sess.classId && a.pertemuanKe === sess.pertemuanKe)
+    );
+
+    setEditingSessionData({
+      ...sess,
+      hari: sess.hari || matchedAgenda?.hari || getIndoDay(sess.tanggal),
+      jamKe: sess.jamKe || matchedAgenda?.jamKe || '1 - 4',
+      rentangJam: sess.rentangJam || matchedAgenda?.rentangJam || '07:15 - 09:15 WIB',
+      topikMateri: sess.topikMateri || matchedAgenda?.materiAjar || '',
+      kegiatan: sess.kegiatan || matchedAgenda?.kegiatan || '',
+      catatan: sess.catatan || matchedAgenda?.catatan || '',
+    });
+    setEditSelectedPeriods([1, 2, 3, 4]);
+    setIsEditTimeSectionExpanded(false);
+    setIsEditPeriodsExpanded(false);
     setIsEditModalOpen(true);
+  };
+
+  const handleStartTimeChangeEdit = (startVal: string) => {
+    if (!editingSessionData) return;
+    const curEnd = parseTimeRangeHelper(editingSessionData.rentangJam).end;
+    setEditingSessionData((prev) => (prev ? { ...prev, rentangJam: `${startVal} - ${curEnd} WIB` } : null));
+  };
+
+  const handleEndTimeChangeEdit = (endVal: string) => {
+    if (!editingSessionData) return;
+    const curStart = parseTimeRangeHelper(editingSessionData.rentangJam).start;
+    setEditingSessionData((prev) => (prev ? { ...prev, rentangJam: `${curStart} - ${endVal} WIB` } : null));
+  };
+
+  const isPeriodActiveEdit = (periods: number[]) => {
+    if (editSelectedPeriods.length !== periods.length) return false;
+    return periods.every((p) => editSelectedPeriods.includes(p));
+  };
+
+  const handleQuickSelectPeriodsEdit = (periods: number[]) => {
+    setEditSelectedPeriods(periods);
+    const { jamKe, rentangJam } = formatPeriodsToJamKe(periods);
+    setEditingSessionData((prev) => (prev ? { ...prev, jamKe, rentangJam } : null));
+  };
+
+  const handleTogglePeriodEdit = (periodNo: number) => {
+    setEditSelectedPeriods((prev) => {
+      let next: number[];
+      if (prev.includes(periodNo)) {
+        if (prev.length === 1) return prev;
+        next = prev.filter((p) => p !== periodNo);
+      } else {
+        next = [...prev, periodNo].sort((a, b) => a - b);
+      }
+      const { jamKe, rentangJam } = formatPeriodsToJamKe(next);
+      setEditingSessionData((prevData) => (prevData ? { ...prevData, jamKe, rentangJam } : null));
+      return next;
+    });
   };
 
   const handleSaveEditedSession = async (e: React.FormEvent) => {
@@ -268,13 +448,16 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     setIsSavingToCloud(true);
     try {
       await onSaveSession(editingSessionData);
-      const timeStr = new Date().toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }) + ' WIB';
+      const timeStr =
+        new Date().toLocaleTimeString('id-ID', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }) + ' WIB';
       setLastSavedTime(timeStr);
-      setSaveSuccessMsg(`Data Pertemuan Ke-${editingSessionData.pertemuanKe} berhasil diperbarui di Cloud!`);
+      setSaveSuccessMsg(
+        `Data Pertemuan Ke-${editingSessionData.pertemuanKe} Berhasil Diperbarui & Tersinkronisasi ke Agenda Mengajar!`
+      );
       setTimeout(() => setSaveSuccessMsg(null), 4000);
       setIsEditModalOpen(false);
       setEditingSessionData(null);
@@ -699,7 +882,7 @@ Pendidik ${currentClass.mataPelajaran}
             </button>
 
             <button
-              onClick={() => setIsNewModalOpen(true)}
+              onClick={handleOpenCreateSessionModal}
               className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
             >
               <Plus className="w-4 h-4" />
@@ -877,8 +1060,15 @@ Pendidik ${currentClass.mataPelajaran}
             )}
           </div>
         ) : (
-          <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-800">
-            Belum ada sesi pertemuan. Klik tombol <strong>"Buat Pertemuan Baru"</strong> di atas untuk memulai pencatatan presensi.
+          <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <span>Belum ada sesi pertemuan. Klik tombol <strong>"Buat Pertemuan Baru"</strong> untuk memulai pencatatan presensi yang tersinkronisasi langsung ke Agenda Mengajar.</span>
+            <button
+              onClick={handleOpenCreateSessionModal}
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Buat Pertemuan Baru
+            </button>
           </div>
         )}
       </div>
@@ -909,12 +1099,27 @@ Pendidik ${currentClass.mataPelajaran}
 
                 <span className="text-xs text-emerald-100 font-mono flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5" />
-                  {currentSession.tanggal}
+                  {currentSession.hari ? `${currentSession.hari}, ` : ''}{currentSession.tanggal}
                 </span>
               </div>
               <h3 className="font-bold text-base mt-2 leading-snug text-white">
                 {currentSession.topikMateri || 'Tanpa topik materi'}
               </h3>
+              {(currentSession.jamKe || currentSession.rentangJam || currentSession.kegiatan) && (
+                <div className="mt-2 space-y-1 text-xs text-emerald-100/90">
+                  {(currentSession.jamKe || currentSession.rentangJam) && (
+                    <div className="flex items-center gap-1.5 font-mono text-[11px] text-emerald-200">
+                      <Clock className="w-3 h-3" />
+                      <span>Jam Ke: {currentSession.jamKe || '1 - 4'} ({currentSession.rentangJam || '07:15 - 09:15 WIB'})</span>
+                    </div>
+                  )}
+                  {currentSession.kegiatan && (
+                    <p className="text-[11px] text-emerald-100 line-clamp-2 italic">
+                      Kegiatan: {currentSession.kegiatan}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-4 mt-4 border-t border-white/10 gap-2 flex-wrap">
@@ -1357,76 +1562,343 @@ Pendidik ${currentClass.mataPelajaran}
         </div>
       )}
 
-      {/* Modal Create Session */}
+      {/* Modal Create Session with Full Teaching Agenda Inputs & Direct Sync */}
       {isNewModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4">
-            <h3 className="font-bold text-slate-900 text-base">
-              Buat Sesi Pertemuan Baru
-            </h3>
-            <form onSubmit={handleCreateSession} className="space-y-3.5">
-              <div className="grid grid-cols-2 gap-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 flex items-center justify-center shadow-xs">
+                  <BookMarked className="w-5 h-5" />
+                </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    Pertemuan Ke-
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    Buat Pertemuan Baru & Sinkron Agenda
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Input absen langsung tersinkronisasi otomatis ke Agenda Mengajar
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Info Rombel & Pengajar */}
+            <div className="flex items-center gap-2 flex-wrap text-xs bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold rounded-lg border border-indigo-200 dark:border-indigo-800">
+                Kelas: {currentClass.namaKelas}
+              </span>
+              <span className="px-2 py-0.5 bg-slate-200/80 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-medium rounded-lg">
+                Mapel: {currentClass.mataPelajaran || teacher.mataPelajaranUtama}
+              </span>
+              <span className="text-slate-500 dark:text-slate-400 text-[11px] ml-auto">
+                Guru: {teacher.namaGuru}
+              </span>
+            </div>
+
+            <form onSubmit={handleCreateSession} className="space-y-4">
+              {/* Row 1: Pertemuan Ke-, Tanggal & Hari */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                    Pertemuan Ke- <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="number"
                     min="1"
                     required
                     value={newSessionData.pertemuanKe}
-                    onChange={(e) =>
-                      setNewSessionData({ ...newSessionData, pertemuanKe: Number(e.target.value) })
-                    }
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-mono"
+                    onChange={(e) => {
+                      const pKe = Number(e.target.value);
+                      const match = agendas.find((a) => a.classId === currentClass.id && a.pertemuanKe === pKe);
+                      setNewSessionData((prev) => ({
+                        ...prev,
+                        pertemuanKe: pKe,
+                        topikMateri: match?.materiAjar || prev.topikMateri,
+                        kegiatan: match?.kegiatan || prev.kegiatan,
+                        catatan: match?.catatan || prev.catatan,
+                      }));
+                    }}
+                    className="w-full min-h-[42px] px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    Tanggal
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                    Tanggal <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="date"
                     required
                     value={newSessionData.tanggal}
-                    onChange={(e) =>
-                      setNewSessionData({ ...newSessionData, tanggal: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-mono"
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      const dayName = getIndoDay(newDate);
+                      const match = agendas.find((a) => a.classId === currentClass.id && a.tanggal === newDate);
+                      setNewSessionData((prev) => ({
+                        ...prev,
+                        tanggal: newDate,
+                        hari: dayName,
+                        topikMateri: match?.materiAjar || prev.topikMateri,
+                        kegiatan: match?.kegiatan || prev.kegiatan,
+                        catatan: match?.catatan || prev.catatan,
+                        jamKe: match?.jamKe || prev.jamKe,
+                        rentangJam: match?.rentangJam || prev.rentangJam,
+                      }));
+                    }}
+                    className="w-full min-h-[42px] px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                    Hari
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newSessionData.hari}
+                    onChange={(e) => setNewSessionData({ ...newSessionData, hari: e.target.value })}
+                    className="w-full min-h-[42px] px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
               </div>
 
+              {/* SEKSI WAKTU MENGAJAR - Collapsible Accordion (Sama dengan Agenda Mengajar) */}
+              <div className="bg-slate-50 dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
+                {/* Header Collapsible Waktu Mengajar */}
+                <div
+                  onClick={() => setIsNewTimeSectionExpanded((prev) => !prev)}
+                  className="w-full flex items-center justify-between p-3.5 bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer select-none transition border-b border-slate-200/60 dark:border-slate-700/60"
+                  title={isNewTimeSectionExpanded ? 'Tutup Waktu Mengajar' : 'Buka Waktu Mengajar'}
+                >
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <span className="text-xs font-black tracking-wider text-slate-800 dark:text-slate-200 uppercase">
+                        WAKTU MENGAJAR
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      Jam ke: {newSessionData.jamKe} &bull; {newSessionData.rentangJam}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="p-1 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition"
+                  >
+                    {isNewTimeSectionExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {/* Body Collapsible Waktu Mengajar */}
+                {isNewTimeSectionExpanded && (
+                  <div className="p-3.5 space-y-3.5 max-h-[360px] overflow-y-auto animate-in fade-in duration-200">
+                    {/* Grid Jam Mulai & Jam Selesai */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                          Jam Mulai
+                        </label>
+                        <input
+                          type="time"
+                          value={parseTimeRangeHelper(newSessionData.rentangJam).start}
+                          onChange={(e) => handleStartTimeChangeNew(e.target.value)}
+                          className="w-full min-h-[40px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                          Jam Selesai
+                        </label>
+                        <input
+                          type="time"
+                          value={parseTimeRangeHelper(newSessionData.rentangJam).end}
+                          onChange={(e) => handleEndTimeChangeNew(e.target.value)}
+                          className="w-full min-h-[40px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Detail Jam Pelajaran & Pilih Cepat */}
+                    <div className="p-3 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">
+                            Jam ke:
+                          </span>
+                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            {newSessionData.jamKe}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">Pilih Cepat:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelectPeriodsNew([1, 2, 3, 4])}
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                              isPeriodActiveNew([1, 2, 3, 4])
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            1-4
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelectPeriodsNew([5, 6, 7, 8])}
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                              isPeriodActiveNew([5, 6, 7, 8])
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            5-8
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelectPeriodsNew([9, 10, 11, 12])}
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                              isPeriodActiveNew([9, 10, 11, 12])
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            9-12
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsNewPeriodsExpanded((prev) => !prev)}
+                            className="px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 transition flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>{isNewPeriodsExpanded ? 'Tutup Daftar' : '12 Jam'}</span>
+                            {isNewPeriodsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Grid 12 Jam Pelajaran */}
+                      {isNewPeriodsExpanded && (
+                        <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                          {TEACHING_PERIODS.map((period) => {
+                            const isSelected = newSelectedPeriods.includes(period.no);
+                            return (
+                              <div
+                                key={period.no}
+                                onClick={() => handleTogglePeriodNew(period.no)}
+                                className={`flex items-center gap-2 p-2 rounded-xl border transition cursor-pointer select-none ${
+                                  isSelected
+                                    ? 'bg-indigo-50/90 dark:bg-indigo-950/50 border-indigo-400 dark:border-indigo-600'
+                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                                }`}
+                              >
+                                <div
+                                  className={`w-4 h-4 rounded-md border flex items-center justify-center transition shrink-0 ${
+                                    isSelected
+                                      ? 'bg-indigo-600 border-indigo-600 text-white'
+                                      : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'
+                                  }`}
+                                >
+                                  {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                </div>
+                                <span
+                                  className={`text-[11px] ${
+                                    isSelected
+                                      ? 'text-indigo-950 dark:text-indigo-200 font-bold'
+                                      : 'text-slate-700 dark:text-slate-300 font-medium'
+                                  }`}
+                                >
+                                  {period.no}. ({period.timeRange})
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Materi Pokok / Capaian Pembelajaran (TP) */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                  Materi Pokok / Capaian Pembelajaran (TP)
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                  Materi Pokok / Capaian Pembelajaran (TP) <span className="text-rose-500">*</span>
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   required
                   placeholder="Contoh: Konfigurasi Virtual LAN (VLAN) dan Trunking pada Switch Cisco"
                   value={newSessionData.topikMateri}
-                  onChange={(e) =>
-                    setNewSessionData({ ...newSessionData, topikMateri: e.target.value })
-                  }
-                  className="w-full p-3 rounded-xl border border-slate-300 text-sm"
+                  onChange={(e) => setNewSessionData({ ...newSessionData, topikMateri: e.target.value })}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t">
+              {/* Kegiatan Pembelajaran & Sintaks */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                  Kegiatan Pembelajaran & Sintaks
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Deskripsi kegiatan (Apersepsi, Diskusi kelompok, Praktikum lab, Refleksi)..."
+                  value={newSessionData.kegiatan}
+                  onChange={(e) => setNewSessionData({ ...newSessionData, kegiatan: e.target.value })}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Catatan / Evaluasi / Kendala Pembelajaran */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                  Catatan / Evaluasi / Kendala Pembelajaran
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Catatan keaktifan murid, kendala perangkat lab, atau tindak lanjut..."
+                  value={newSessionData.catatan}
+                  onChange={(e) => setNewSessionData({ ...newSessionData, catatan: e.target.value })}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Box Notifikasi Sinkronisasi Langsung ke Agenda Mengajar */}
+              <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-emerald-900 dark:text-emerald-200 leading-relaxed">
+                  <span className="font-bold">Sinkronisasi Langsung ke Agenda Mengajar:</span>
+                  <p className="text-emerald-800 dark:text-emerald-300 mt-0.5">
+                    Menyimpan pertemuan ini otomatis membuat & menyinkronkan Agenda Mengajar secara real-time, termasuk rekap presensi murid (hadir/tidak hadir).
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsNewModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl cursor-pointer hover:bg-slate-200 transition"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer"
+                  disabled={isSavingToCloud}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition"
                 >
-                  <Cloud className="w-4 h-4" />
-                  Simpan Pertemuan Baru ke Cloud
+                  {isSavingToCloud ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+                  <span>Simpan Pertemuan & Sinkron Agenda</span>
                 </button>
               </div>
             </form>
@@ -1434,21 +1906,21 @@ Pendidik ${currentClass.mataPelajaran}
         </div>
       )}
 
-      {/* Modal Edit Sesi Pertemuan Absen yang Sudah Dibuat */}
+      {/* Modal Edit Sesi Pertemuan Absen yang Sudah Dibuat dengan Sinkronisasi Agenda */}
       {isEditModalOpen && editingSessionData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/35 backdrop-blur-[2px] animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center shadow-xs">
                   <Edit2 className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                    Edit Sesi Pertemuan Absen
+                    Edit Sesi Pertemuan Absen & Agenda
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Ubah tanggal, nomor pertemuan, atau materi ajar
+                    Perubahan langsung tersinkronisasi ke Agenda Mengajar
                   </p>
                 </div>
               </div>
@@ -1458,58 +1930,271 @@ Pendidik ${currentClass.mataPelajaran}
                   setIsEditModalOpen(false);
                   setEditingSessionData(null);
                 }}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveEditedSession} className="space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                  Tanggal Pertemuan
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={editingSessionData.tanggal}
-                  onChange={(e) =>
-                    setEditingSessionData({ ...editingSessionData, tanggal: e.target.value })
-                  }
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+              {/* Row 1: Pertemuan Ke-, Tanggal & Hari */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                    Pertemuan Ke- <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={editingSessionData.pertemuanKe}
+                    onChange={(e) =>
+                      setEditingSessionData({
+                        ...editingSessionData,
+                        pertemuanKe: Number(e.target.value),
+                      })
+                    }
+                    className="w-full min-h-[42px] px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                    Tanggal Pertemuan <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editingSessionData.tanggal}
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      const dayName = getIndoDay(newDate);
+                      setEditingSessionData({
+                        ...editingSessionData,
+                        tanggal: newDate,
+                        hari: dayName,
+                      });
+                    }}
+                    className="w-full min-h-[42px] px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                    Hari
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingSessionData.hari || getIndoDay(editingSessionData.tanggal)}
+                    onChange={(e) =>
+                      setEditingSessionData({
+                        ...editingSessionData,
+                        hari: e.target.value,
+                      })
+                    }
+                    className="w-full min-h-[42px] px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                  Pertemuan Ke-
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={editingSessionData.pertemuanKe}
-                  onChange={(e) =>
-                    setEditingSessionData({
-                      ...editingSessionData,
-                      pertemuanKe: Number(e.target.value),
-                    })
-                  }
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+              {/* SEKSI WAKTU MENGAJAR - Collapsible Accordion */}
+              <div className="bg-slate-50 dark:bg-slate-850 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
+                <div
+                  onClick={() => setIsEditTimeSectionExpanded((prev) => !prev)}
+                  className="w-full flex items-center justify-between p-3.5 bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer select-none transition border-b border-slate-200/60 dark:border-slate-700/60"
+                >
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <span className="text-xs font-black tracking-wider text-slate-800 dark:text-slate-200 uppercase">
+                        WAKTU MENGAJAR
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      Jam ke: {editingSessionData.jamKe || '1 - 4'} &bull; {editingSessionData.rentangJam || '07:15 - 09:15 WIB'}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="p-1 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition"
+                  >
+                    {isEditTimeSectionExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {isEditTimeSectionExpanded && (
+                  <div className="p-3.5 space-y-3.5 max-h-[360px] overflow-y-auto animate-in fade-in duration-200">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                          Jam Mulai
+                        </label>
+                        <input
+                          type="time"
+                          value={parseTimeRangeHelper(editingSessionData.rentangJam).start}
+                          onChange={(e) => handleStartTimeChangeEdit(e.target.value)}
+                          className="w-full min-h-[40px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                          Jam Selesai
+                        </label>
+                        <input
+                          type="time"
+                          value={parseTimeRangeHelper(editingSessionData.rentangJam).end}
+                          onChange={(e) => handleEndTimeChangeEdit(e.target.value)}
+                          className="w-full min-h-[40px] px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">
+                            Jam ke:
+                          </span>
+                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            {editingSessionData.jamKe || '1 - 4'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">Pilih Cepat:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelectPeriodsEdit([1, 2, 3, 4])}
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                              isPeriodActiveEdit([1, 2, 3, 4])
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            1-4
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelectPeriodsEdit([5, 6, 7, 8])}
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                              isPeriodActiveEdit([5, 6, 7, 8])
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            5-8
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleQuickSelectPeriodsEdit([9, 10, 11, 12])}
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                              isPeriodActiveEdit([9, 10, 11, 12])
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            9-12
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setIsEditPeriodsExpanded((prev) => !prev)}
+                            className="px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 transition flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>{isEditPeriodsExpanded ? 'Tutup Daftar' : '12 Jam'}</span>
+                            {isEditPeriodsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {isEditPeriodsExpanded && (
+                        <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                          {TEACHING_PERIODS.map((period) => {
+                            const isSelected = editSelectedPeriods.includes(period.no);
+                            return (
+                              <div
+                                key={period.no}
+                                onClick={() => handleTogglePeriodEdit(period.no)}
+                                className={`flex items-center gap-2 p-2 rounded-xl border transition cursor-pointer select-none ${
+                                  isSelected
+                                    ? 'bg-indigo-50/90 dark:bg-indigo-950/50 border-indigo-400 dark:border-indigo-600'
+                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                                }`}
+                              >
+                                <div
+                                  className={`w-4 h-4 rounded-md border flex items-center justify-center transition shrink-0 ${
+                                    isSelected
+                                      ? 'bg-indigo-600 border-indigo-600 text-white'
+                                      : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700'
+                                  }`}
+                                >
+                                  {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                </div>
+                                <span
+                                  className={`text-[11px] ${
+                                    isSelected
+                                      ? 'text-indigo-950 dark:text-indigo-200 font-bold'
+                                      : 'text-slate-700 dark:text-slate-300 font-medium'
+                                  }`}
+                                >
+                                  {period.no}. ({period.timeRange})
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* Materi Pokok / Capaian Pembelajaran */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                  Materi Pokok / Capaian Pembelajaran
+                  Materi Pokok / Capaian Pembelajaran <span className="text-rose-500">*</span>
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   required
                   placeholder="Contoh: Pengujian Jaringan Lokal dan Troubleshoot IP Address"
                   value={editingSessionData.topikMateri || ''}
                   onChange={(e) =>
                     setEditingSessionData({ ...editingSessionData, topikMateri: e.target.value })
+                  }
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Kegiatan Pembelajaran & Sintaks */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                  Kegiatan Pembelajaran & Sintaks
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Deskripsi kegiatan (Apersepsi, Diskusi kelompok, Praktikum lab, Refleksi)..."
+                  value={editingSessionData.kegiatan || ''}
+                  onChange={(e) =>
+                    setEditingSessionData({ ...editingSessionData, kegiatan: e.target.value })
+                  }
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Catatan / Evaluasi / Kendala Pembelajaran */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                  Catatan / Evaluasi / Kendala Pembelajaran
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Catatan keaktifan murid, kendala perangkat lab, atau tindak lanjut..."
+                  value={editingSessionData.catatan || ''}
+                  onChange={(e) =>
+                    setEditingSessionData({ ...editingSessionData, catatan: e.target.value })
                   }
                   className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
@@ -1536,21 +2221,21 @@ Pendidik ${currentClass.mataPelajaran}
                       setIsEditModalOpen(false);
                       setEditingSessionData(null);
                     }}
-                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl cursor-pointer"
+                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl cursor-pointer hover:bg-slate-200 transition"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
                     disabled={isSavingToCloud}
-                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition"
                   >
                     {isSavingToCloud ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <RefreshCw className="w-4 h-4 animate-spin" />
                     ) : (
                       <Cloud className="w-4 h-4" />
                     )}
-                    <span>Simpan Perubahan</span>
+                    <span>Simpan Perubahan & Sinkron Agenda</span>
                   </button>
                 </div>
               </div>

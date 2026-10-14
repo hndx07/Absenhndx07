@@ -1175,13 +1175,15 @@ export async function syncAttendanceSessionToAgenda(
 
   // Hari dalam bahasa Indonesia
   const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-  let hari = 'Senin';
-  try {
-    const d = new Date(session.tanggal);
-    if (!isNaN(d.getTime())) {
-      hari = dayNames[d.getDay()] || 'Senin';
-    }
-  } catch {}
+  let hari = session.hari?.trim() || 'Senin';
+  if (!session.hari) {
+    try {
+      const d = new Date(session.tanggal);
+      if (!isNaN(d.getTime())) {
+        hari = dayNames[d.getDay()] || 'Senin';
+      }
+    } catch {}
+  }
 
   const topic = session.topikMateri?.trim() || `Pertemuan Pembelajaran Rutin Ke-${session.pertemuanKe}`;
 
@@ -1195,23 +1197,28 @@ export async function syncAttendanceSessionToAgenda(
     existing = localAgendas.find((a) => a.classId === session.classId && a.pertemuanKe === session.pertemuanKe);
   }
 
+  let finalCatatan = session.catatan?.trim() || '';
+  if (!finalCatatan) {
+    finalCatatan = summaryCatatan;
+  } else if (absentDetails.length > 0 && !finalCatatan.includes('Tidak hadir:')) {
+    finalCatatan = `${finalCatatan} (${summaryCatatan})`;
+  }
+
   let agendaToSave: TeachingAgenda;
 
   if (existing) {
-    let updatedCatatan = existing.catatan || '';
-    if (!updatedCatatan || updatedCatatan === 'Seluruh siswa hadir tertib.' || updatedCatatan.startsWith('Tidak hadir:')) {
-      updatedCatatan = summaryCatatan;
-    }
-
     agendaToSave = {
       ...existing,
       pertemuanKe: session.pertemuanKe,
       tanggal: session.tanggal,
-      hari: hari || existing.hari,
+      hari: session.hari || hari || existing.hari,
+      jamKe: session.jamKe || existing.jamKe || '1 - 4',
+      rentangJam: session.rentangJam || existing.rentangJam || '07:15 - 09:15 WIB',
       materiAjar: session.topikMateri?.trim() ? session.topikMateri.trim() : (existing.materiAjar || topic),
+      kegiatan: session.kegiatan?.trim() || existing.kegiatan || `Pembelajaran tatap muka pertemuan ke-${session.pertemuanKe}`,
+      catatan: finalCatatan,
       hadirCount,
       tidakHadirCount,
-      catatan: updatedCatatan,
       classNameSnapshot: classRoom?.namaKelas || existing.classNameSnapshot || '',
       mataPelajaran: classRoom?.mataPelajaran || existing.mataPelajaran || teacher?.mataPelajaranUtama || '',
       guruName: teacher?.namaGuru || existing.guruName,
@@ -1226,11 +1233,11 @@ export async function syncAttendanceSessionToAgenda(
       guruName: teacher?.namaGuru || 'Pendidik',
       tanggal: session.tanggal,
       hari,
-      jamKe: '1 - 4',
-      rentangJam: '07:15 - 09:15 WIB',
+      jamKe: session.jamKe || '1 - 4',
+      rentangJam: session.rentangJam || '07:15 - 09:15 WIB',
       materiAjar: topic,
-      kegiatan: `Pembelajaran tatap muka pertemuan ke-${session.pertemuanKe}`,
-      catatan: summaryCatatan,
+      kegiatan: session.kegiatan?.trim() || `Pembelajaran tatap muka pertemuan ke-${session.pertemuanKe}`,
+      catatan: finalCatatan,
       hadirCount,
       tidakHadirCount,
       pertemuanKe: session.pertemuanKe,

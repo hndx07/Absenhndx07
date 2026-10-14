@@ -11,6 +11,11 @@ export interface AttendanceSession {
   tanggal: string;
   pertemuanKe: number;
   topikMateri?: string;
+  hari?: string;
+  jamKe?: string;
+  rentangJam?: string;
+  kegiatan?: string;
+  catatan?: string;
   records: Record<string, AttendanceRecord>;
   created_at?: string;
   updated_at?: string;
