@@ -70,9 +70,11 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     return resequenceStudentsAlphabetically(raw, currentClass.id);
   }, [students, currentClass.id]);
 
-  const classSessions = sessions
-    .filter((s) => s.classId === currentClass.id)
-    .sort((a, b) => b.pertemuanKe - a.pertemuanKe);
+  const classSessions = useMemo(() => {
+    return sessions
+      .filter((s) => s.classId === currentClass.id)
+      .sort((a, b) => b.pertemuanKe - a.pertemuanKe);
+  }, [sessions, currentClass.id]);
 
   const [activeSessionId, setActiveSessionId] = useState<string>(
     classSessions[0]?.id || ''
@@ -119,16 +121,15 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   // Sync prop classSessions into localSessions when classSessions change
   useEffect(() => {
     setLocalSessions((prev) => {
+      let changed = false;
       const next = { ...prev };
       classSessions.forEach((s) => {
-        if (!next[s.id]) {
+        if (!next[s.id] || JSON.stringify(next[s.id]) !== JSON.stringify(s)) {
           next[s.id] = s;
-        } else {
-          // Merge while preserving local edits
-          next[s.id] = { ...s, ...next[s.id] };
+          changed = true;
         }
       });
-      return next;
+      return changed ? next : prev;
     });
   }, [classSessions]);
 

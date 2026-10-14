@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   CalendarCheck,
   Award,
@@ -262,7 +262,7 @@ export default function App() {
     if (!currentClassId && cachedClasses && cachedClasses.length > 0) {
       currentClassId = cachedClasses[0].id;
     }
-    if (currentClassId) {
+    if (currentClassId && currentClassId !== activeClassId) {
       setActiveClassId(currentClassId);
     }
 
@@ -312,7 +312,7 @@ export default function App() {
       if (!currentClassId && loadedClasses.length > 0) {
         currentClassId = loadedClasses[0].id;
       }
-      if (currentClassId) {
+      if (currentClassId && currentClassId !== activeClassId) {
         setActiveClassId(currentClassId);
       }
 
@@ -401,6 +401,10 @@ export default function App() {
     }
   };
 
+  // Stable ref for loadUserData to avoid re-triggering auth useEffect
+  const loadUserDataRef = useRef(loadUserData);
+  loadUserDataRef.current = loadUserData;
+
   // Check auth session on startup & subscribe to auth changes
   useEffect(() => {
     let isMounted = true;
@@ -412,7 +416,7 @@ export default function App() {
           setSession(currentSession);
           setIsAuthChecking(false);
           if (currentSession) {
-            loadUserData();
+            loadUserDataRef.current();
           }
         }
       } catch (err) {
@@ -438,7 +442,7 @@ export default function App() {
 
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           if (newSession) {
-            loadUserData();
+            loadUserDataRef.current();
           }
         } else if (event === 'TOKEN_REFRESHED') {
           // Token refreshed: Jangan reload data jika session masih valid dan cache masih fresh
@@ -463,7 +467,7 @@ export default function App() {
     return () => {
       isMounted = false;
     };
-  }, [loadUserData]);
+  }, []);
 
   // Handle active class change with cache-first and background sync
   const handleSelectClass = async (clsId: string) => {
@@ -883,29 +887,19 @@ export default function App() {
               </button>
             </div>
 
-            {/* Penanda Cloud Supabase Aktif & Tombol Log Out */}
+            {/* Penanda Cloud Supabase Aktif */}
             <div className="flex items-center gap-2 shrink-0">
               <div
-                className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold shadow-2xs backdrop-blur-xs"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold shadow-2xs backdrop-blur-xs"
                 title="Database PostgreSQL Supabase Cloud Aktif & Sinkron (RLS)"
               >
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-80"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
                 </span>
-                <span>Cloud Supabase Aktif</span>
+                <span className="hidden sm:inline">Cloud Supabase Aktif</span>
+                <span className="sm:hidden text-[11px]">Cloud Aktif</span>
               </div>
-
-              {/* Tombol Log Out Header */}
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-bold shadow-sm border border-rose-400/50 transition cursor-pointer backdrop-blur-xs hover:shadow-md"
-                title="Keluar dari akun (Log Out)"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Log Out</span>
-              </button>
             </div>
           </div>
         </div>

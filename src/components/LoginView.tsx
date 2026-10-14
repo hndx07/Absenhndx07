@@ -28,9 +28,9 @@ const STORAGE_SAVED_EMAIL = 'smk_saved_login_email';
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState(() => {
     try {
-      return localStorage.getItem(STORAGE_SAVED_EMAIL) || 'guru@smkmuhbawang.sch.id';
+      return localStorage.getItem(STORAGE_SAVED_EMAIL) || '';
     } catch {
-      return 'guru@smkmuhbawang.sch.id';
+      return '';
     }
   });
   const [password, setPassword] = useState('');
@@ -65,13 +65,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       } catch {}
     }
 
-    // Jika Supabase belum dikonfigurasi, langsung gunakan mode lokal offline tanpa error
-    if (!isConfigured) {
-      createOfflineSession(cleanEmail, 'Guru SMK Muhammadiyah Bawang');
-      onLoginSuccess();
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
@@ -88,6 +81,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         setErrorMessage('Alamat email atau kata sandi tidak cocok. Silakan periksa kembali.');
       } else if (rawMsg.includes('Email not confirmed')) {
         setErrorMessage('Alamat email belum dikonfirmasi di Supabase Auth.');
+      } else if (!isConfigured) {
+        createOfflineSession(cleanEmail, 'Guru SMK Muhammadiyah Bawang');
+        onLoginSuccess();
       } else {
         setErrorMessage(err?.message || 'Gagal masuk akun. Periksa koneksi internet atau kredensial Anda.');
       }
@@ -131,21 +127,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               Sistem Informasi Presensi & Penilaian 2026
             </span>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* TikTok Video Badge */}
-          <a
-            href="https://vt.tiktok.com/ZSbNppdrX/"
-            target="_blank"
-            rel="noreferrer"
-            title="Tonton video profil Smart Classroom 4.0 SMK Muhiba di TikTok"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/75 hover:bg-slate-900 text-white text-xs font-semibold border border-white/30 backdrop-blur-md transition shadow-md"
-          >
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-            <span>Video Smart Classroom</span>
-            <ExternalLink className="w-3 h-3 text-slate-300" />
-          </a>
         </div>
       </div>
 
