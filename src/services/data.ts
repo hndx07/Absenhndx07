@@ -1378,7 +1378,31 @@ export async function deleteSavingTransaction(txId: string): Promise<void> {
 // 9. PUBLIC SHARE SERVICE
 // ============================================================================
 
-export async function createOrUpdatePublicShare(record: PublicShareRecord): Promise<void> {
+export function maskNisn(nisn?: string | null): string {
+  if (!nisn) return '';
+  const str = String(nisn).trim();
+  if (str.length <= 4) return str;
+  return '*'.repeat(str.length - 4) + str.slice(-4);
+}
+
+export function sanitizePublicStudent(student: any): any {
+  if (!student || typeof student !== 'object') return student;
+  const {
+    noHpOrangTua,
+    catatanUmum,
+    no_hp_orang_tua,
+    catatan_umum,
+    nisn,
+    ...rest
+  } = student;
+
+  return {
+    ...rest,
+    nisn: maskNisn(nisn),
+  };
+}
+
+export async function createOrUpdatePublicShare(record: PublicShareRecord): Promise<string | null> {
   const content = record.payload || record.data || {};
   const strippedClassId = record.id.replace(/^(att_share_|grade_share_|nilai_share_|sav_share_|tabungan_share_|age_share_|agenda_share_|share_)/, '');
   const extractedClassId =
@@ -1430,6 +1454,7 @@ export async function createOrUpdatePublicShare(record: PublicShareRecord): Prom
     } catch {}
   }
 
+  let retrievedToken: string | null = null;
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
@@ -1451,13 +1476,63 @@ export async function createOrUpdatePublicShare(record: PublicShareRecord): Prom
         row.class_id = extractedClassId;
       }
       await supabase.from('public_shares').upsert(row, { onConflict: 'id' });
+
+      // Ambil share_token baris tersebut
+      const { data: tokenRow } = await supabase
+        .from('public_shares')
+        .select('share_token')
+        .eq('id', record.id)
+        .maybeSingle();
+
+      if (tokenRow?.share_token) {
+        const tok = tokenRow.share_token;
+        retrievedToken = tok;
+        (record as any).share_token = tok;
+        SafeCache.set(`pub_share_token_${record.id}`, tok);
+        try {
+          localStorage.setItem(`pub_share_token_${record.id}`, tok);
+        } catch {}
+      }
     } catch (err: any) {
       console.warn('Could not upsert public share to Supabase:', err.message);
     }
   }
+
+  return retrievedToken;
 }
 
-export async function getPublicShare(shareId: string): Promise<PublicShareRecord | null> {
+export async function getPublicShareToken(shareId: string): Promise<string | null> {
+  const cached = SafeCache.get<string>(`pub_share_token_${shareId}`);
+  if (cached) return cached;
+  try {
+    const stored = localStorage.getItem(`pub_share_token_${shareId}`);
+    if (stored) return stored;
+  } catch {}
+
+  const supabase = getSafeSupabaseClient();
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('public_shares')
+        .select('share_token')
+        .eq('id', shareId)
+        .maybeSingle();
+      if (data?.share_token) {
+        SafeCache.set(`pub_share_token_${shareId}`, data.share_token);
+        try {
+          localStorage.setItem(`pub_share_token_${shareId}`, data.share_token);
+        } catch {}
+        return data.share_token;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+export async function getPublicShare(
+  shareId: string,
+  since?: string | null
+): Promise<PublicShareRecord | null> {
   const strippedClassId = shareId.replace(/^(att_share_|grade_share_|nilai_share_|sav_share_|tabungan_share_|age_share_|agenda_share_|share_)/, '');
   const candidateIds = Array.from(new Set([
     shareId,
@@ -1477,6 +1552,65 @@ export async function getPublicShare(shareId: string): Promise<PublicShareRecord
 
   const supabase = getSafeSupabaseClient();
   if (supabase) {
+    // 1. Prioritas: Coba panggil RPC get_public_share terlebih dahulu
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_public_share', {
+        p_key: shareId,
+        p_since: since || null,
+      });
+
+      if (!rpcError && rpcData) {
+        // Respons unchanged dari server untuk hemat bandwidth
+        if (rpcData.unchanged === true) {
+          return {
+            id: shareId,
+            type: 'nilai',
+            title: '',
+            payload: { unchanged: true },
+            data: { unchanged: true },
+          };
+        }
+
+        const payloadData = rpcData.payload || {};
+        const extractedClassId =
+          rpcData.class_id ||
+          payloadData.classId ||
+          (strippedClassId !== rpcData.id ? strippedClassId : undefined);
+
+        const rec: PublicShareRecord = {
+          id: rpcData.id,
+          type: rpcData.type,
+          classId: extractedClassId,
+          title: rpcData.title,
+          data: payloadData,
+          payload: payloadData,
+          created_at: rpcData.created_at,
+          updated_at: rpcData.updated_at,
+        };
+
+        if (rpcData.share_token) {
+          (rec as any).share_token = rpcData.share_token;
+          SafeCache.set(`pub_share_token_${rec.id}`, rpcData.share_token);
+          try {
+            localStorage.setItem(`pub_share_token_${rec.id}`, rpcData.share_token);
+          } catch {}
+        }
+
+        candidateIds.forEach((cid) => {
+          SafeCache.set(`pub_share_${cid}`, rec);
+          try {
+            localStorage.setItem(`pub_share_${cid}`, JSON.stringify(rec));
+          } catch {}
+        });
+
+        return rec;
+      }
+    } catch (rpcErr) {
+      // RPC belum terdeploy / error, lanjut ke fallback query
+      console.warn('RPC get_public_share notice, falling back to direct query:', rpcErr);
+    }
+
+    // 2. Fallback query lama jika RPC belum ter-deploy
     try {
       let foundRow: any = null;
       const { data, error } = await supabase
@@ -1501,6 +1635,17 @@ export async function getPublicShare(shareId: string): Promise<PublicShareRecord
       }
 
       if (foundRow) {
+        // Jika parameter since diberikan dan data tidak berubah
+        if (since && foundRow.updated_at && new Date(foundRow.updated_at).getTime() <= new Date(since).getTime()) {
+          return {
+            id: foundRow.id,
+            type: foundRow.type,
+            title: foundRow.title,
+            payload: { unchanged: true },
+            data: { unchanged: true },
+          };
+        }
+
         const payloadData = foundRow.payload || foundRow.data || {};
         const extractedClassId =
           foundRow.class_id ||
@@ -1517,6 +1662,11 @@ export async function getPublicShare(shareId: string): Promise<PublicShareRecord
           created_at: foundRow.created_at,
           updated_at: foundRow.updated_at,
         };
+
+        if (foundRow.share_token) {
+          (rec as any).share_token = foundRow.share_token;
+          SafeCache.set(`pub_share_token_${rec.id}`, foundRow.share_token);
+        }
 
         candidateIds.forEach((cid) => {
           SafeCache.set(`pub_share_${cid}`, rec);
@@ -1575,6 +1725,7 @@ export async function syncPublicAttendanceShare(params: {
 
   const effectiveStudents = students.filter((s) => s.classId === classId);
   const effectiveSessions = sessions.filter((s) => s.classId === classId);
+  const sanitizedStudents = effectiveStudents.map(sanitizePublicStudent);
 
   const shareRecord: PublicShareRecord = {
     id: `att_share_${classId}`,
@@ -1597,7 +1748,7 @@ export async function syncPublicAttendanceShare(params: {
       nbmKepalaSekolah: teacher?.nbmKepalaSekolah || '',
       tahunAjaran: teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
       semester: teacher?.semester || SCHOOL_CONFIG.semester,
-      students: effectiveStudents,
+      students: sanitizedStudents,
       sessions: effectiveSessions,
     },
     payload: {
@@ -1614,7 +1765,7 @@ export async function syncPublicAttendanceShare(params: {
       nbmKepalaSekolah: teacher?.nbmKepalaSekolah || '',
       tahunAjaran: teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
       semester: teacher?.semester || SCHOOL_CONFIG.semester,
-      students: effectiveStudents,
+      students: sanitizedStudents,
       sessions: effectiveSessions,
     },
   };
@@ -1639,6 +1790,7 @@ export async function syncPublicGradesShare(params: {
       effectiveStudents = await getStudents(classId);
     } catch {}
   }
+  const sanitizedStudents = effectiveStudents.map(sanitizePublicStudent);
   const effectiveGrades = grades.filter((g) => g.classId === classId);
   let effectiveColumns = gradeColumns;
   if (!effectiveColumns || effectiveColumns.length === 0) {
@@ -1662,7 +1814,7 @@ export async function syncPublicGradesShare(params: {
     nbmKepalaSekolah: teacher?.nbmKepalaSekolah || '',
     tahunAjaran: teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
     semester: teacher?.semester || SCHOOL_CONFIG.semester,
-    students: effectiveStudents,
+    students: sanitizedStudents,
     grades: effectiveGrades,
     gradeColumns: effectiveColumns,
     shareType: 'nilai',
@@ -1778,6 +1930,8 @@ export async function syncPublicSavingsShare(params: {
     lastTransactionDate: studentLatestDateMap[s.id] || (s as any).lastTransactionDate || '',
   }));
 
+  const sanitizedStudents = studentsWithDatesAndBalances.map(sanitizePublicStudent);
+
   const payloadData = {
     className: classRoom?.namaKelas || 'Kelas',
     classCashBalance,
@@ -1786,7 +1940,7 @@ export async function syncPublicSavingsShare(params: {
     cashTransactions,
     transactions: detailedTransactions,
     allTransactions: detailedTransactions,
-    students: studentsWithDatesAndBalances,
+    students: sanitizedStudents,
     teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
     teacherName: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
     teacherNip: teacher?.nip || '',

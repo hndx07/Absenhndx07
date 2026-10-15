@@ -33,9 +33,13 @@ import {
   Upload,
   FileUp,
   AlertTriangle,
+  Share2,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { TeachingAgenda, ClassRoom, TeacherProfile, Student, AttendanceSession } from '../types';
+import QRCode from 'qrcode';
+import { TeachingAgenda, ClassRoom, TeacherProfile, Student, AttendanceSession, PublicShareRecord } from '../types';
 import {
   exportAgendasToExcel,
   exportToWordDocument,
@@ -46,7 +50,7 @@ import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { OfficialLetterhead } from './OfficialLetterhead';
 import { SearchableClassSelect } from './SearchableClassSelect';
 import { UiStatePersistence } from '../utils/storageCache';
-import { getStudents, getAttendanceSessions, batchSaveTeachingAgendas } from '../services/data';
+import { getStudents, getAttendanceSessions, batchSaveTeachingAgendas, createOrUpdatePublicShare } from '../services/data';
 
 export interface ParsedAgendaRow {
   rowNum: number;
@@ -175,6 +179,12 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [editingAgenda, setEditingAgenda] = useState<Partial<TeachingAgenda> | null>(null);
+
+  // Share Modal State
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareLink, setShareLink] = useState('');
+  const [shareQrUrl, setShareQrUrl] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Excel Upload Parser State
   const [isUploadExcelOpen, setIsUploadExcelOpen] = useState(false);
@@ -484,6 +494,63 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
     if (!editingAgenda) return;
     const total = targetClassStudents.length || editingAgenda.hadirCount || 0;
     setEditingAgenda((prev) => (prev ? { ...prev, hadirCount: total, tidakHadirCount: 0 } : null));
+  };
+
+  const handleOpenShare = async () => {
+    const classId = filterClassId !== 'all' ? filterClassId : currentClass?.id;
+    const shareId = classId ? `agenda_share_${classId}` : 'agenda_share_all';
+    const baseUrl = window.location.origin + window.location.pathname;
+    const initialUrl = `${baseUrl}?agenda_share=${shareId}`;
+    setShareLink(initialUrl);
+
+    const shareRecord: PublicShareRecord = {
+      id: shareId,
+      type: 'agenda',
+      classId: classId,
+      title: `Agenda Mengajar Pendidik - ${teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      data: {
+        className: selectedClassObj?.namaKelas || currentClass?.namaKelas || 'Semua Kelas',
+        agendas: filteredAgendas,
+        teacher: teacher.namaGuru,
+        namaSekolah: teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+        shareType: 'agenda',
+      },
+      payload: {
+        className: selectedClassObj?.namaKelas || currentClass?.namaKelas || 'Semua Kelas',
+        agendas: filteredAgendas,
+        teacher: teacher.namaGuru,
+        namaSekolah: teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+        shareType: 'agenda',
+      },
+    };
+
+    let targetLink = initialUrl;
+    try {
+      const token = await createOrUpdatePublicShare(shareRecord);
+      const effectiveToken = token || (shareRecord as any).share_token;
+      if (effectiveToken) {
+        targetLink = `${baseUrl}?agenda_share=${effectiveToken}`;
+        setShareLink(targetLink);
+      }
+    } catch (err) {
+      console.warn('Could not sync share to cloud', err);
+    }
+
+    try {
+      const qr = await QRCode.toDataURL(targetLink, { width: 240, margin: 2 });
+      setShareQrUrl(qr);
+    } catch (e) {
+      console.error(e);
+    }
+    setShareModalOpen(true);
+  };
+
+  const copyShareLink = () => {
+    navigator.clipboard.writeText(shareLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
   // Handle open Add Modal
@@ -1217,6 +1284,17 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
           >
             <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             Word
+          </button>
+
+          {/* Tombol Bagikan Link Publik Agenda Mengajar */}
+          <button
+            type="button"
+            onClick={handleOpenShare}
+            className="min-h-[44px] px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/70 text-indigo-800 dark:text-indigo-300 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-900 cursor-pointer"
+            title="Bagikan Tautan Preview Publik Agenda Mengajar (Dilindungi Token Aman)"
+          >
+            <Share2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <span>Bagikan Link</span>
           </button>
 
           {/* Tombol Simpan Agenda ke Cloud Supabase */}
@@ -2605,6 +2683,78 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
                     <span>Impor {selectedImportIndices.size} Agenda Terpilih</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {shareModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto">
+              <Share2 className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="font-bold text-slate-900 text-lg">Bagikan Agenda Mengajar</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Tautan publik aman dilindungi token unik. Pihak sekolah, kepala sekolah, atau pengawas dapat memeriksa agenda kegiatan belajar mengajar secara langsung.
+              </p>
+            </div>
+
+            {shareQrUrl && (
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 inline-block mx-auto">
+                <img src={shareQrUrl} alt="QR Code Share" className="w-48 h-48 mx-auto" />
+                <p className="text-[10px] text-slate-400 mt-1">Scan QR Code dengan kamera smartphone</p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200 text-left">
+              <input
+                type="text"
+                readOnly
+                value={shareLink}
+                className="w-full bg-transparent text-xs font-mono text-slate-700 px-2 focus:outline-none"
+              />
+              <button
+                onClick={copyShareLink}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shrink-0 transition flex items-center gap-1 cursor-pointer"
+              >
+                {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedLink ? 'Tersalin' : 'Salin'}
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 pt-2">
+              <div className="flex items-center gap-2">
+                <a
+                  href={shareLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-xs text-indigo-700 font-bold flex items-center gap-1 transition"
+                  title="Buka Halaman Preview Publik di Tab Baru"
+                >
+                  Tab Baru <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = shareLink;
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-xs text-emerald-700 font-bold flex items-center gap-1 transition cursor-pointer"
+                  title="Buka Preview Publik Langsung di Halaman Ini"
+                >
+                  Buka Langsung
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShareModalOpen(false)}
+                className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                Tutup
               </button>
             </div>
           </div>

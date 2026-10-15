@@ -38,7 +38,7 @@ import {
 } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { exportGradesToExcel, downloadGradesTemplateExcel } from '../utils/exportUtils';
-import { createOrUpdatePublicShare, resequenceStudentsAlphabetically } from '../services/data';
+import { createOrUpdatePublicShare, resequenceStudentsAlphabetically, sanitizePublicStudent } from '../services/data';
 import { getKurikulumMerdekaAssessment } from '../utils/gradeCalculations';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
 import { OfficialLetterhead } from './OfficialLetterhead';
@@ -458,12 +458,11 @@ export const GradesView: React.FC<GradesViewProps> = ({
   const handleOpenShare = async () => {
     const shareId = `grade_share_${currentClass.id}`;
     const baseUrl = window.location.origin + window.location.pathname;
-    const fullUrl = `${baseUrl}?nilai_share=${shareId}`;
-    setShareLink(fullUrl);
+    const initialUrl = `${baseUrl}?nilai_share=${shareId}`;
+    setShareLink(initialUrl);
 
     try {
-      const qr = await QRCode.toDataURL(fullUrl, { width: 300, margin: 2 });
-      setShareQrUrl(qr);
+      const sanitizedStudents = classStudents.map(sanitizePublicStudent);
 
       const record: PublicShareRecord = {
         id: shareId,
@@ -487,11 +486,20 @@ export const GradesView: React.FC<GradesViewProps> = ({
           kkm: currentClass.kkm,
           grades: Object.values(localGrades),
           gradeColumns,
-          students: classStudents,
+          students: sanitizedStudents,
         },
       };
 
-      await createOrUpdatePublicShare(record);
+      const token = await createOrUpdatePublicShare(record);
+      const effectiveToken = token || (record as any).share_token;
+      const targetUrl = effectiveToken
+        ? `${baseUrl}?nilai_share=${effectiveToken}`
+        : initialUrl;
+      setShareLink(targetUrl);
+
+      const qr = await QRCode.toDataURL(targetUrl, { width: 300, margin: 2 });
+      setShareQrUrl(qr);
+
       setShareModalOpen(true);
     } catch (e) {
       console.error(e);

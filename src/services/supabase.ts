@@ -169,37 +169,41 @@ export function clearOfflineSession() {
 }
 
 export async function getAuthSession() {
+  if (!isSupabaseConfigured()) {
+    return getOfflineSession();
+  }
   const client = getSafeSupabaseClient();
   if (!client) {
-    return getOfflineSession();
+    return null;
   }
   try {
     const { data, error } = await client.auth.getSession();
     if (error || !data?.session) {
-      return getOfflineSession();
+      return null;
     }
     return data.session;
   } catch {
-    return getOfflineSession();
+    return null;
   }
 }
 
 export async function getAuthUser() {
-  const client = getSafeSupabaseClient();
-  if (!client) {
+  if (!isSupabaseConfigured()) {
     const offline = getOfflineSession();
     return offline?.user || null;
+  }
+  const client = getSafeSupabaseClient();
+  if (!client) {
+    return null;
   }
   try {
     const { data, error } = await client.auth.getUser();
     if (error || !data?.user) {
-      const offline = getOfflineSession();
-      return offline?.user || null;
+      return null;
     }
     return data.user;
   } catch {
-    const offline = getOfflineSession();
-    return offline?.user || null;
+    return null;
   }
 }
 

@@ -142,6 +142,17 @@ function parsePublicShareFromUrl(): {
     if (params.get('agenda_share')) {
       return { type: 'agenda' as const, shareId: params.get('agenda_share')! };
     }
+    // Token-based shares: ?token=... or ?share_token=...
+    const tokenParam = params.get('token') || params.get('share_token');
+    if (tokenParam) {
+      const typeParam = params.get('type') as any;
+      let detectedType: 'absen' | 'nilai' | 'tabungan' | 'agenda' = 'nilai';
+      if (['absen', 'nilai', 'tabungan', 'agenda'].includes(typeParam)) {
+        detectedType = typeParam;
+      }
+      return { type: detectedType, shareId: tokenParam };
+    }
+
     // Generic fallback for links like ?share=... or ?share_id=...
     const genericShare = params.get('share') || params.get('share_id');
     if (genericShare) {

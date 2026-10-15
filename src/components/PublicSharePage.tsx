@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   GraduationCap,
   Calendar,
@@ -129,6 +129,8 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   const nbmKepala =
     data?.nbmKepalaSekolah || cloudTeacher?.nbmKepalaSekolah || '';
 
+  const lastUpdatedAtRef = useRef<string | null>(null);
+
   const loadData = async (isSilent = false) => {
     if (!isSilent) {
       setLoading(true);
@@ -137,11 +139,25 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     }
     try {
       const [sharePayload, teacherData] = await Promise.all([
-        getPublicShare(shareId).catch(() => null),
+        getPublicShare(shareId, lastUpdatedAtRef.current).catch(() => null),
         getTeacherProfile().catch(() => null),
       ]);
       if (teacherData) {
         setCloudTeacher(teacherData);
+      }
+
+      // Jika server mengembalikan indikator unchanged (hemat data/bandwidth)
+      if ((sharePayload as any)?.payload?.unchanged === true || (sharePayload as any)?.unchanged === true) {
+        return;
+      }
+
+      const recUpdatedAt =
+        (sharePayload as any)?.updated_at ||
+        (sharePayload as any)?.created_at ||
+        (sharePayload as any)?.payload?.updated_at ||
+        null;
+      if (recUpdatedAt) {
+        lastUpdatedAtRef.current = recUpdatedAt;
       }
 
       const cleanClassId =
@@ -452,34 +468,28 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   useEffect(() => {
     loadData();
 
-    // 1. Supabase Realtime subscription (Listen to ALL changes on public_shares)
-    const supabase = getSafeSupabaseClient();
-    let channel: any = null;
-    if (supabase) {
-      channel = supabase
-        .channel(`public_share_live_${Date.now()}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'public_shares' },
-          (payload: any) => {
-            loadData(true);
-          }
-        )
-        .subscribe();
-    }
-
-    // 2. High-frequency zero-delay auto polling (every 3 seconds)
+    // 1. Efficient 45-second auto polling (paused when document is hidden)
     const pollInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
       loadData(true);
-    }, 3000);
+    }, 45000);
 
-    // 3. Instant sync on window focus (when parent or student returns to tab)
+    // 2. Instant sync when user returns to tab / visibility changes
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        loadData(true);
+      }
+    };
     const handleFocus = () => loadData(true);
+
     window.addEventListener('focus', handleFocus);
     window.addEventListener('online', handleFocus);
     window.addEventListener('public_share_updated', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // 4. Instant sync on cross-tab storage changes (0 ms latency on same device)
+    // 3. Instant sync on cross-tab storage changes (0 ms latency on same device)
     const handleStorage = (e: StorageEvent) => {
       if (!e.key || e.key.includes('pub_share') || e.key.includes('smk_') || e.key.includes('muhiba_')) {
         loadData(true);
@@ -488,13 +498,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     window.addEventListener('storage', handleStorage);
 
     return () => {
-      if (channel && supabase) {
-        supabase.removeChannel(channel);
-      }
       clearInterval(pollInterval);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', handleFocus);
       window.removeEventListener('public_share_updated', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('storage', handleStorage);
     };
   }, [shareId]);

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { SavingTransaction, Student, ClassRoom, TeacherProfile, PublicShareRecord } from '../types';
-import { createOrUpdatePublicShare, resequenceStudentsAlphabetically } from '../services/data';
+import { createOrUpdatePublicShare, resequenceStudentsAlphabetically, sanitizePublicStudent } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
 interface SavingsViewProps {
@@ -210,6 +210,8 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
       lastTransactionDate: studentLatestDateMap[s.id] || '',
     }));
 
+    const sanitizedStudents = studentsWithDates.map(sanitizePublicStudent);
+
     const shareRecord: PublicShareRecord = {
       id: shareId,
       type: 'tabungan',
@@ -225,7 +227,7 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
         cashTransactions,
         transactions: detailedTransactions,
         allTransactions: detailedTransactions,
-        students: studentsWithDates,
+        students: sanitizedStudents,
         teacher: teacher.namaGuru,
         teacherName: teacher.namaGuru,
         teacherNip: teacher.nip || '',
@@ -246,7 +248,7 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
         cashTransactions,
         transactions: detailedTransactions,
         allTransactions: detailedTransactions,
-        students: studentsWithDates,
+        students: sanitizedStudents,
         teacher: teacher.namaGuru,
         teacherName: teacher.namaGuru,
         teacherNip: teacher.nip || '',
@@ -261,14 +263,20 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
       },
     };
 
+    let targetLink = fullLink;
     try {
-      await createOrUpdatePublicShare(shareRecord);
+      const token = await createOrUpdatePublicShare(shareRecord);
+      const effectiveToken = token || (shareRecord as any).share_token;
+      if (effectiveToken) {
+        targetLink = `${baseUrl}?tabungan_share=${effectiveToken}`;
+        setShareLink(targetLink);
+      }
     } catch (err) {
       console.warn('Could not sync share to cloud', err);
     }
 
     try {
-      const qrData = await QRCode.toDataURL(fullLink, { width: 240, margin: 2 });
+      const qrData = await QRCode.toDataURL(targetLink, { width: 240, margin: 2 });
       setShareQrUrl(qrData);
     } catch (e) {
       console.error(e);

@@ -47,7 +47,7 @@ import {
   TeachingAgenda,
 } from '../types';
 import { exportAttendanceToExcel, exportAttendanceToPDF } from '../utils/exportUtils';
-import { createOrUpdatePublicShare, getStudents, getAttendanceSessions, resequenceStudentsAlphabetically } from '../services/data';
+import { createOrUpdatePublicShare, getStudents, getAttendanceSessions, resequenceStudentsAlphabetically, sanitizePublicStudent } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
 import { TEACHING_PERIODS, formatPeriodsToJamKe } from './TeachingAgendaView';
@@ -759,7 +759,7 @@ Pendidik ${currentClass.mataPelajaran}
         getAttendanceSessions(currentClass.id).catch(() => classSessions),
       ]);
 
-      const effectiveStudents = freshStudents && freshStudents.length > 0 ? freshStudents : classStudents;
+      const effectiveStudents = (freshStudents && freshStudents.length > 0 ? freshStudents : classStudents).map(sanitizePublicStudent);
       const effectiveSessions = freshSessions && freshSessions.length > 0 ? freshSessions : classSessions;
 
       // 2. Susun payload dari data terbaru
@@ -806,20 +806,26 @@ Pendidik ${currentClass.mataPelajaran}
         },
       };
 
-      // 3. Tulis ke public_shares dan SafeCache
-      await createOrUpdatePublicShare(shareRecord);
+      // 3. Tulis ke public_shares dan SafeCache, lalu ambil share_token
+      const token = await createOrUpdatePublicShare(shareRecord);
+      const effectiveToken = token || (shareRecord as any).share_token;
+      const targetLink = effectiveToken
+        ? `${baseUrl}?absen_share=${effectiveToken}`
+        : fullLink;
+      setShareLink(targetLink);
+
+      try {
+        const qrData = await QRCode.toDataURL(targetLink, { width: 240, margin: 2 });
+        setShareQrUrl(qrData);
+      } catch (e) {
+        console.error(e);
+      }
     } catch (err) {
       console.warn('Could not sync share to cloud', err);
     } finally {
       setIsRefreshingShare(false);
     }
 
-    try {
-      const qrData = await QRCode.toDataURL(fullLink, { width: 240, margin: 2 });
-      setShareQrUrl(qrData);
-    } catch (e) {
-      console.error(e);
-    }
     setShareModalOpen(true);
   };
 
