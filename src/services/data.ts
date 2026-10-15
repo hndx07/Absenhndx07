@@ -1409,8 +1409,26 @@ export async function createOrUpdatePublicShare(record: PublicShareRecord): Prom
     if (extractedClassId) {
       localStorage.setItem(`pub_share_${record.type}_${extractedClassId}`, JSON.stringify(fullPayload));
       localStorage.setItem(`pub_share_class_${extractedClassId}`, JSON.stringify(fullPayload));
+      if (record.type === 'nilai') {
+        localStorage.setItem(`pub_share_grade_share_${extractedClassId}`, JSON.stringify(fullPayload));
+        localStorage.setItem(`pub_share_nilai_share_${extractedClassId}`, JSON.stringify(fullPayload));
+      } else if (record.type === 'tabungan') {
+        localStorage.setItem(`pub_share_sav_share_${extractedClassId}`, JSON.stringify(fullPayload));
+        localStorage.setItem(`pub_share_tabungan_share_${extractedClassId}`, JSON.stringify(fullPayload));
+      } else if (record.type === 'absen') {
+        localStorage.setItem(`pub_share_att_share_${extractedClassId}`, JSON.stringify(fullPayload));
+        localStorage.setItem(`pub_share_absen_share_${extractedClassId}`, JSON.stringify(fullPayload));
+      }
     }
   } catch {}
+
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new CustomEvent('public_share_updated', {
+        detail: { id: record.id, type: record.type, classId: extractedClassId }
+      }));
+    } catch {}
+  }
 
   const supabase = getSafeSupabaseClient();
   if (supabase) {
@@ -1440,37 +1458,72 @@ export async function createOrUpdatePublicShare(record: PublicShareRecord): Prom
 }
 
 export async function getPublicShare(shareId: string): Promise<PublicShareRecord | null> {
+  const strippedClassId = shareId.replace(/^(att_share_|grade_share_|nilai_share_|sav_share_|tabungan_share_|age_share_|agenda_share_|share_)/, '');
+  const candidateIds = Array.from(new Set([
+    shareId,
+    shareId.replace(/^nilai_/, 'grade_'),
+    shareId.replace(/^grade_/, 'nilai_'),
+    shareId.replace(/^tabungan_/, 'sav_'),
+    shareId.replace(/^sav_/, 'tabungan_'),
+    `grade_share_${strippedClassId}`,
+    `nilai_share_${strippedClassId}`,
+    `sav_share_${strippedClassId}`,
+    `tabungan_share_${strippedClassId}`,
+    `att_share_${strippedClassId}`,
+    `absen_share_${strippedClassId}`,
+    `agenda_share_${strippedClassId}`,
+    strippedClassId,
+  ])).filter(Boolean);
+
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
+      let foundRow: any = null;
       const { data, error } = await supabase
         .from('public_shares')
         .select('*')
-        .eq('id', shareId)
+        .in('id', candidateIds)
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (!error && data) {
-        const payloadData = data.payload || data.data || {};
-        const strippedClassId = data.id.replace(/^(att_share_|grade_share_|nilai_share_|sav_share_|tabungan_share_|age_share_|agenda_share_|share_)/, '');
+        foundRow = data;
+      } else if (strippedClassId) {
+        const { data: byClass } = await supabase
+          .from('public_shares')
+          .select('*')
+          .eq('class_id', strippedClassId)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (byClass) foundRow = byClass;
+      }
+
+      if (foundRow) {
+        const payloadData = foundRow.payload || foundRow.data || {};
         const extractedClassId =
-          data.class_id ||
+          foundRow.class_id ||
           payloadData.classId ||
-          (strippedClassId !== data.id ? strippedClassId : undefined);
+          (strippedClassId !== foundRow.id ? strippedClassId : undefined);
 
         const rec: PublicShareRecord = {
-          id: data.id,
-          type: data.type,
+          id: foundRow.id,
+          type: foundRow.type,
           classId: extractedClassId,
-          title: data.title,
+          title: foundRow.title,
           data: payloadData,
           payload: payloadData,
-          created_at: data.created_at,
-          updated_at: data.updated_at,
+          created_at: foundRow.created_at,
+          updated_at: foundRow.updated_at,
         };
-        SafeCache.set(`pub_share_${shareId}`, rec);
-        try {
-          localStorage.setItem(`pub_share_${shareId}`, JSON.stringify(rec));
-        } catch {}
+
+        candidateIds.forEach((cid) => {
+          SafeCache.set(`pub_share_${cid}`, rec);
+          try {
+            localStorage.setItem(`pub_share_${cid}`, JSON.stringify(rec));
+          } catch {}
+        });
         return rec;
       }
     } catch (err) {
@@ -1479,17 +1532,16 @@ export async function getPublicShare(shareId: string): Promise<PublicShareRecord
   }
 
   // Fallback to cache / localStorage if offline or Supabase is not available
-  const cached = SafeCache.get<PublicShareRecord>(`pub_share_${shareId}`);
-  if (cached) return cached;
-
-  const raw = getLocalItem<PublicShareRecord | null>(`pub_share_${shareId}`, null);
-  if (raw) {
-    SafeCache.set(`pub_share_${shareId}`, raw);
-    return raw;
+  for (const cid of candidateIds) {
+    const cached = SafeCache.get<PublicShareRecord>(`pub_share_${cid}`);
+    if (cached) return cached;
+    const raw = getLocalItem<PublicShareRecord | null>(`pub_share_${cid}`, null);
+    if (raw) {
+      SafeCache.set(`pub_share_${cid}`, raw);
+      return raw;
+    }
   }
 
-  // Fallback: Check if shareId has extracted classId and check by type and class
-  const strippedClassId = shareId.replace(/^(att_share_|grade_share_|nilai_share_|sav_share_|tabungan_share_|age_share_|agenda_share_|share_)/, '');
   if (strippedClassId && strippedClassId !== shareId) {
     for (const t of ['absen', 'nilai', 'tabungan', 'agenda']) {
       const byClass = getLocalItem<PublicShareRecord | null>(`pub_share_${t}_${strippedClassId}`, null);
@@ -1581,54 +1633,50 @@ export async function syncPublicGradesShare(params: {
   const classId = classRoom?.id || grades[0]?.classId;
   if (!classId) return;
 
-  const effectiveStudents = students.filter((s) => s.classId === classId);
+  let effectiveStudents = students.filter((s) => s.classId === classId);
+  if (effectiveStudents.length === 0) {
+    try {
+      effectiveStudents = await getStudents(classId);
+    } catch {}
+  }
   const effectiveGrades = grades.filter((g) => g.classId === classId);
+  let effectiveColumns = gradeColumns;
+  if (!effectiveColumns || effectiveColumns.length === 0) {
+    try {
+      effectiveColumns = await getGradeColumns(classId);
+    } catch {}
+  }
+
+  const payloadData = {
+    className: classRoom?.namaKelas || 'Kelas',
+    subject: classRoom?.mataPelajaran || 'Mata Pelajaran',
+    kkm: classRoom?.kkm || 75,
+    teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+    teacherName: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+    teacherNip: teacher?.nip || '',
+    teacherNbm: teacher?.nbm || '',
+    school: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+    namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+    namaKepalaSekolah: teacher?.namaKepalaSekolah || '',
+    nipKepalaSekolah: teacher?.nipKepalaSekolah || '',
+    nbmKepalaSekolah: teacher?.nbmKepalaSekolah || '',
+    tahunAjaran: teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
+    semester: teacher?.semester || SCHOOL_CONFIG.semester,
+    students: effectiveStudents,
+    grades: effectiveGrades,
+    gradeColumns: effectiveColumns,
+    shareType: 'nilai',
+  };
 
   const shareRecord: PublicShareRecord = {
     id: `grade_share_${classId}`,
     type: 'nilai',
     classId: classId,
-    title: `Daftar Nilai Murid Kelas ${classRoom?.namaKelas || 'Kelas'} - ${teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}`,
+    title: `Rekapitulasi Nilai Murid Kelas ${classRoom?.namaKelas || 'Kelas'} - ${teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}`,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    data: {
-      className: classRoom?.namaKelas || 'Kelas',
-      subject: classRoom?.mataPelajaran || 'Mata Pelajaran',
-      kkm: classRoom?.kkm || 75,
-      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
-      teacherName: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
-      teacherNip: teacher?.nip || '',
-      teacherNbm: teacher?.nbm || '',
-      school: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
-      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
-      namaKepalaSekolah: teacher?.namaKepalaSekolah || '',
-      nipKepalaSekolah: teacher?.nipKepalaSekolah || '',
-      nbmKepalaSekolah: teacher?.nbmKepalaSekolah || '',
-      tahunAjaran: teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
-      semester: teacher?.semester || SCHOOL_CONFIG.semester,
-      students: effectiveStudents,
-      grades: effectiveGrades,
-      gradeColumns: gradeColumns,
-    },
-    payload: {
-      className: classRoom?.namaKelas || 'Kelas',
-      subject: classRoom?.mataPelajaran || 'Mata Pelajaran',
-      kkm: classRoom?.kkm || 75,
-      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
-      teacherName: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
-      teacherNip: teacher?.nip || '',
-      teacherNbm: teacher?.nbm || '',
-      school: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
-      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
-      namaKepalaSekolah: teacher?.namaKepalaSekolah || '',
-      nipKepalaSekolah: teacher?.nipKepalaSekolah || '',
-      nbmKepalaSekolah: teacher?.nbmKepalaSekolah || '',
-      tahunAjaran: teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
-      semester: teacher?.semester || SCHOOL_CONFIG.semester,
-      students: effectiveStudents,
-      grades: effectiveGrades,
-      gradeColumns: gradeColumns,
-    },
+    data: payloadData,
+    payload: payloadData,
   };
 
   await createOrUpdatePublicShare(shareRecord);
@@ -1652,12 +1700,14 @@ export async function syncPublicAgendasShare(params: {
       agendas,
       teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
       namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+      shareType: 'agenda',
     },
     payload: {
       className: classRoom?.namaKelas || 'Semua Kelas',
       agendas,
       teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
       namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+      shareType: 'agenda',
     },
   };
 
@@ -1674,30 +1724,92 @@ export async function syncPublicSavingsShare(params: {
   const classId = classRoom?.id || transactions[0]?.classId;
   if (!classId) return;
 
-  const effectiveStudents = students.filter((s) => s.classId === classId);
+  let effectiveStudents = students.filter((s) => s.classId === classId);
+  if (effectiveStudents.length === 0) {
+    try {
+      effectiveStudents = await getStudents(classId);
+    } catch {}
+  }
   const effectiveTransactions = transactions.filter((t) => t.classId === classId);
+
+  // Kalkulasi total kas kelas
+  const classTxList = effectiveTransactions;
+  const classCashBalance = classTxList
+    .filter((tx) => tx.isClassCash)
+    .reduce((acc, tx) => (tx.tipe === 'masuk' ? acc + Number(tx.jumlah || 0) : acc - Number(tx.jumlah || 0)), 0);
+  const totalCashIn = classTxList
+    .filter((tx) => tx.isClassCash && tx.tipe === 'masuk')
+    .reduce((acc, tx) => acc + Number(tx.jumlah || 0), 0);
+  const totalCashOut = classTxList
+    .filter((tx) => tx.isClassCash && tx.tipe === 'keluar')
+    .reduce((acc, tx) => acc + Number(tx.jumlah || 0), 0);
+  const cashTransactions = classTxList.filter((tx) => tx.isClassCash);
+
+  // Hitung saldo tabungan dan tanggal input mutasi per siswa
+  const studentBalances: Record<string, number> = {};
+  const studentLatestDateMap: Record<string, string> = {};
+
+  effectiveStudents.forEach((std) => {
+    const stdTxs = classTxList
+      .filter((tx) => !tx.isClassCash && tx.studentId === std.id)
+      .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+    studentBalances[std.id] = stdTxs.reduce(
+      (acc, tx) => (tx.tipe === 'masuk' ? acc + Number(tx.jumlah || 0) : acc - Number(tx.jumlah || 0)),
+      0
+    );
+    if (stdTxs.length > 0) {
+      studentLatestDateMap[std.id] = stdTxs[0].tanggal;
+    }
+  });
+
+  const detailedTransactions = classTxList.map((tx) => {
+    const std = effectiveStudents.find((s) => s.id === tx.studentId);
+    return {
+      ...tx,
+      namaMurid: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
+      namaSiswa: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
+    };
+  });
+
+  const studentsWithDatesAndBalances = effectiveStudents.map((s) => ({
+    ...s,
+    saldo: studentBalances[s.id] ?? (s as any).saldo ?? 0,
+    tanggalInput: studentLatestDateMap[s.id] || (s as any).tanggalInput || '',
+    lastTransactionDate: studentLatestDateMap[s.id] || (s as any).lastTransactionDate || '',
+  }));
+
+  const payloadData = {
+    className: classRoom?.namaKelas || 'Kelas',
+    classCashBalance,
+    totalCashIn,
+    totalCashOut,
+    cashTransactions,
+    transactions: detailedTransactions,
+    allTransactions: detailedTransactions,
+    students: studentsWithDatesAndBalances,
+    teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+    teacherName: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+    teacherNip: teacher?.nip || '',
+    teacherNbm: teacher?.nbm || '',
+    school: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+    namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+    namaKepalaSekolah: teacher?.namaKepalaSekolah || '',
+    nipKepalaSekolah: teacher?.nipKepalaSekolah || '',
+    nbmKepalaSekolah: teacher?.nbmKepalaSekolah || '',
+    tahunAjaran: teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
+    semester: teacher?.semester || SCHOOL_CONFIG.semester,
+    shareType: 'tabungan',
+  };
 
   const shareRecord: PublicShareRecord = {
     id: `sav_share_${classId}`,
     type: 'tabungan',
     classId: classId,
-    title: `Buku Kas & Tabungan Kelas ${classRoom?.namaKelas || 'Kelas'} - ${teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}`,
+    title: `Laporan Keuangan & Tabungan Kelas ${classRoom?.namaKelas || 'Kelas'} - ${teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}`,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    data: {
-      className: classRoom?.namaKelas || 'Kelas',
-      students: effectiveStudents,
-      transactions: effectiveTransactions,
-      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
-      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
-    },
-    payload: {
-      className: classRoom?.namaKelas || 'Kelas',
-      students: effectiveStudents,
-      transactions: effectiveTransactions,
-      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
-      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
-    },
+    data: payloadData,
+    payload: payloadData,
   };
 
   await createOrUpdatePublicShare(shareRecord);

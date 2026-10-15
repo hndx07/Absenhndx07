@@ -189,10 +189,141 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           } catch {}
         }
 
+        // Sinkronisasi Real-Time Nilai & Grade Columns
+        let mergedGrades = payloadContent.grades;
+        let mergedGradeColumns = payloadContent.gradeColumns;
+        let mergedStudents = payloadContent.students;
+        if (payloadContent.shareType === 'nilai' || initialType === 'nilai') {
+          try {
+            const rawLocalGrades = localStorage.getItem('smk_grades') || localStorage.getItem('smk_student_grades');
+            if (rawLocalGrades) {
+              const localGrades = JSON.parse(rawLocalGrades);
+              const classLocalGrades = cleanClassId
+                ? localGrades.filter((g: any) => g.classId === cleanClassId)
+                : localGrades;
+              if (classLocalGrades && classLocalGrades.length > 0) {
+                mergedGrades = classLocalGrades;
+              }
+            }
+
+            const rawGradeCols = localStorage.getItem('muhiba_grade_columns');
+            if (rawGradeCols) {
+              const allCols = JSON.parse(rawGradeCols);
+              if (cleanClassId && allCols[cleanClassId] && Array.isArray(allCols[cleanClassId]) && allCols[cleanClassId].length > 0) {
+                mergedGradeColumns = allCols[cleanClassId];
+              }
+            }
+
+            if (!mergedStudents || mergedStudents.length === 0) {
+              const rawStudents = localStorage.getItem('smk_students');
+              if (rawStudents) {
+                const allStds = JSON.parse(rawStudents);
+                const classStds = cleanClassId
+                  ? allStds.filter((s: any) => s.classId === cleanClassId)
+                  : allStds;
+                if (classStds && classStds.length > 0) {
+                  mergedStudents = classStds;
+                }
+              }
+            }
+          } catch {}
+        }
+
+        // Sinkronisasi Real-Time Tabungan & Kas Kelas
+        let mergedTransactions = payloadContent.transactions || payloadContent.allTransactions;
+        let finalCashBalance = payloadContent.classCashBalance;
+        let finalCashIn = payloadContent.totalCashIn;
+        let finalCashOut = payloadContent.totalCashOut;
+        let finalCashTransactions = payloadContent.cashTransactions;
+
+        if (payloadContent.shareType === 'tabungan' || initialType === 'tabungan') {
+          try {
+            const rawSavings = localStorage.getItem('smk_savings') || localStorage.getItem('smk_saving_transactions');
+            if (rawSavings) {
+              const localSavings = JSON.parse(rawSavings);
+              const classLocalSavings = cleanClassId
+                ? localSavings.filter((t: any) => t.classId === cleanClassId)
+                : localSavings;
+              if (classLocalSavings && classLocalSavings.length > 0) {
+                mergedTransactions = classLocalSavings;
+              }
+            }
+
+            if (!mergedStudents || mergedStudents.length === 0) {
+              const rawStudents = localStorage.getItem('smk_students');
+              if (rawStudents) {
+                const allStds = JSON.parse(rawStudents);
+                const classStds = cleanClassId
+                  ? allStds.filter((s: any) => s.classId === cleanClassId)
+                  : allStds;
+                if (classStds && classStds.length > 0) {
+                  mergedStudents = classStds;
+                }
+              }
+            }
+          } catch {}
+
+          if (Array.isArray(mergedTransactions)) {
+            const txList = mergedTransactions;
+            finalCashBalance = txList
+              .filter((tx: any) => tx.isClassCash)
+              .reduce((acc: number, tx: any) => (tx.tipe === 'masuk' ? acc + Number(tx.jumlah || 0) : acc - Number(tx.jumlah || 0)), 0);
+            finalCashIn = txList
+              .filter((tx: any) => tx.isClassCash && tx.tipe === 'masuk')
+              .reduce((acc: number, tx: any) => acc + Number(tx.jumlah || 0), 0);
+            finalCashOut = txList
+              .filter((tx: any) => tx.isClassCash && tx.tipe === 'keluar')
+              .reduce((acc: number, tx: any) => acc + Number(tx.jumlah || 0), 0);
+            finalCashTransactions = txList.filter((tx: any) => tx.isClassCash);
+
+            const studentBalances: Record<string, number> = {};
+            const studentLatestDateMap: Record<string, string> = {};
+            if (Array.isArray(mergedStudents)) {
+              mergedStudents.forEach((std: any) => {
+                const stdTxs = txList
+                  .filter((tx: any) => !tx.isClassCash && tx.studentId === std.id)
+                  .sort((a: any, b: any) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+                studentBalances[std.id] = stdTxs.reduce(
+                  (acc: number, tx: any) => (tx.tipe === 'masuk' ? acc + Number(tx.jumlah || 0) : acc - Number(tx.jumlah || 0)),
+                  0
+                );
+                if (stdTxs.length > 0) {
+                  studentLatestDateMap[std.id] = stdTxs[0].tanggal;
+                }
+              });
+
+              mergedStudents = mergedStudents.map((std: any) => ({
+                ...std,
+                saldo: studentBalances[std.id] ?? std.saldo ?? 0,
+                tanggalInput: studentLatestDateMap[std.id] || std.tanggalInput || std.lastTransactionDate || '',
+                lastTransactionDate: studentLatestDateMap[std.id] || std.lastTransactionDate || std.tanggalInput || '',
+              }));
+            }
+
+            mergedTransactions = txList.map((tx: any) => {
+              const std = Array.isArray(mergedStudents) ? mergedStudents.find((s: any) => s.id === tx.studentId) : null;
+              return {
+                ...tx,
+                namaMurid: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : (tx.namaMurid || '-'),
+                namaSiswa: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : (tx.namaSiswa || '-'),
+              };
+            });
+          }
+        }
+
         setData({
           ...payloadContent,
           sessions: mergedSessions || payloadContent.sessions,
           agendas: mergedAgendas || payloadContent.agendas,
+          grades: mergedGrades || payloadContent.grades,
+          gradeColumns: mergedGradeColumns || payloadContent.gradeColumns,
+          students: mergedStudents || payloadContent.students,
+          transactions: mergedTransactions || payloadContent.transactions,
+          allTransactions: mergedTransactions || payloadContent.allTransactions,
+          cashTransactions: finalCashTransactions ?? payloadContent.cashTransactions,
+          classCashBalance: finalCashBalance ?? payloadContent.classCashBalance,
+          totalCashIn: finalCashIn ?? payloadContent.totalCashIn,
+          totalCashOut: finalCashOut ?? payloadContent.totalCashOut,
           shareType: (sharePayload as any).type || payloadContent.shareType || initialType,
           title: (sharePayload as any).title || payloadContent.title,
           created_at: (sharePayload as any).created_at || payloadContent.created_at,
@@ -246,10 +377,58 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
             getStudents(clsId).catch(() => []),
             getSavingTransactions(clsId).catch(() => []),
           ]);
+          const classTxList = txs;
+          const classCashBalance = classTxList
+            .filter((tx) => tx.isClassCash)
+            .reduce((acc, tx) => (tx.tipe === 'masuk' ? acc + Number(tx.jumlah || 0) : acc - Number(tx.jumlah || 0)), 0);
+          const totalCashIn = classTxList
+            .filter((tx) => tx.isClassCash && tx.tipe === 'masuk')
+            .reduce((acc, tx) => acc + Number(tx.jumlah || 0), 0);
+          const totalCashOut = classTxList
+            .filter((tx) => tx.isClassCash && tx.tipe === 'keluar')
+            .reduce((acc, tx) => acc + Number(tx.jumlah || 0), 0);
+          const cashTransactions = classTxList.filter((tx) => tx.isClassCash);
+
+          const studentBalances: Record<string, number> = {};
+          const studentLatestDateMap: Record<string, string> = {};
+          stds.forEach((std) => {
+            const stdTxs = classTxList
+              .filter((tx) => !tx.isClassCash && tx.studentId === std.id)
+              .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+            studentBalances[std.id] = stdTxs.reduce(
+              (acc, tx) => (tx.tipe === 'masuk' ? acc + Number(tx.jumlah || 0) : acc - Number(tx.jumlah || 0)),
+              0
+            );
+            if (stdTxs.length > 0) {
+              studentLatestDateMap[std.id] = stdTxs[0].tanggal;
+            }
+          });
+
+          const detailedTransactions = classTxList.map((tx) => {
+            const std = stds.find((s) => s.id === tx.studentId);
+            return {
+              ...tx,
+              namaMurid: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
+              namaSiswa: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
+            };
+          });
+
+          const studentsWithDatesAndBalances = stds.map((s) => ({
+            ...s,
+            saldo: studentBalances[s.id] || 0,
+            tanggalInput: studentLatestDateMap[s.id] || '',
+            lastTransactionDate: studentLatestDateMap[s.id] || '',
+          }));
+
           setData({
             className: targetClass?.namaKelas || 'XII TKJ 1',
-            students: stds,
-            transactions: txs,
+            classCashBalance,
+            totalCashIn,
+            totalCashOut,
+            cashTransactions,
+            students: studentsWithDatesAndBalances,
+            transactions: detailedTransactions,
+            allTransactions: detailedTransactions,
             shareType: 'tabungan',
           });
         } else if (initialType === 'agenda') {
@@ -273,28 +452,17 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   useEffect(() => {
     loadData();
 
-    // 1. Supabase Realtime subscription (Listen to INSERT, UPDATE, etc.)
+    // 1. Supabase Realtime subscription (Listen to ALL changes on public_shares)
     const supabase = getSafeSupabaseClient();
     let channel: any = null;
     if (supabase) {
       channel = supabase
-        .channel(`public_share_${shareId}_${Date.now()}`)
+        .channel(`public_share_live_${Date.now()}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'public_shares', filter: `id=eq.${shareId}` },
+          { event: '*', schema: 'public', table: 'public_shares' },
           (payload: any) => {
-            if (payload.new && (payload.new as any).payload) {
-              const newPayload = (payload.new as any).payload;
-              setData((prev: any) => ({
-                ...(prev || {}),
-                ...newPayload,
-                created_at: (payload.new as any).created_at,
-                updated_at: (payload.new as any).updated_at,
-              }));
-              setLastRefreshed(new Date());
-            } else {
-              loadData(true);
-            }
+            loadData(true);
           }
         )
         .subscribe();
@@ -309,10 +477,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     const handleFocus = () => loadData(true);
     window.addEventListener('focus', handleFocus);
     window.addEventListener('online', handleFocus);
+    window.addEventListener('public_share_updated', handleFocus);
 
     // 4. Instant sync on cross-tab storage changes (0 ms latency on same device)
     const handleStorage = (e: StorageEvent) => {
-      if (!e.key || e.key.includes('pub_share') || e.key.includes('smk_')) {
+      if (!e.key || e.key.includes('pub_share') || e.key.includes('smk_') || e.key.includes('muhiba_')) {
         loadData(true);
       }
     };
@@ -325,6 +494,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       clearInterval(pollInterval);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('online', handleFocus);
+      window.removeEventListener('public_share_updated', handleFocus);
       window.removeEventListener('storage', handleStorage);
     };
   }, [shareId]);

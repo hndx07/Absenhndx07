@@ -358,12 +358,27 @@ export default function App() {
           savings: loadedSavings,
         });
 
-        // Pastikan Public Share langsung tersinkronisasi otomatis dengan data terbaru dari cloud
+        // Pastikan seluruh Public Share (absen, nilai, tabungan) langsung tersinkronisasi otomatis dengan data terbaru dari cloud
         const activeClsObj = loadedClasses.find((c) => c.id === currentClassId);
         syncPublicAttendanceShare({
           classRoom: activeClsObj,
           students: sequencedStudents,
           sessions: loadedAttendance,
+          teacher: profile || undefined,
+        }).catch(() => {});
+
+        syncPublicGradesShare({
+          classRoom: activeClsObj,
+          students: sequencedStudents,
+          grades: loadedGrades,
+          gradeColumns: loadedGradeCols,
+          teacher: profile || undefined,
+        }).catch(() => {});
+
+        syncPublicSavingsShare({
+          classRoom: activeClsObj,
+          students: sequencedStudents,
+          transactions: loadedSavings,
           teacher: profile || undefined,
         }).catch(() => {});
       } else {
@@ -741,16 +756,22 @@ export default function App() {
   // 4. Grades Handlers
   const handleSaveGrade = async (gradeData: StudentGrade) => {
     const saved = await saveStudentGrade(gradeData);
-    const updatedGrades = [saved, ...grades.filter((g) => g.id !== saved.id)];
-    setGrades(updatedGrades);
+    let updatedGrades: StudentGrade[] = [];
+    setGrades((prev) => {
+      updatedGrades = [saved, ...prev.filter((g) => g.id !== saved.id)];
+      return updatedGrades;
+    });
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
 
     const cls = classes.find((c) => c.id === gradeData.classId);
-    const clsStudents = students.filter((s) => s.classId === gradeData.classId);
+    let clsStudents = students.filter((s) => s.classId === gradeData.classId);
+    if (clsStudents.length === 0) {
+      clsStudents = await getStudents(gradeData.classId).catch(() => []);
+    }
     syncPublicGradesShare({
       classRoom: cls,
       students: clsStudents,
-      grades: updatedGrades,
+      grades: updatedGrades.length > 0 ? updatedGrades : [saved, ...grades.filter((g) => g.id !== saved.id)],
       gradeColumns,
       teacher: teacher || undefined,
     }).catch(() => {});
@@ -763,7 +784,10 @@ export default function App() {
     SafeCache.invalidate(`class_data_${activeClassId}`);
 
     const cls = classes.find((c) => c.id === activeClassId);
-    const clsStudents = students.filter((s) => s.classId === activeClassId);
+    let clsStudents = students.filter((s) => s.classId === activeClassId);
+    if (clsStudents.length === 0) {
+      clsStudents = await getStudents(activeClassId).catch(() => []);
+    }
     syncPublicGradesShare({
       classRoom: cls,
       students: clsStudents,
@@ -814,28 +838,40 @@ export default function App() {
   // 6. Savings Handlers
   const handleSaveSaving = async (txData: SavingTransaction) => {
     const saved = await saveSavingTransaction(txData);
-    const updatedSavings = [saved, ...savings.filter((s) => s.id !== saved.id)];
-    setSavings(updatedSavings);
+    let updatedSavings: SavingTransaction[] = [];
+    setSavings((prev) => {
+      updatedSavings = [saved, ...prev.filter((s) => s.id !== saved.id)];
+      return updatedSavings;
+    });
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
 
     const cls = classes.find((c) => c.id === txData.classId);
-    const clsStudents = students.filter((s) => s.classId === txData.classId);
+    let clsStudents = students.filter((s) => s.classId === txData.classId);
+    if (clsStudents.length === 0) {
+      clsStudents = await getStudents(txData.classId).catch(() => []);
+    }
     syncPublicSavingsShare({
       classRoom: cls,
       students: clsStudents,
-      transactions: updatedSavings,
+      transactions: updatedSavings.length > 0 ? updatedSavings : [saved, ...savings.filter((s) => s.id !== saved.id)],
       teacher: teacher || undefined,
     }).catch(() => {});
   };
 
   const handleDeleteSaving = async (txId: string) => {
     await deleteSavingTransaction(txId);
-    const updatedSavings = savings.filter((s) => s.id !== txId);
-    setSavings(updatedSavings);
+    let updatedSavings: SavingTransaction[] = [];
+    setSavings((prev) => {
+      updatedSavings = prev.filter((s) => s.id !== txId);
+      return updatedSavings;
+    });
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
 
     const cls = classes.find((c) => c.id === activeClassId);
-    const clsStudents = students.filter((s) => s.classId === activeClassId);
+    let clsStudents = students.filter((s) => s.classId === activeClassId);
+    if (clsStudents.length === 0 && activeClassId) {
+      clsStudents = await getStudents(activeClassId).catch(() => []);
+    }
     syncPublicSavingsShare({
       classRoom: cls,
       students: clsStudents,
