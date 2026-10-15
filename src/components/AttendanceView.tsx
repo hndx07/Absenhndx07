@@ -249,6 +249,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
     // 1. Instant optimistic local update - UI updates in 0 milliseconds
     setLocalSessions((prev) => ({ ...prev, [updated.id]: updated }));
+    try {
+      const raw = localStorage.getItem('smk_attendance');
+      const all: AttendanceSession[] = raw ? JSON.parse(raw) : [];
+      const nextAll = [...all.filter((s) => s.id !== updated.id), updated];
+      localStorage.setItem('smk_attendance', JSON.stringify(nextAll));
+    } catch {}
 
     // 2. Debounced background save to Cloud - no network blocking or race conditions
     scheduleSessionCloudSave(updated);
@@ -269,6 +275,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       records,
     };
     setLocalSessions((prev) => ({ ...prev, [updated.id]: updated }));
+    try {
+      const raw = localStorage.getItem('smk_attendance');
+      const all: AttendanceSession[] = raw ? JSON.parse(raw) : [];
+      const nextAll = [...all.filter((s) => s.id !== updated.id), updated];
+      localStorage.setItem('smk_attendance', JSON.stringify(nextAll));
+    } catch {}
     scheduleSessionCloudSave(updated);
   };
 

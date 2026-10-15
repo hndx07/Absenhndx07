@@ -60,6 +60,10 @@ import {
   getSavingTransactions,
   saveSavingTransaction,
   deleteSavingTransaction,
+  syncPublicAttendanceShare,
+  syncPublicGradesShare,
+  syncPublicAgendasShare,
+  syncPublicSavingsShare,
 } from './services/data';
 
 // Types
@@ -353,6 +357,15 @@ export default function App() {
           gradeColumns: loadedGradeCols,
           savings: loadedSavings,
         });
+
+        // Pastikan Public Share langsung tersinkronisasi otomatis dengan data terbaru dari cloud
+        const activeClsObj = loadedClasses.find((c) => c.id === currentClassId);
+        syncPublicAttendanceShare({
+          classRoom: activeClsObj,
+          students: sequencedStudents,
+          sessions: loadedAttendance,
+          teacher: profile || undefined,
+        }).catch(() => {});
       } else {
         setStudents([]);
         setAttendance([]);
@@ -671,13 +684,23 @@ export default function App() {
   // 3. Attendance Handlers
   const handleSaveAttendance = async (sessionData: AttendanceSession) => {
     const saved = await saveAttendanceSession(sessionData);
-    setAttendance((prev) => [saved, ...prev.filter((s) => s.id !== saved.id)]);
+    const updatedSessions = [saved, ...attendance.filter((s) => s.id !== saved.id)];
+    setAttendance(updatedSessions);
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+
+    const cls = classes.find((c) => c.id === sessionData.classId);
+    const clsStudents = students.filter((s) => s.classId === sessionData.classId);
+
+    // Sinkronisasi Langsung ke Public Share Tanpa Delay
+    syncPublicAttendanceShare({
+      classRoom: cls,
+      students: clsStudents,
+      sessions: updatedSessions,
+      teacher: teacher || undefined,
+    }).catch((err) => console.warn('Sync public attendance notice:', err));
 
     // Sinkronisasi Langsung & Efektif ke Agenda Mengajar
     try {
-      const cls = classes.find((c) => c.id === sessionData.classId);
-      const clsStudents = students.filter((s) => s.classId === sessionData.classId);
       const syncedAgenda = await syncAttendanceSessionToAgenda(
         saved,
         cls,
@@ -685,8 +708,14 @@ export default function App() {
         clsStudents
       );
       if (syncedAgenda) {
-        setAgendas((prev) => [syncedAgenda, ...prev.filter((a) => a.id !== syncedAgenda.id)]);
+        const nextAgendas = [syncedAgenda, ...agendas.filter((a) => a.id !== syncedAgenda.id)];
+        setAgendas(nextAgendas);
         SafeCache.invalidate('all_agendas');
+        syncPublicAgendasShare({
+          agendas: nextAgendas,
+          classRoom: cls,
+          teacher: teacher || undefined,
+        }).catch(() => {});
       }
     } catch (syncErr) {
       console.warn('Sinkronisasi otomatis agenda mengajar notice:', syncErr);
@@ -695,15 +724,36 @@ export default function App() {
 
   const handleDeleteAttendance = async (sessionId: string) => {
     await deleteAttendanceSession(sessionId);
-    setAttendance((prev) => prev.filter((s) => s.id !== sessionId));
+    const updatedSessions = attendance.filter((s) => s.id !== sessionId);
+    setAttendance(updatedSessions);
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+
+    const cls = classes.find((c) => c.id === activeClassId);
+    const clsStudents = students.filter((s) => s.classId === activeClassId);
+    syncPublicAttendanceShare({
+      classRoom: cls,
+      students: clsStudents,
+      sessions: updatedSessions,
+      teacher: teacher || undefined,
+    }).catch(() => {});
   };
 
   // 4. Grades Handlers
   const handleSaveGrade = async (gradeData: StudentGrade) => {
     const saved = await saveStudentGrade(gradeData);
-    setGrades((prev) => [saved, ...prev.filter((g) => g.id !== saved.id)]);
+    const updatedGrades = [saved, ...grades.filter((g) => g.id !== saved.id)];
+    setGrades(updatedGrades);
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+
+    const cls = classes.find((c) => c.id === gradeData.classId);
+    const clsStudents = students.filter((s) => s.classId === gradeData.classId);
+    syncPublicGradesShare({
+      classRoom: cls,
+      students: clsStudents,
+      grades: updatedGrades,
+      gradeColumns,
+      teacher: teacher || undefined,
+    }).catch(() => {});
   };
 
   const handleSaveGradeCols = async (cols: GradeColumn[]) => {
@@ -711,38 +761,87 @@ export default function App() {
     await saveGradeColumns(cols, activeClassId);
     setGradeColumns(cols);
     SafeCache.invalidate(`class_data_${activeClassId}`);
+
+    const cls = classes.find((c) => c.id === activeClassId);
+    const clsStudents = students.filter((s) => s.classId === activeClassId);
+    syncPublicGradesShare({
+      classRoom: cls,
+      students: clsStudents,
+      grades,
+      gradeColumns: cols,
+      teacher: teacher || undefined,
+    }).catch(() => {});
   };
 
   // 5. Teaching Agenda Handlers (Decoupled from active class)
   const handleSaveAgenda = async (agendaData: TeachingAgenda) => {
     const saved = await saveTeachingAgenda(agendaData);
-    setAgendas((prev) => [saved, ...prev.filter((a) => a.id !== saved.id)]);
+    const updatedAgendas = [saved, ...agendas.filter((a) => a.id !== saved.id)];
+    setAgendas(updatedAgendas);
     SafeCache.invalidate('all_agendas');
+
+    const cls = classes.find((c) => c.id === agendaData.classId);
+    syncPublicAgendasShare({
+      agendas: updatedAgendas,
+      classRoom: cls,
+      teacher: teacher || undefined,
+    }).catch(() => {});
   };
 
   const handleBatchSaveAgendas = async (newAgendas: TeachingAgenda[]) => {
     const updatedAll = await batchSaveTeachingAgendas(newAgendas);
     setAgendas(updatedAll);
     SafeCache.invalidate('all_agendas');
+
+    syncPublicAgendasShare({
+      agendas: updatedAll,
+      teacher: teacher || undefined,
+    }).catch(() => {});
   };
 
   const handleDeleteAgenda = async (agendaId: string) => {
     await deleteTeachingAgenda(agendaId);
-    setAgendas((prev) => prev.filter((a) => a.id !== agendaId));
+    const updatedAgendas = agendas.filter((a) => a.id !== agendaId);
+    setAgendas(updatedAgendas);
     SafeCache.invalidate('all_agendas');
+
+    syncPublicAgendasShare({
+      agendas: updatedAgendas,
+      teacher: teacher || undefined,
+    }).catch(() => {});
   };
 
   // 6. Savings Handlers
   const handleSaveSaving = async (txData: SavingTransaction) => {
     const saved = await saveSavingTransaction(txData);
-    setSavings((prev) => [saved, ...prev.filter((s) => s.id !== saved.id)]);
+    const updatedSavings = [saved, ...savings.filter((s) => s.id !== saved.id)];
+    setSavings(updatedSavings);
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+
+    const cls = classes.find((c) => c.id === txData.classId);
+    const clsStudents = students.filter((s) => s.classId === txData.classId);
+    syncPublicSavingsShare({
+      classRoom: cls,
+      students: clsStudents,
+      transactions: updatedSavings,
+      teacher: teacher || undefined,
+    }).catch(() => {});
   };
 
   const handleDeleteSaving = async (txId: string) => {
     await deleteSavingTransaction(txId);
-    setSavings((prev) => prev.filter((s) => s.id !== txId));
+    const updatedSavings = savings.filter((s) => s.id !== txId);
+    setSavings(updatedSavings);
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
+
+    const cls = classes.find((c) => c.id === activeClassId);
+    const clsStudents = students.filter((s) => s.classId === activeClassId);
+    syncPublicSavingsShare({
+      classRoom: cls,
+      students: clsStudents,
+      transactions: updatedSavings,
+      teacher: teacher || undefined,
+    }).catch(() => {});
   };
 
   // Download JSON backup
@@ -786,19 +885,12 @@ export default function App() {
     setSavings([]);
   };
 
-  // Public Share Zero-Login Route
+  // Public Share Zero-Login Route (Strictly isolated, zero access to login form)
   if (publicShare) {
     return (
       <PublicSharePage
         type={publicShare.type}
         shareId={publicShare.shareId}
-        onExit={() => {
-          setPublicShare(null);
-          if (typeof window !== 'undefined') {
-            const cleanUrl = window.location.origin + window.location.pathname;
-            window.history.pushState({}, '', cleanUrl);
-          }
-        }}
       />
     );
   }

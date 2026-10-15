@@ -60,7 +60,6 @@ import { ExcelDownloadToast } from './ExcelDownloadToast';
 interface PublicSharePageProps {
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
   shareId: string;
-  onExit?: () => void;
 }
 
 function formatIndonesianDate(isoStr?: string): string {
@@ -94,11 +93,11 @@ function formatIndonesianDateTime(isoStr?: string): string {
 export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   type: initialType,
   shareId,
-  onExit,
 }) => {
   const [data, setData] = useState<any>(null);
   const [cloudTeacher, setCloudTeacher] = useState<TeacherProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [copied, setCopied] = useState(false);
@@ -130,8 +129,12 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   const nbmKepala =
     data?.nbmKepalaSekolah || cloudTeacher?.nbmKepalaSekolah || '';
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSilent = false) => {
+    if (!isSilent) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     try {
       const [sharePayload, teacherData] = await Promise.all([
         getPublicShare(shareId).catch(() => null),
@@ -141,11 +144,55 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         setCloudTeacher(teacherData);
       }
 
+      const cleanClassId =
+        (sharePayload as any)?.classId ||
+        (sharePayload as any)?.payload?.classId ||
+        shareId
+          .replace(/^(att_share_|grade_share_|sav_share_|agenda_share_|att_|grade_|sav_|agenda_)/, '')
+          .trim();
+
       if (sharePayload) {
         const payloadContent =
           (sharePayload as any).payload || (sharePayload as any).data || sharePayload;
+
+        // Cek sinkronisasi real-time instan dengan storage lokal pada browser/perangkat jika ada
+        let mergedSessions = payloadContent.sessions;
+        if (payloadContent.shareType === 'absen' || initialType === 'absen') {
+          try {
+            const rawLocal = localStorage.getItem('smk_attendance');
+            if (rawLocal) {
+              const localSessions = JSON.parse(rawLocal);
+              const classLocalSessions = cleanClassId
+                ? localSessions.filter((s: any) => s.classId === cleanClassId)
+                : localSessions;
+              if (classLocalSessions && classLocalSessions.length > 0) {
+                if (!mergedSessions || classLocalSessions.length >= mergedSessions.length) {
+                  mergedSessions = classLocalSessions;
+                }
+              }
+            }
+          } catch {}
+        }
+
+        let mergedAgendas = payloadContent.agendas;
+        if (payloadContent.shareType === 'agenda' || initialType === 'agenda') {
+          try {
+            const rawLocal = localStorage.getItem('smk_teaching_agendas');
+            if (rawLocal) {
+              const localAgendas = JSON.parse(rawLocal);
+              if (localAgendas && localAgendas.length > 0) {
+                if (!mergedAgendas || localAgendas.length >= mergedAgendas.length) {
+                  mergedAgendas = localAgendas;
+                }
+              }
+            }
+          } catch {}
+        }
+
         setData({
           ...payloadContent,
+          sessions: mergedSessions || payloadContent.sessions,
+          agendas: mergedAgendas || payloadContent.agendas,
           shareType: (sharePayload as any).type || payloadContent.shareType || initialType,
           title: (sharePayload as any).title || payloadContent.title,
           created_at: (sharePayload as any).created_at || payloadContent.created_at,
@@ -153,9 +200,6 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
         });
       } else {
         // Fallback cerdas: ekstrak ID kelas jika ada dan load data langsung dari database/cache
-        const cleanClassId = shareId
-          .replace(/^(att_share_|grade_share_|sav_share_|agenda_share_|att_|grade_|sav_|agenda_)/, '')
-          .trim();
         const loadedClasses = await getClasses().catch(() => []);
         const targetClass =
           loadedClasses.find((c) => c.id === cleanClassId) || loadedClasses[0] || null;
@@ -221,6 +265,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       console.warn('Could not load public share from supabase', err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
       setLastRefreshed(new Date());
     }
   };
@@ -228,31 +273,60 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   useEffect(() => {
     loadData();
 
-    // Supabase Realtime subscription
+    // 1. Supabase Realtime subscription (Listen to INSERT, UPDATE, etc.)
     const supabase = getSafeSupabaseClient();
+    let channel: any = null;
     if (supabase) {
-      const channel = supabase
-        .channel(`public_share_${shareId}`)
+      channel = supabase
+        .channel(`public_share_${shareId}_${Date.now()}`)
         .on(
           'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'public_shares', filter: `id=eq.${shareId}` },
-          (payload) => {
+          { event: '*', schema: 'public', table: 'public_shares', filter: `id=eq.${shareId}` },
+          (payload: any) => {
             if (payload.new && (payload.new as any).payload) {
-              setData({
-                ...(payload.new as any).payload,
+              const newPayload = (payload.new as any).payload;
+              setData((prev: any) => ({
+                ...(prev || {}),
+                ...newPayload,
                 created_at: (payload.new as any).created_at,
                 updated_at: (payload.new as any).updated_at,
-              });
+              }));
               setLastRefreshed(new Date());
+            } else {
+              loadData(true);
             }
           }
         )
         .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     }
+
+    // 2. High-frequency zero-delay auto polling (every 3 seconds)
+    const pollInterval = setInterval(() => {
+      loadData(true);
+    }, 3000);
+
+    // 3. Instant sync on window focus (when parent or student returns to tab)
+    const handleFocus = () => loadData(true);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleFocus);
+
+    // 4. Instant sync on cross-tab storage changes (0 ms latency on same device)
+    const handleStorage = (e: StorageEvent) => {
+      if (!e.key || e.key.includes('pub_share') || e.key.includes('smk_')) {
+        loadData(true);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+      }
+      clearInterval(pollInterval);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleFocus);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, [shareId]);
 
   // Handle share copy
@@ -631,25 +705,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2">
             <button
               type="button"
-              onClick={loadData}
+              onClick={() => loadData(false)}
               className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-indigo-600/20"
             >
               <RefreshCw className="w-4 h-4" />
               Coba Segarkan Lagi
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (onExit) {
-                  onExit();
-                } else if (typeof window !== 'undefined') {
-                  window.location.href = window.location.origin + window.location.pathname;
-                }
-              }}
-              className="w-full sm:w-auto px-5 py-2.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Kembali ke Aplikasi Utama
             </button>
           </div>
         </div>
@@ -799,26 +859,15 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                if (onExit) {
-                  onExit();
-                } else if (typeof window !== 'undefined') {
-                  window.location.href = window.location.origin + window.location.pathname;
-                }
-              }}
-              className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white transition text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-white/25 shadow-xs"
-              title="Kembali ke Aplikasi Utama / Dashboard Pendidik"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Kembali ke Aplikasi</span>
-            </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden xs:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 border border-white/25 text-white text-[11px] font-bold shadow-2xs backdrop-blur-xs">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-200" />
+              <span>Akses Publik Resmi</span>
+            </div>
             <button
               type="button"
               onClick={handleCopyLink}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition text-xs font-semibold flex items-center gap-1 cursor-pointer border border-white/15"
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition text-xs font-semibold flex items-center gap-1 cursor-pointer border border-white/15 shadow-xs"
               title="Salin Tautan Publik"
             >
               <Share2 className="w-4 h-4" />
@@ -826,11 +875,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
             </button>
             <button
               type="button"
-              onClick={loadData}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer border border-white/15"
-              title="Segarkan Data"
+              onClick={() => loadData(false)}
+              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer border border-white/15 shadow-xs"
+              title="Segarkan Data Real-Time"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>

@@ -1415,16 +1415,23 @@ export async function createOrUpdatePublicShare(record: PublicShareRecord): Prom
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
-      const row = {
+      const user = await getAuthUser();
+      const row: any = {
         id: record.id,
         type: record.type,
-        title: record.title,
+        title: record.title || 'Data Publik SMK Muhammadiyah Bawang',
         payload: {
           ...content,
           classId: extractedClassId,
         },
         updated_at: new Date().toISOString(),
       };
+      if (user?.id) {
+        row.user_id = user.id;
+      }
+      if (extractedClassId) {
+        row.class_id = extractedClassId;
+      }
       await supabase.from('public_shares').upsert(row, { onConflict: 'id' });
     } catch (err: any) {
       console.warn('Could not upsert public share to Supabase:', err.message);
@@ -1433,9 +1440,6 @@ export async function createOrUpdatePublicShare(record: PublicShareRecord): Prom
 }
 
 export async function getPublicShare(shareId: string): Promise<PublicShareRecord | null> {
-  const cached = SafeCache.get<PublicShareRecord>(`pub_share_${shareId}`);
-  if (cached) return cached;
-
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
@@ -1464,12 +1468,19 @@ export async function getPublicShare(shareId: string): Promise<PublicShareRecord
           updated_at: data.updated_at,
         };
         SafeCache.set(`pub_share_${shareId}`, rec);
+        try {
+          localStorage.setItem(`pub_share_${shareId}`, JSON.stringify(rec));
+        } catch {}
         return rec;
       }
     } catch (err) {
       console.warn('Supabase fetch public share notice:', err);
     }
   }
+
+  // Fallback to cache / localStorage if offline or Supabase is not available
+  const cached = SafeCache.get<PublicShareRecord>(`pub_share_${shareId}`);
+  if (cached) return cached;
 
   const raw = getLocalItem<PublicShareRecord | null>(`pub_share_${shareId}`, null);
   if (raw) {
@@ -1498,4 +1509,196 @@ export async function getPublicShare(shareId: string): Promise<PublicShareRecord
   }
 
   return null;
+}
+
+export async function syncPublicAttendanceShare(params: {
+  classRoom?: ClassRoom;
+  students?: Student[];
+  sessions: AttendanceSession[];
+  teacher?: TeacherProfile;
+}): Promise<void> {
+  const { classRoom, students = [], sessions, teacher } = params;
+  const classId = classRoom?.id || sessions[0]?.classId;
+  if (!classId) return;
+
+  const effectiveStudents = students.filter((s) => s.classId === classId);
+  const effectiveSessions = sessions.filter((s) => s.classId === classId);
+
+  const shareRecord: PublicShareRecord = {
+    id: `att_share_${classId}`,
+    type: 'absen',
+    classId: classId,
+    title: `Presensi Murid Kelas ${classRoom?.namaKelas || 'Kelas'} - ${teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}`,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    data: {
+      className: classRoom?.namaKelas || 'Kelas',
+      subject: classRoom?.mataPelajaran || 'Mata Pelajaran',
+      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      teacherName: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      teacherNip: teacher?.nip || '',
+      teacherNbm: teacher?.nbm || '',
+      school: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+      namaKepalaSekolah: teacher?.namaKepalaSekolah || '',
+      nipKepalaSekolah: teacher?.nipKepalaSekolah || '',
+      nbmKepalaSekolah: teacher?.nbmKepalaSekolah || '',
+      tahunAjaran: teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
+      semester: teacher?.semester || SCHOOL_CONFIG.semester,
+      students: effectiveStudents,
+      sessions: effectiveSessions,
+    },
+    payload: {
+      className: classRoom?.namaKelas || 'Kelas',
+      subject: classRoom?.mataPelajaran || 'Mata Pelajaran',
+      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      teacherName: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      teacherNip: teacher?.nip || '',
+      teacherNbm: teacher?.nbm || '',
+      school: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+      namaKepalaSekolah: teacher?.namaKepalaSekolah || '',
+      nipKepalaSekolah: teacher?.nipKepalaSekolah || '',
+      nbmKepalaSekolah: teacher?.nbmKepalaSekolah || '',
+      tahunAjaran: teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
+      semester: teacher?.semester || SCHOOL_CONFIG.semester,
+      students: effectiveStudents,
+      sessions: effectiveSessions,
+    },
+  };
+
+  await createOrUpdatePublicShare(shareRecord);
+}
+
+export async function syncPublicGradesShare(params: {
+  classRoom?: ClassRoom;
+  students?: Student[];
+  grades: StudentGrade[];
+  gradeColumns?: GradeColumn[];
+  teacher?: TeacherProfile;
+}): Promise<void> {
+  const { classRoom, students = [], grades, gradeColumns = [], teacher } = params;
+  const classId = classRoom?.id || grades[0]?.classId;
+  if (!classId) return;
+
+  const effectiveStudents = students.filter((s) => s.classId === classId);
+  const effectiveGrades = grades.filter((g) => g.classId === classId);
+
+  const shareRecord: PublicShareRecord = {
+    id: `grade_share_${classId}`,
+    type: 'nilai',
+    classId: classId,
+    title: `Daftar Nilai Murid Kelas ${classRoom?.namaKelas || 'Kelas'} - ${teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}`,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    data: {
+      className: classRoom?.namaKelas || 'Kelas',
+      subject: classRoom?.mataPelajaran || 'Mata Pelajaran',
+      kkm: classRoom?.kkm || 75,
+      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      teacherName: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      teacherNip: teacher?.nip || '',
+      teacherNbm: teacher?.nbm || '',
+      school: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+      namaKepalaSekolah: teacher?.namaKepalaSekolah || '',
+      nipKepalaSekolah: teacher?.nipKepalaSekolah || '',
+      nbmKepalaSekolah: teacher?.nbmKepalaSekolah || '',
+      tahunAjaran: teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
+      semester: teacher?.semester || SCHOOL_CONFIG.semester,
+      students: effectiveStudents,
+      grades: effectiveGrades,
+      gradeColumns: gradeColumns,
+    },
+    payload: {
+      className: classRoom?.namaKelas || 'Kelas',
+      subject: classRoom?.mataPelajaran || 'Mata Pelajaran',
+      kkm: classRoom?.kkm || 75,
+      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      teacherName: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      teacherNip: teacher?.nip || '',
+      teacherNbm: teacher?.nbm || '',
+      school: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+      namaKepalaSekolah: teacher?.namaKepalaSekolah || '',
+      nipKepalaSekolah: teacher?.nipKepalaSekolah || '',
+      nbmKepalaSekolah: teacher?.nbmKepalaSekolah || '',
+      tahunAjaran: teacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
+      semester: teacher?.semester || SCHOOL_CONFIG.semester,
+      students: effectiveStudents,
+      grades: effectiveGrades,
+      gradeColumns: gradeColumns,
+    },
+  };
+
+  await createOrUpdatePublicShare(shareRecord);
+}
+
+export async function syncPublicAgendasShare(params: {
+  agendas: TeachingAgenda[];
+  classRoom?: ClassRoom;
+  teacher?: TeacherProfile;
+}): Promise<void> {
+  const { agendas, classRoom, teacher } = params;
+  const shareRecord: PublicShareRecord = {
+    id: classRoom?.id ? `agenda_share_${classRoom.id}` : 'agenda_share_all',
+    type: 'agenda',
+    classId: classRoom?.id,
+    title: `Agenda Mengajar Pendidik - ${teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}`,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    data: {
+      className: classRoom?.namaKelas || 'Semua Kelas',
+      agendas,
+      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+    },
+    payload: {
+      className: classRoom?.namaKelas || 'Semua Kelas',
+      agendas,
+      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+    },
+  };
+
+  await createOrUpdatePublicShare(shareRecord);
+}
+
+export async function syncPublicSavingsShare(params: {
+  classRoom?: ClassRoom;
+  students?: Student[];
+  transactions: SavingTransaction[];
+  teacher?: TeacherProfile;
+}): Promise<void> {
+  const { classRoom, students = [], transactions, teacher } = params;
+  const classId = classRoom?.id || transactions[0]?.classId;
+  if (!classId) return;
+
+  const effectiveStudents = students.filter((s) => s.classId === classId);
+  const effectiveTransactions = transactions.filter((t) => t.classId === classId);
+
+  const shareRecord: PublicShareRecord = {
+    id: `sav_share_${classId}`,
+    type: 'tabungan',
+    classId: classId,
+    title: `Buku Kas & Tabungan Kelas ${classRoom?.namaKelas || 'Kelas'} - ${teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}`,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    data: {
+      className: classRoom?.namaKelas || 'Kelas',
+      students: effectiveStudents,
+      transactions: effectiveTransactions,
+      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+    },
+    payload: {
+      className: classRoom?.namaKelas || 'Kelas',
+      students: effectiveStudents,
+      transactions: effectiveTransactions,
+      teacher: teacher?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
+      namaSekolah: teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
+    },
+  };
+
+  await createOrUpdatePublicShare(shareRecord);
 }
