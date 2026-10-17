@@ -116,7 +116,6 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     data?.namaSekolah || data?.school || cloudTeacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah;
   const guruPengampu =
     data?.teacherName || data?.teacher || cloudTeacher?.namaGuru || 'Pendidik Pengampu';
-  const nipGuru = data?.teacherNip || cloudTeacher?.nip || '';
   const nbmGuru = data?.teacherNbm || cloudTeacher?.nbm || '';
   const tahunAjaran =
     data?.tahunAjaran || cloudTeacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran;
@@ -124,8 +123,6 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
     data?.semester || cloudTeacher?.semester || SCHOOL_CONFIG.semester;
   const kepalaSekolah =
     data?.namaKepalaSekolah || cloudTeacher?.namaKepalaSekolah || '';
-  const nipKepala =
-    data?.nipKepalaSekolah || cloudTeacher?.nipKepalaSekolah || '';
   const nbmKepala =
     data?.nbmKepalaSekolah || cloudTeacher?.nbmKepalaSekolah || '';
 
@@ -975,7 +972,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       { 'Komponen Asesmen': 'Nama Murid', Nilai: std.nama, Keterangan: `NISN: ${std.nisn || '-'}` },
       { 'Komponen Asesmen': 'Kelas / Rombel', Nilai: data?.className || '-', Keterangan: '-' },
       { 'Komponen Asesmen': 'Mata Pelajaran', Nilai: data?.subject || 'Muatan Kejuruan', Keterangan: `KKM: ${data?.kkm || 75}` },
-      { 'Komponen Asesmen': 'Pendidik Pengampu', Nilai: guruPengampu, Keterangan: nbmGuru || nipGuru ? `NIP/NBM: ${nbmGuru || nipGuru}` : '-' },
+      { 'Komponen Asesmen': 'Pendidik Pengampu', Nilai: guruPengampu, Keterangan: nbmGuru ? `NBM: ${nbmGuru}` : '-' },
       { 'Komponen Asesmen': 'Tahun Pelajaran', Nilai: `${tahunAjaran} (${semester})`, Keterangan: '-' },
       { 'Komponen Asesmen': 'Total Formatif', Nilai: totalFormatifVal, Keterangan: 'Rata-rata Asesmen Formatif' },
       { 'Komponen Asesmen': 'Total Sumatif', Nilai: totalSumatifVal, Keterangan: 'Rata-rata Asesmen Sumatif (STS + SAS)' },
@@ -2520,15 +2517,15 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                           <p className="text-slate-600">{data?.subject || 'Guru Pengampu'}</p>
                           <div className="h-20"></div>
                           <p className="font-bold underline">{data?.teacher || data?.teacherName || 'Pendidik Pengampu'}</p>
-                          <p className="text-[11px] text-slate-600">NBM/NIP. -</p>
+                          <p className="text-[11px] text-slate-600">{nbmGuru ? `NBM. ${nbmGuru}` : 'NBM. -'}</p>
                         </div>
                       </div>
                       <div className="text-center mt-6">
                         <p className="font-semibold">Mengetahui,</p>
                         <p className="font-semibold">Kepala SMK Muhammadiyah Bawang</p>
                         <div className="h-20"></div>
-                        <p className="font-bold underline">( .................................................... )</p>
-                        <p className="text-[11px] text-slate-600">NBM / NIP. ........................................</p>
+                        <p className="font-bold underline">{kepalaSekolah ? kepalaSekolah : '( .................................................... )'}</p>
+                        <p className="text-[11px] text-slate-600">{nbmKepala ? `NBM. ${nbmKepala}` : 'NBM. ........................................'}</p>
                       </div>
                     </div>
                   </div>
@@ -3286,11 +3283,9 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                 </p>
               </div>
               <p className="text-[11px] text-slate-600 font-mono mt-0.5">
-                {nipKepala
-                  ? `NIP. ${nipKepala}`
-                  : nbmKepala
+                {nbmKepala
                   ? `NBM. ${nbmKepala}`
-                  : 'NBM / NIP. ........................................'}
+                  : 'NBM. ........................................'}
               </p>
             </div>
             <div>
@@ -3300,7 +3295,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
                 <p className="font-bold underline">{guruPengampu}</p>
               </div>
               <p className="text-[11px] text-slate-600 font-mono mt-0.5">
-                {nbmGuru || nipGuru ? `NBM / NIP: ${nbmGuru || nipGuru}` : 'NBM / NIP. -'}
+                {nbmGuru ? `NBM: ${nbmGuru}` : 'NBM. -'}
               </p>
             </div>
           </div>

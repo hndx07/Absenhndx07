@@ -116,31 +116,17 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  NIP (Opsional)
-                </label>
-                <input
-                  type="text"
-                  value={formData.nip || ''}
-                  onChange={(e) => setFormData({ ...formData, nip: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#009B62]/30 focus:border-[#009B62]"
-                  placeholder="19870512 201201 1 004"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  NBM (Nomor Baku Muhammadiyah)
-                </label>
-                <input
-                  type="text"
-                  value={formData.nbm || ''}
-                  onChange={(e) => setFormData({ ...formData, nbm: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#009B62]/30 focus:border-[#009B62]"
-                  placeholder="1122334"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                NBM (Nomor Baku Muhammadiyah)
+              </label>
+              <input
+                type="text"
+                value={formData.nbm || ''}
+                onChange={(e) => setFormData({ ...formData, nbm: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#009B62]/30 focus:border-[#009B62]"
+                placeholder="1122334"
+              />
             </div>
 
             <div>
@@ -233,31 +219,17 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      NIP Kepala Sekolah (Opsional)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.nipKepalaSekolah || ''}
-                      onChange={(e) => setFormData({ ...formData, nipKepalaSekolah: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#009B62]/30 focus:border-[#009B62]"
-                      placeholder="19700101 199503 1 002"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      NBM Kepala Sekolah (Opsional)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.nbmKepalaSekolah || ''}
-                      onChange={(e) => setFormData({ ...formData, nbmKepalaSekolah: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#009B62]/30 focus:border-[#009B62]"
-                      placeholder="987654"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    NBM Kepala Sekolah (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.nbmKepalaSekolah || ''}
+                    onChange={(e) => setFormData({ ...formData, nbmKepalaSekolah: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#009B62]/30 focus:border-[#009B62]"
+                    placeholder="987654"
+                  />
                 </div>
               </div>
             </div>

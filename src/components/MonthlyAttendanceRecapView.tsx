@@ -293,7 +293,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
       [
         [reportTitle],
         [`Periode: ${monthLabel} ${selectedYear} | Rombel: ${classLabel}`],
-        [`Pendidik Pengampu: ${teacher.namaGuru} (NBM/NIP: ${teacher.nbm || teacher.nip || '-'})`],
+        [`Pendidik Pengampu: ${teacher.namaGuru} (NBM: ${teacher.nbm || '-'})`],
         [`Website: ${SCHOOL_CONFIG.website} | Alamat: ${SCHOOL_CONFIG.alamat}`],
         [],
       ],
@@ -342,7 +342,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
             <div className="space-y-0.5">
               <p><span className="inline-block w-28 text-slate-700">Mata Pelajaran:</span> <strong>{currentClass?.mataPelajaran || teacher.mataPelajaranUtama || 'Seluruh Mata Pelajaran'}</strong></p>
               <p><span className="inline-block w-28 text-slate-700">Pendidik Pengampu:</span> <strong>{teacher.namaGuru}</strong></p>
-              <p><span className="inline-block w-28 text-slate-700">NBM / NIP:</span> {teacher.nbm || teacher.nip || '-'}</p>
+              <p><span className="inline-block w-28 text-slate-700">NBM:</span> {teacher.nbm || '-'}</p>
             </div>
           </div>
         </div>
@@ -923,11 +923,9 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
                 </p>
               </div>
               <p className="text-[11px] text-slate-600 font-mono mt-0.5">
-                {teacher.nipKepalaSekolah
-                  ? `NIP. ${teacher.nipKepalaSekolah}`
-                  : teacher.nbmKepalaSekolah
+                {teacher.nbmKepalaSekolah
                   ? `NBM. ${teacher.nbmKepalaSekolah}`
-                  : 'NBM / NIP. ........................................'}
+                  : 'NBM. ........................................'}
               </p>
             </div>
             <div>
@@ -936,7 +934,7 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
                 <p className="font-bold underline">{teacher.namaGuru}</p>
               </div>
               <p className="text-[11px] text-slate-600 font-mono mt-0.5">
-                NBM / NIP: {teacher.nbm || teacher.nip || '-'}
+                NBM: {teacher.nbm || '-'}
               </p>
             </div>
           </div>

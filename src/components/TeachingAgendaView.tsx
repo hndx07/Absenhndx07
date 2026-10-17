@@ -1036,7 +1036,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
       </div>
       <h3 style="text-align:center; margin-bottom: 4px;">BUKU JURNAL & AGENDA MENGAJAR PENDIDIK</h3>
       <p style="text-align:center; margin: 0 0 15px 0;">
-        Pendidik: <strong>${teacher.namaGuru}</strong> (NBM/NIP: ${teacher.nbm || teacher.nip || '-'}) | 
+        Pendidik: <strong>${teacher.namaGuru}</strong> (NBM: ${teacher.nbm || '-'}) | 
         Kelas: <strong>${classNameHeader}</strong> | Mapel: <strong>${mapelHeader}</strong> | 
         Tahun Ajaran: ${teacher.tahunAjaran} (${teacher.semester})
       </p>
@@ -1088,7 +1088,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
         <div className="space-y-1">
           <p><span className="text-slate-600 print:text-black inline-block w-28">Satuan Pendidikan:</span> <strong>{teacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah}</strong></p>
           <p><span className="text-slate-600 print:text-black inline-block w-28">Nama Pendidik:</span> <strong>{teacher?.namaGuru || 'Guru Pengampu'}</strong></p>
-          <p><span className="text-slate-600 print:text-black inline-block w-28">NBM / NIP:</span> {teacher?.nbm || teacher?.nip || '-'}</p>
+          <p><span className="text-slate-600 print:text-black inline-block w-28">NBM:</span> {teacher?.nbm || '-'}</p>
           <p><span className="text-slate-600 print:text-black inline-block w-28">Mata Pelajaran:</span> {filterClassId === 'all' ? teacher?.mataPelajaranUtama || 'Seluruh Mapel' : selectedClassObj?.mataPelajaran}</p>
         </div>
         <div className="space-y-1">
@@ -1167,11 +1167,9 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
               </p>
             </div>
             <p className="text-[10px] text-slate-700 print:text-black font-mono mt-0.5">
-              {teacher?.nipKepalaSekolah
-                ? `NIP. ${teacher.nipKepalaSekolah}`
-                : teacher?.nbmKepalaSekolah
+              {teacher?.nbmKepalaSekolah
                 ? `NBM. ${teacher.nbmKepalaSekolah}`
-                : 'NBM / NIP. ........................................'}
+                : 'NBM. ........................................'}
             </p>
           </div>
           <div>
@@ -1181,7 +1179,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
               <p className="font-bold underline text-black">{teacher?.namaGuru || 'Guru Pengampu'}</p>
             </div>
             <p className="text-[10px] text-slate-700 print:text-black font-mono mt-0.5">
-              NBM / NIP: {teacher?.nbm || teacher?.nip || '-'}
+              NBM: {teacher?.nbm || '-'}
             </p>
           </div>
         </div>

@@ -475,11 +475,11 @@ export const GradesView: React.FC<GradesViewProps> = ({
           className: currentClass.namaKelas,
           subject: currentClass.mataPelajaran,
           teacherName: teacher.namaGuru,
-          teacherNip: teacher.nip || '',
+          teacherNip: '',
           teacherNbm: teacher.nbm || '',
           namaSekolah: teacher.namaSekolah || SCHOOL_CONFIG.namaSekolah,
           namaKepalaSekolah: teacher.namaKepalaSekolah || '',
-          nipKepalaSekolah: teacher.nipKepalaSekolah || '',
+          nipKepalaSekolah: '',
           nbmKepalaSekolah: teacher.nbmKepalaSekolah || '',
           tahunAjaran: teacher.tahunAjaran || '2025/2026',
           semester: teacher.semester || 'Genap',
@@ -2218,11 +2218,9 @@ export const GradesView: React.FC<GradesViewProps> = ({
                         </p>
                       </div>
                       <p className="text-[11px] text-slate-600 font-mono mt-0.5">
-                        {teacher.nipKepalaSekolah
-                          ? `NIP. ${teacher.nipKepalaSekolah}`
-                          : teacher.nbmKepalaSekolah
+                        {teacher.nbmKepalaSekolah
                           ? `NBM. ${teacher.nbmKepalaSekolah}`
-                          : 'NBM / NIP. ........................................'}
+                          : 'NBM. ........................................'}
                       </p>
                     </div>
                     <div>
@@ -2232,7 +2230,7 @@ export const GradesView: React.FC<GradesViewProps> = ({
                         <p className="font-bold underline">{teacher.namaGuru}</p>
                       </div>
                       <p className="text-[11px] text-slate-600 font-mono mt-0.5">
-                        NBM / NIP: {teacher.nbm || teacher.nip || '-'}
+                        NBM: {teacher.nbm || '-'}
                       </p>
                     </div>
                   </div>
