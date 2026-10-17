@@ -1606,78 +1606,7 @@ export async function getPublicShare(
         return rec;
       }
     } catch (rpcErr) {
-      // RPC belum terdeploy / error, lanjut ke fallback query
-      console.warn('RPC get_public_share notice, falling back to direct query:', rpcErr);
-    }
-
-    // 2. Fallback query lama jika RPC belum ter-deploy
-    try {
-      let foundRow: any = null;
-      const { data, error } = await supabase
-        .from('public_shares')
-        .select('*')
-        .in('id', candidateIds)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!error && data) {
-        foundRow = data;
-      } else if (strippedClassId) {
-        const { data: byClass } = await supabase
-          .from('public_shares')
-          .select('*')
-          .eq('class_id', strippedClassId)
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (byClass) foundRow = byClass;
-      }
-
-      if (foundRow) {
-        // Jika parameter since diberikan dan data tidak berubah
-        if (since && foundRow.updated_at && new Date(foundRow.updated_at).getTime() <= new Date(since).getTime()) {
-          return {
-            id: foundRow.id,
-            type: foundRow.type,
-            title: foundRow.title,
-            payload: { unchanged: true },
-            data: { unchanged: true },
-          };
-        }
-
-        const payloadData = foundRow.payload || foundRow.data || {};
-        const extractedClassId =
-          foundRow.class_id ||
-          payloadData.classId ||
-          (strippedClassId !== foundRow.id ? strippedClassId : undefined);
-
-        const rec: PublicShareRecord = {
-          id: foundRow.id,
-          type: foundRow.type,
-          classId: extractedClassId,
-          title: foundRow.title,
-          data: payloadData,
-          payload: payloadData,
-          created_at: foundRow.created_at,
-          updated_at: foundRow.updated_at,
-        };
-
-        if (foundRow.share_token) {
-          (rec as any).share_token = foundRow.share_token;
-          SafeCache.set(`pub_share_token_${rec.id}`, foundRow.share_token);
-        }
-
-        candidateIds.forEach((cid) => {
-          SafeCache.set(`pub_share_${cid}`, rec);
-          try {
-            localStorage.setItem(`pub_share_${cid}`, JSON.stringify(rec));
-          } catch {}
-        });
-        return rec;
-      }
-    } catch (err) {
-      console.warn('Supabase fetch public share notice:', err);
+      console.warn('RPC get_public_share notice:', rpcErr);
     }
   }
 

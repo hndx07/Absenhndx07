@@ -15,7 +15,6 @@ import {
   isSupabaseConfigured,
   getSupabaseUrl,
   isValidHttpUrl,
-  createOfflineSession,
 } from '../services/supabase';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 
@@ -45,13 +44,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     e.preventDefault();
     setErrorMessage(null);
 
+    if (!isConfigured) {
+      setErrorMessage('Konfigurasi Supabase belum lengkap. Variabel VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY belum diatur.');
+      return;
+    }
+
     const cleanEmail = email.trim();
     if (!cleanEmail) {
       setErrorMessage('Silakan masukkan alamat email yang valid.');
       return;
     }
-    if (!password || password.length < 6) {
-      setErrorMessage('Kata sandi minimal 6 karakter.');
+    if (!password || password.length < 8) {
+      setErrorMessage('Kata sandi minimal 8 karakter.');
       return;
     }
 
@@ -81,9 +85,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         setErrorMessage('Alamat email atau kata sandi tidak cocok. Silakan periksa kembali.');
       } else if (rawMsg.includes('Email not confirmed')) {
         setErrorMessage('Alamat email belum dikonfirmasi di Supabase Auth.');
-      } else if (!isConfigured) {
-        createOfflineSession(cleanEmail, 'Guru SMK Muhammadiyah Bawang');
-        onLoginSuccess();
       } else {
         setErrorMessage(err?.message || 'Gagal masuk akun. Periksa koneksi internet atau kredensial Anda.');
       }

@@ -102,6 +102,9 @@ export function getSafeSupabaseClient(): SupabaseClient | null {
 
 // Auth API Methods
 export async function signInWithEmailPassword(email: string, password: string) {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Konfigurasi Supabase belum lengkap. Variabel VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY belum diatur.');
+  }
   const client = getSupabaseClient();
   const { data, error } = await client.auth.signInWithPassword({
     email,
@@ -116,6 +119,9 @@ export async function signUpWithEmailPassword(
   password: string,
   metadata?: { nama_guru?: string }
 ) {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Konfigurasi Supabase belum lengkap. Variabel VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY belum diatur.');
+  }
   const client = getSupabaseClient();
   const { data, error } = await client.auth.signUp({
     email,
@@ -128,49 +134,9 @@ export async function signUpWithEmailPassword(
   return data;
 }
 
-export function getOfflineSession() {
-  try {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('smk_offline_session');
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    }
-  } catch {}
-  return null;
-}
-
-export function createOfflineSession(email = 'guru@smkmuhbawang.sch.id', namaGuru = 'Guru SMK Muhammadiyah Bawang') {
-  const session = {
-    user: {
-      id: 'guru_offline_id',
-      email: email,
-      user_metadata: {
-        nama_guru: namaGuru,
-      },
-    },
-    expires_at: 9999999999,
-    access_token: 'offline_token',
-  };
-  try {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('smk_offline_session', JSON.stringify(session));
-    }
-  } catch {}
-  return session;
-}
-
-export function clearOfflineSession() {
-  try {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('smk_offline_session');
-    }
-  } catch {}
-}
-
 export async function getAuthSession() {
   if (!isSupabaseConfigured()) {
-    return getOfflineSession();
+    return null;
   }
   const client = getSafeSupabaseClient();
   if (!client) {
@@ -189,8 +155,7 @@ export async function getAuthSession() {
 
 export async function getAuthUser() {
   if (!isSupabaseConfigured()) {
-    const offline = getOfflineSession();
-    return offline?.user || null;
+    return null;
   }
   const client = getSafeSupabaseClient();
   if (!client) {
@@ -210,7 +175,6 @@ export async function getAuthUser() {
 export const getCurrentUser = getAuthUser;
 
 export async function signOutSupabase() {
-  clearOfflineSession();
   const client = getSafeSupabaseClient();
   if (client) {
     try {

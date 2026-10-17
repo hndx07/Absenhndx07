@@ -922,6 +922,35 @@ export default function App() {
       console.warn('Sign out notice:', err);
     }
     SafeCache.clear();
+
+    // Hapus semua key localStorage milik aplikasi selain smk_saved_login_email
+    try {
+      if (typeof window !== 'undefined') {
+        const savedEmail = localStorage.getItem('smk_saved_login_email');
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (
+            key &&
+            key !== 'smk_saved_login_email' &&
+            (key.startsWith('smk_') ||
+              key.startsWith('muhiba_') ||
+              key.startsWith('cache_') ||
+              key.startsWith('ui_') ||
+              key.startsWith('pub_share_'))
+          ) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach((k) => localStorage.removeItem(k));
+        if (savedEmail) {
+          localStorage.setItem('smk_saved_login_email', savedEmail);
+        }
+      }
+    } catch (clearErr) {
+      console.warn('Clear localStorage error on logout:', clearErr);
+    }
+
     setSession(null);
     setTeacher(null);
     setClasses([]);
