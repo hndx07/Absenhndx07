@@ -673,11 +673,43 @@ export default function App() {
 
     const existingOther = students.filter((s) => s.classId !== targetClassId);
     const existingClass = students.filter((s) => s.classId === targetClassId);
-    const existingIds = new Set(existingClass.map((s) => s.id));
-    const toAdd = newStds.filter((s) => !existingIds.has(s.id));
+
+    // Merge updates for existing students (matched by ID or case-insensitive name)
+    const updateMap = new Map<string, Student>();
+    const toAdd: Student[] = [];
+
+    newStds.forEach((std) => {
+      const lowerName = std.nama.trim().toLowerCase();
+      const existingMatch = existingClass.find(
+        (s) => s.id === std.id || s.nama.trim().toLowerCase() === lowerName
+      );
+      if (existingMatch) {
+        const merged: Student = {
+          ...existingMatch,
+          ...std,
+          id: existingMatch.id, // Strictly preserve existing ID
+          classId: existingMatch.classId,
+          nisn: std.nisn !== undefined && std.nisn !== '' ? std.nisn : existingMatch.nisn,
+          noHpOrangTua:
+            std.noHpOrangTua !== undefined && std.noHpOrangTua !== ''
+              ? std.noHpOrangTua
+              : existingMatch.noHpOrangTua,
+          catatanUmum:
+            std.catatanUmum && std.catatanUmum !== 'Impor Excel'
+              ? std.catatanUmum
+              : existingMatch.catatanUmum,
+          updated_at: new Date().toISOString(),
+        };
+        updateMap.set(existingMatch.id, merged);
+      } else {
+        toAdd.push(std);
+      }
+    });
+
+    const mergedExistingClass = existingClass.map((s) => updateMap.get(s.id) || s);
+    const combinedClass = [...mergedExistingClass, ...toAdd];
 
     // Gabungkan dan susun nomor absen otomatis sesuai abjad nama (A-Z)
-    const combinedClass = [...existingClass, ...toAdd];
     const resequencedClass = resequenceStudentsAlphabetically(combinedClass, targetClassId)
       .filter((s) => s.classId === targetClassId);
 

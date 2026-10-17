@@ -46,7 +46,8 @@ interface ParsedPreviewRow {
   gender: 'L' | 'P';
   noHpOrangTua: string;
   catatanUmum: string;
-  status: 'valid' | 'duplicate' | 'invalid';
+  status: 'valid' | 'update' | 'duplicate' | 'invalid';
+  targetStudentId?: string;
   reason?: string;
 }
 
@@ -271,8 +272,9 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     }
 
     const dataRows = headerRowIdx !== -1 ? rawData.slice(headerRowIdx + 1) : rawData;
-    const existingNisns = new Set(students.map((s) => s.nisn?.trim()).filter(Boolean));
-    const existingNamesInClass = new Set(classStudents.map((s) => s.nama.trim().toLowerCase()));
+    const existingNisnsOtherClasses = new Set(
+      students.filter((s) => s.classId !== currentClass.id).map((s) => s.nisn?.trim()).filter(Boolean)
+    );
 
     const seenImportNisns = new Set<string>();
     const seenImportNames = new Set<string>();
@@ -360,40 +362,88 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
         gender = 'P';
       }
 
+      // Deteksi murid yang sama di kelas yang sedang aktif (berdasarkan nama atau NISN)
+      const matchedByName = classStudents.find(
+        (s) => s.nama.trim().toLowerCase() === lowerNama
+      );
+      const matchedByNisn = nisn
+        ? classStudents.find((s) => s.nisn && s.nisn.trim() === nisn)
+        : undefined;
+
+      const existingStudent = matchedByName || matchedByNisn;
+
       // Validation logic
-      let status: 'valid' | 'duplicate' | 'invalid' = 'valid';
+      let status: 'valid' | 'update' | 'duplicate' | 'invalid' = 'valid';
       let reason = '';
+      let targetStudentId: string | undefined = undefined;
 
       if (!nama || nama.length < 2) {
         status = 'invalid';
         reason = 'Nama murid terlalu pendek atau kosong';
-      } else if (nisn && existingNisns.has(nisn)) {
-        status = 'duplicate';
-        reason = `NISN ${nisn} sudah terdaftar di sistem`;
-      } else if (existingNamesInClass.has(lowerNama)) {
-        status = 'duplicate';
-        reason = `Nama "${nama}" sudah terdaftar di kelas ini`;
-      } else if (nisn && seenImportNisns.has(nisn)) {
-        status = 'duplicate';
-        reason = `NISN ${nisn} duplikat dalam berkas ini`;
       } else if (seenImportNames.has(lowerNama)) {
         status = 'duplicate';
         reason = `Nama "${nama}" ganda dalam berkas ini`;
+      } else if (nisn && seenImportNisns.has(nisn)) {
+        status = 'duplicate';
+        reason = `NISN ${nisn} duplikat dalam berkas ini`;
+      } else if (existingStudent) {
+        // Data murid yang sama sudah ada di kelas
+        targetStudentId = existingStudent.id;
+        const existingNisn = (existingStudent.nisn || '').trim();
+        const existingHp = (existingStudent.noHpOrangTua || '').trim();
+        const existingGender = existingStudent.gender;
+        const existingCatatan = (existingStudent.catatanUmum || '').trim();
+
+        const isNisnDiff = Boolean(nisn && nisn !== existingNisn);
+        const isHpDiff = Boolean(hp && hp !== existingHp);
+        const isGenderDiff = Boolean(gender && gender !== existingGender);
+        const isCatatanDiff = Boolean(catatan && catatan !== 'Impor Excel' && catatan !== existingCatatan);
+
+        if (isNisnDiff || isHpDiff || isGenderDiff || isCatatanDiff) {
+          // Cek apakah NISN baru berbenturan dengan murid lain di kelas
+          const nisnConflict = nisn
+            ? classStudents.find((s) => s.id !== existingStudent.id && s.nisn && s.nisn.trim() === nisn)
+            : undefined;
+
+          if (nisnConflict) {
+            status = 'duplicate';
+            reason = `NISN ${nisn} sudah terdaftar atas nama murid lain (${nisnConflict.nama})`;
+          } else {
+            status = 'update';
+            const diffs: string[] = [];
+            if (isNisnDiff) diffs.push(`NISN: ${existingNisn || '-'} → ${nisn}`);
+            if (isHpDiff) diffs.push(`HP: ${existingHp || '-'} → ${hp}`);
+            if (isGenderDiff) diffs.push(`Gender: ${existingGender} → ${gender}`);
+            if (isCatatanDiff) diffs.push(`Catatan`);
+            reason = `Pembaruan data (${diffs.join(', ')})`;
+          }
+        } else {
+          status = 'duplicate';
+          reason = `Data murid "${nama}" sudah terdaftar & identik di kelas ini`;
+        }
+      } else if (nisn && existingNisnsOtherClasses.has(nisn)) {
+        status = 'duplicate';
+        reason = `NISN ${nisn} sudah terdaftar di kelas lain`;
+      } else {
+        status = 'valid';
+        reason = 'Murid baru, siap ditambahkan';
       }
 
-      if (status === 'valid') {
+      if (status === 'valid' || status === 'update') {
         if (nisn) seenImportNisns.add(nisn);
+        else if (existingStudent?.nisn?.trim()) seenImportNisns.add(existingStudent.nisn.trim());
         seenImportNames.add(lowerNama);
       }
 
       previews.push({
         rowNum: idx + 1,
-        nisn,
-        nama,
-        gender,
-        noHpOrangTua: hp,
-        catatanUmum: catatan || 'Impor Excel',
+        nisn: nisn || (existingStudent ? existingStudent.nisn || '' : ''),
+        nama: existingStudent ? existingStudent.nama : nama,
+        gender: gender || (existingStudent ? existingStudent.gender : 'L'),
+        noHpOrangTua: hp || (existingStudent ? existingStudent.noHpOrangTua || '' : ''),
+        catatanUmum: catatan || (existingStudent ? existingStudent.catatanUmum || '' : 'Impor Excel'),
         status,
+        targetStudentId,
         reason,
       });
     });
@@ -404,9 +454,11 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     }
 
     setParsedRows(previews);
-    // Pre-select all valid rows
-    const validRowsSet = new Set(previews.filter((r) => r.status === 'valid').map((r) => r.rowNum));
-    setSelectedRowNums(validRowsSet);
+    // Pre-select all valid and update rows
+    const actionableRowsSet = new Set(
+      previews.filter((r) => r.status === 'valid' || r.status === 'update').map((r) => r.rowNum)
+    );
+    setSelectedRowNums(actionableRowsSet);
   };
 
   // Handle file drop / upload with ArrayBuffer
@@ -468,7 +520,13 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   };
 
   const selectAllValid = () => {
-    setSelectedRowNums(new Set(parsedRows.filter((r) => r.status === 'valid').map((r) => r.rowNum)));
+    setSelectedRowNums(
+      new Set(
+        parsedRows
+          .filter((r) => r.status === 'valid' || r.status === 'update')
+          .map((r) => r.rowNum)
+      )
+    );
   };
 
   const selectAllRows = () => {
@@ -484,31 +542,66 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     const toImport = parsedRows.filter((r) => selectedRowNums.has(r.rowNum));
 
     if (toImport.length === 0) {
-      alert('Pilih setidaknya 1 baris murid yang siap diimpor.');
+      alert('Pilih setidaknya 1 baris murid yang siap diimpor atau diperbarui.');
       return;
     }
 
     setIsImporting(true);
     try {
       let nextNo = classStudents.length > 0 ? Math.max(...classStudents.map((s) => s.no)) + 1 : 1;
-      const newStudents: Student[] = toImport.map((r, idx) => ({
-        id: `std_imp_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 7)}`,
-        classId: currentClass.id,
-        no: nextNo++,
-        nisn: r.nisn || `00${Math.floor(10000000 + Math.random() * 90000000)}`,
-        nama: r.nama,
-        gender: r.gender,
-        catatanUmum: r.catatanUmum || 'Impor Excel',
-        noHpOrangTua: r.noHpOrangTua || '',
-      }));
+      let newCount = 0;
+      let updateCount = 0;
 
-      await onBatchAddStudents(newStudents);
+      const processedStudents: Student[] = toImport.map((r, idx) => {
+        // Cek apakah baris ini adalah data murid yang sudah ada di kelas
+        const existing = r.targetStudentId
+          ? classStudents.find((s) => s.id === r.targetStudentId) || students.find((s) => s.id === r.targetStudentId)
+          : classStudents.find((s) => s.nama.trim().toLowerCase() === r.nama.trim().toLowerCase());
+
+        if (existing) {
+          updateCount++;
+          return {
+            ...existing,
+            nisn: r.nisn !== undefined && r.nisn !== '' ? r.nisn : (existing.nisn || ''),
+            noHpOrangTua:
+              r.noHpOrangTua !== undefined && r.noHpOrangTua !== ''
+                ? r.noHpOrangTua
+                : (existing.noHpOrangTua || ''),
+            gender: r.gender || existing.gender,
+            catatanUmum:
+              r.catatanUmum && r.catatanUmum !== 'Impor Excel'
+                ? r.catatanUmum
+                : (existing.catatanUmum || ''),
+            updated_at: new Date().toISOString(),
+          };
+        }
+
+        newCount++;
+        return {
+          id: `std_imp_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 7)}`,
+          classId: currentClass.id,
+          no: nextNo++,
+          nisn: r.nisn || `00${Math.floor(10000000 + Math.random() * 90000000)}`,
+          nama: r.nama,
+          gender: r.gender,
+          catatanUmum: r.catatanUmum || 'Impor Excel',
+          noHpOrangTua: r.noHpOrangTua || '',
+        };
+      });
+
+      await onBatchAddStudents(processedStudents);
       setIsImportOpen(false);
       setParsedRows([]);
       setSelectedRowNums(new Set());
       setImportFileName('');
       setImportRawText('');
-      alert(`Berhasil mengimpor ${newStudents.length} murid ke kelas ${currentClass.namaKelas}! Data sudah masuk dan langsung aktif di aplikasi.`);
+
+      const msgParts = [];
+      if (newCount > 0) msgParts.push(`${newCount} murid baru ditambahkan`);
+      if (updateCount > 0) msgParts.push(`${updateCount} murid diperbarui datanya`);
+      alert(
+        `Berhasil memproses ke kelas ${currentClass.namaKelas} (${msgParts.join(', ') || 'selesai'})! Data langsung aktif.`
+      );
     } catch (err) {
       console.error('Commit import error:', err);
       alert('Data murid telah diproses ke aplikasi.');
@@ -520,6 +613,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   // Counters for preview summary
   const totalParsed = parsedRows.length;
   const validCount = parsedRows.filter((r) => r.status === 'valid').length;
+  const updateCount = parsedRows.filter((r) => r.status === 'update').length;
   const duplicateCount = parsedRows.filter((r) => r.status === 'duplicate').length;
   const invalidCount = parsedRows.filter((r) => r.status === 'invalid').length;
 
@@ -1158,11 +1252,16 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
 
                     <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200 shadow-xs">
                       <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">
-                        Siap Diimpor
+                        Siap Diproses
                       </span>
                       <span className="text-xl font-black font-mono text-emerald-800 mt-0.5 block">
-                        {validCount} murid
+                        {validCount + updateCount} murid
                       </span>
+                      {updateCount > 0 && (
+                        <span className="text-[10px] font-semibold text-emerald-600 block mt-0.5">
+                          {validCount} baru, {updateCount} update
+                        </span>
+                      )}
                     </div>
 
                     <div className="bg-amber-50 p-3.5 rounded-2xl border border-amber-200 shadow-xs">
@@ -1202,7 +1301,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                           onClick={selectAllValid}
                           className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-[11px]"
                         >
-                          Pilih Semua Valid ({validCount})
+                          Pilih Semua Siap Proses ({validCount + updateCount})
                         </button>
                         <button
                           type="button"
@@ -1256,6 +1355,8 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                                 className={`cursor-pointer transition ${
                                   isSelected
                                     ? 'bg-indigo-50/50 hover:bg-indigo-50'
+                                    : r.status === 'update'
+                                    ? 'bg-blue-50/30 hover:bg-blue-50/60'
                                     : r.status === 'duplicate'
                                     ? 'bg-amber-50/30 hover:bg-amber-50/60'
                                     : r.status === 'invalid'
@@ -1277,7 +1378,12 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                                 <td className="p-2.5">
                                   {r.status === 'valid' && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                      <CheckCircle2 className="w-3 h-3" /> Siap Diimpor
+                                      <CheckCircle2 className="w-3 h-3" /> Baru
+                                    </span>
+                                  )}
+                                  {r.status === 'update' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                                      <RefreshCw className="w-3 h-3" /> Update
                                     </span>
                                   )}
                                   {r.status === 'duplicate' && (
@@ -1309,9 +1415,13 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                                   {r.reason ? (
                                     <span
                                       className={
-                                        r.status === 'duplicate'
+                                        r.status === 'update'
+                                          ? 'text-blue-700 font-semibold'
+                                          : r.status === 'duplicate'
                                           ? 'text-amber-700 font-semibold'
-                                          : 'text-rose-600 font-semibold'
+                                          : r.status === 'invalid'
+                                          ? 'text-rose-600 font-semibold'
+                                          : 'text-emerald-700 font-medium'
                                       }
                                     >
                                       {r.reason}
@@ -1360,7 +1470,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                   <Cloud className="w-4 h-4" />
                   {isImporting
                     ? 'Menyimpan ke Cloud Supabase...'
-                    : `Simpan ${selectedRowNums.size} Murid ke Cloud`}
+                    : `Simpan & Perbarui ${selectedRowNums.size} Murid ke Cloud`}
                 </button>
               </div>
             </div>
