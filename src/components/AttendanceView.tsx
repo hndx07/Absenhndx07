@@ -592,11 +592,9 @@ Dengan hormat, kami dari *${SCHOOL_CONFIG.namaSekolah}* menyampaikan laporan rek
 📋 *INFORMASI KBM & KELAS*
 • *Sekolah* : ${SCHOOL_CONFIG.namaSekolah}
 • *Kelas / Rombel* : ${currentClass.namaKelas}
-• *Mata Pelajaran* : ${currentClass.mataPelajaran}
 • *Pendidik Pengampu* : ${teacher.namaGuru}
 • *Hari / Tanggal* : ${tanggalFormatted}
-• *Pertemuan Ke* : ${session.pertemuanKe}
-• *Materi Pokok* : ${materiFormatted}
+
 
 📊 *RINGKASAN KEHADIRAN*
 • Total Murid : ${classStudents.length} murid
@@ -608,7 +606,7 @@ ${
     ? `📌 *RINCIAN ANANDA YANG BERHALANGAN HADIR:*\n${rincianTidakBerangkat}\n`
     : `_Alhamdulillah, seluruh murid hadir lengkap dan mengikuti KBM dengan tertib._\n`
 }
-Demikian laporan kehadiran ini kami sampaikan sebagai bentuk transparansi serta sinergi antara pihak madrasah/sekolah dengan Bapak/Ibu wali murid.
+Demikian laporan kehadiran ini kami sampaikan sebagai bentuk transparansi serta sinergi antara pihak sekolah dengan Bapak/Ibu wali murid.
 
 Atas perhatian, bimbingan, dan kerja sama yang senantiasa terjalin harmonis, kami haturkan terima kasih yang sebesar-besarnya.
 
@@ -616,10 +614,7 @@ Jazakumullahu Khairan Katsiran.
 Wassalamu’alaikum Warahmatullahi Wabarakatuh.
 
 Salam hormat & takzim,
-*${teacher.namaGuru}*
-Pendidik ${currentClass.mataPelajaran}
-*${SCHOOL_CONFIG.namaSekolah}*
-🌐 ${SCHOOL_CONFIG.website}`;
+*${teacher.namaGuru}*`;
   };
 
   // WhatsApp Report Generator for Individual Student (Japri Orang Tua)
@@ -694,10 +689,7 @@ Jazakumullahu Khairan Katsiran.
 Wassalamu’alaikum Warahmatullahi Wabarakatuh.
 
 Salam hormat & takzim,
-*${teacher.namaGuru}*
-Pendidik ${currentClass.mataPelajaran}
-*${SCHOOL_CONFIG.namaSekolah}*
-🌐 ${SCHOOL_CONFIG.website}`;
+*${teacher.namaGuru}*`;
   };
 
   const handleOpenWaReport = (mode: 'group' | 'personal' = 'group', student?: Student) => {
