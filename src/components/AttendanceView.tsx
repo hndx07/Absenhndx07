@@ -730,9 +730,9 @@ Salam hormat & takzim,
     const phone = phoneOverride?.replace(/\D/g, '');
     if (phone) {
       const cleanPhone = phone.startsWith('0') ? `62${phone.slice(1)}` : phone;
-      window.open(`https://wa.me/${cleanPhone}?text=${encoded}`, '_blank');
+      window.open(`https://wa.me/${cleanPhone}?text=${encoded}`, '_blank', 'noopener,noreferrer');
     } else {
-      window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+      window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank', 'noopener,noreferrer');
     }
   };
 

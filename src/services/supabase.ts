@@ -114,26 +114,6 @@ export async function signInWithEmailPassword(email: string, password: string) {
   return data;
 }
 
-export async function signUpWithEmailPassword(
-  email: string,
-  password: string,
-  metadata?: { nama_guru?: string }
-) {
-  if (!isSupabaseConfigured()) {
-    throw new Error('Konfigurasi Supabase belum lengkap. Variabel VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY belum diatur.');
-  }
-  const client = getSupabaseClient();
-  const { data, error } = await client.auth.signUp({
-    email,
-    password,
-    options: {
-      data: metadata || {},
-    },
-  });
-  if (error) throw error;
-  return data;
-}
-
 export async function getAuthSession() {
   if (!isSupabaseConfigured()) {
     return null;

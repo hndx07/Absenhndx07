@@ -1,4 +1,9 @@
 -- ==============================================================================
+-- PENTING / CATATAN SUMBER UTAMA:
+-- Folder 'supabase/migrations/' adalah SUMBER UTAMA untuk migrasi database bertahap.
+-- Untuk skema terbaru dan pengerasan keamanan (RLS & RPC), lihat:
+--   supabase/migrations/
+-- ==============================================================================
 -- SCHEMA POSTGRESQL & ROW LEVEL SECURITY (RLS) UNTUK APLIKASI ABSENSI & NILAI
 -- SMK MUHAMMADIYAH BAWANG (100% SUPABASE NATIVE)
 -- Jalankan seluruh query ini di SQL Editor Dashboard Supabase Anda:
@@ -415,11 +420,6 @@ USING ((SELECT auth.uid()) = user_id);
 
 -- I. PUBLIC SHARES
 ALTER TABLE public.public_shares ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Public can view valid shares" ON public.public_shares;
-CREATE POLICY "Public can view valid shares"
-ON public.public_shares FOR SELECT TO anon, authenticated
-USING (true);
 
 DROP POLICY IF EXISTS "Users can manage own shares" ON public.public_shares;
 CREATE POLICY "Users can manage own shares"

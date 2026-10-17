@@ -163,7 +163,7 @@ Pendidik Mata Pelajaran ${currentClass.mataPelajaran}
     }
     const cleanPhone = phone.startsWith('0') ? `62${phone.slice(1)}` : phone;
     const text = encodeURIComponent(generateWhatsAppMessage(std));
-    window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+    window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank', 'noopener,noreferrer');
   };
 
   return (

@@ -37,7 +37,7 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
 
   const handleStartAdd = () => {
     setEditingClass({
-      id: `cls_${Date.now()}`,
+      id: `cls_${crypto.randomUUID()}`,
       namaKelas: '',
       mataPelajaran: '',
       kkm: 75,
