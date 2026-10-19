@@ -659,9 +659,11 @@ export async function exportAgendaToPDF(
 }
 
 export function exportToWordDocument(fileName: string, htmlContent: string) {
+  const safeTitle = fileName.replace(/[<>&"']/g, '');
+  const cleanFileName = fileName.replace(/[/\\?%*:|"<>]/g, '_');
   const header = `<!DOCTYPE html>
 <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset='utf-8'><title>${fileName}</title>
+<head><meta charset='utf-8'><title>${safeTitle}</title>
 <style>
   body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; color: #111; }
   table { border-collapse: collapse; width: 100%; margin-top: 12px; }
@@ -679,7 +681,7 @@ export function exportToWordDocument(fileName: string, htmlContent: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${fileName}.doc`;
+  a.download = `${cleanFileName}.doc`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

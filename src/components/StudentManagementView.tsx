@@ -589,7 +589,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
 
         newCount++;
         return {
-          id: `std_imp_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 7)}`,
+          id: `std_imp_${crypto.randomUUID()}`,
           classId: currentClass.id,
           no: nextNo++,
           nisn: r.nisn || `00${Math.floor(10000000 + Math.random() * 90000000)}`,

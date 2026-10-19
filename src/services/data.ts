@@ -274,6 +274,38 @@ function setLocalItem<T>(key: string, value: T): void {
   } catch {}
 }
 
+/**
+ * Helper pagination untuk query Supabase yang berpotensi melebihi default limit 1000 baris.
+ * Menggunakan .range(from, to) secara bertahap dalam loop hingga seluruh data terambil.
+ */
+export async function fetchAllPaginated<T = any>(
+  queryBuilder: any,
+  pageSize = 1000
+): Promise<T[]> {
+  const allRows: T[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const to = from + pageSize - 1;
+    const { data, error } = await queryBuilder.range(from, to);
+    if (error) {
+      throw error;
+    }
+    if (!data || data.length === 0) {
+      break;
+    }
+    allRows.push(...data);
+    if (data.length < pageSize) {
+      hasMore = false;
+    } else {
+      from += pageSize;
+    }
+  }
+
+  return allRows;
+}
+
 // ============================================================================
 // 1. TEACHER PROFILE SERVICE
 // ============================================================================
@@ -608,7 +640,7 @@ export async function getStudents(classId?: string): Promise<Student[]> {
 }
 
 export async function createStudent(std: Student): Promise<Student> {
-  const id = std.id || `std_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const id = std.id || `std_${crypto.randomUUID()}`;
   const newStd = { ...std, id };
 
   const localStudents = getLocalItem<Student[]>('smk_students', DEFAULT_STUDENTS);
@@ -725,12 +757,16 @@ export async function getAttendanceSessions(classId?: string): Promise<Attendanc
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
-      let query = supabase.from('attendance_sessions').select('*').order('tanggal', { ascending: false });
+      let query = supabase
+        .from('attendance_sessions')
+        .select('*')
+        .order('tanggal', { ascending: false })
+        .order('id', { ascending: true });
       if (classId) {
         query = query.eq('class_id', classId);
       }
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
+      const data = await fetchAllPaginated(query);
+      if (data && data.length > 0) {
         const sessions: AttendanceSession[] = data.map((row: any) => ({
           id: row.id,
           classId: row.class_id,
@@ -817,12 +853,12 @@ export async function getStudentGrades(classId?: string): Promise<StudentGrade[]
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
-      let query = supabase.from('student_grades').select('*');
+      let query = supabase.from('student_grades').select('*').order('id', { ascending: true });
       if (classId) {
         query = query.eq('class_id', classId);
       }
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
+      const data = await fetchAllPaginated(query);
+      if (data && data.length > 0) {
         const grades: StudentGrade[] = data.map((row: any) => ({
           id: row.id,
           studentId: row.student_id,
@@ -1032,12 +1068,16 @@ export async function getTeachingAgendas(classId?: string): Promise<TeachingAgen
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
-      let query = supabase.from('teaching_agendas').select('*').order('tanggal', { ascending: false });
+      let query = supabase
+        .from('teaching_agendas')
+        .select('*')
+        .order('tanggal', { ascending: false })
+        .order('id', { ascending: true });
       if (classId) {
         query = query.eq('class_id', classId);
       }
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
+      const data = await fetchAllPaginated(query);
+      if (data && data.length > 0) {
         const agendas: TeachingAgenda[] = data.map((row: any) => ({
           id: row.id,
           classId: row.class_id,
@@ -1296,12 +1336,16 @@ export async function getSavingTransactions(classId?: string): Promise<SavingTra
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
-      let query = supabase.from('saving_transactions').select('*').order('tanggal', { ascending: false });
+      let query = supabase
+        .from('saving_transactions')
+        .select('*')
+        .order('tanggal', { ascending: false })
+        .order('id', { ascending: true });
       if (classId) {
         query = query.eq('class_id', classId);
       }
-      const { data, error } = await query;
-      if (!error && data) {
+      const data = await fetchAllPaginated(query);
+      if (data) {
         const txs: SavingTransaction[] = data.map((row: any) => ({
           id: row.id,
           classId: row.class_id,
@@ -1402,8 +1446,40 @@ export function sanitizePublicStudent(student: any): any {
   };
 }
 
+const LAST_PAYLOAD_STRING: Record<string, string> = {};
+
+/**
+ * Memeriksa daftar ID share publik yang telah dibuat oleh pemilik untuk suatu kelas.
+ * Mencegah pembuatan share baru secara otomatis tanpa persetujuan manual pengguna.
+ */
+export async function getExistingShareIdsForClass(classId: string): Promise<Set<string>> {
+  const existing = new Set<string>();
+  if (!classId) return existing;
+  const supabase = getSafeSupabaseClient();
+  if (!supabase) return existing;
+  try {
+    const user = await getAuthUser();
+    if (!user?.id) return existing;
+    const { data, error } = await supabase
+      .from('public_shares')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('class_id', classId);
+    if (!error && data) {
+      data.forEach((r: any) => existing.add(r.id));
+    }
+  } catch (e) {
+    console.warn('Notice checking existing shares:', e);
+  }
+  return existing;
+}
+
 export async function createOrUpdatePublicShare(record: PublicShareRecord): Promise<string | null> {
   const content = record.payload || record.data || {};
+  const currentPayloadStr = JSON.stringify(content);
+  const isPayloadUnchanged = LAST_PAYLOAD_STRING[record.id] === currentPayloadStr;
+  LAST_PAYLOAD_STRING[record.id] = currentPayloadStr;
+
   const strippedClassId = record.id.replace(/^(att_share_|grade_share_|nilai_share_|sav_share_|tabungan_share_|age_share_|agenda_share_|share_)/, '');
   const extractedClassId =
     record.classId ||
@@ -1452,6 +1528,12 @@ export async function createOrUpdatePublicShare(record: PublicShareRecord): Prom
         detail: { id: record.id, type: record.type, classId: extractedClassId }
       }));
     } catch {}
+  }
+
+  // Jika isi payload identik dengan yang terakhir di memori, lewati query upsert ke database
+  if (isPayloadUnchanged) {
+    const cachedToken = SafeCache.get<string>(`pub_share_token_${record.id}`);
+    if (cachedToken) return cachedToken;
   }
 
   let retrievedToken: string | null = null;

@@ -4,6 +4,18 @@ interface CacheEntry<T> {
 }
 const MEMORY_CACHE: Record<string, CacheEntry<any>> = {};
 
+// Bersihkan cache legacy 'cache_*' di localStorage satu kali saat startup aplikasi
+if (typeof window !== 'undefined') {
+  try {
+    const legacyKeys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('cache_')) legacyKeys.push(k);
+    }
+    legacyKeys.forEach((k) => localStorage.removeItem(k));
+  } catch {}
+}
+
 export class SafeCache {
   static get<T = any>(key: string): T | null {
     const mem = MEMORY_CACHE[key];
@@ -16,12 +28,12 @@ export class SafeCache {
     }
     if (typeof window === 'undefined') return null;
     try {
-      const item = localStorage.getItem(`cache_${key}`);
+      const item = sessionStorage.getItem(`cache_${key}`);
       if (!item) return null;
       const parsed = JSON.parse(item);
       if (parsed && typeof parsed === 'object' && 'expiresAt' in parsed) {
         if (Date.now() > parsed.expiresAt) {
-          localStorage.removeItem(`cache_${key}`);
+          sessionStorage.removeItem(`cache_${key}`);
           return null;
         }
         MEMORY_CACHE[key] = { data: parsed.data, expiresAt: parsed.expiresAt };
@@ -42,9 +54,9 @@ export class SafeCache {
         data,
         expiresAt,
       };
-      localStorage.setItem(`cache_${key}`, JSON.stringify(payload));
+      sessionStorage.setItem(`cache_${key}`, JSON.stringify(payload));
     } catch (e) {
-      console.warn('SafeCache set error:', e);
+      console.warn('SafeCache set error in sessionStorage:', e);
     }
   }
 
@@ -52,7 +64,7 @@ export class SafeCache {
     delete MEMORY_CACHE[key];
     if (typeof window === 'undefined') return;
     try {
-      localStorage.removeItem(`cache_${key}`);
+      sessionStorage.removeItem(`cache_${key}`);
     } catch {}
   }
 
@@ -63,11 +75,11 @@ export class SafeCache {
     if (typeof window === 'undefined') return;
     try {
       const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
         if (k && k.startsWith('cache_')) keysToRemove.push(k);
       }
-      keysToRemove.forEach((k) => localStorage.removeItem(k));
+      keysToRemove.forEach((k) => sessionStorage.removeItem(k));
     } catch {}
   }
 }

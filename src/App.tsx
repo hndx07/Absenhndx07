@@ -64,6 +64,7 @@ import {
   syncPublicGradesShare,
   syncPublicAgendasShare,
   syncPublicSavingsShare,
+  getExistingShareIdsForClass,
 } from './services/data';
 
 // Types
@@ -369,29 +370,46 @@ export default function App() {
           savings: loadedSavings,
         });
 
-        // Pastikan seluruh Public Share (absen, nilai, tabungan) langsung tersinkronisasi otomatis dengan data terbaru dari cloud
+        // Sinkronisasi Public Share HANYA jika baris share untuk kelas ini sudah pernah dibuat oleh pemilik
+        // Dilarang membuat share baru secara otomatis tanpa persetujuan eksplisit pengguna
         const activeClsObj = loadedClasses.find((c) => c.id === currentClassId);
-        syncPublicAttendanceShare({
-          classRoom: activeClsObj,
-          students: sequencedStudents,
-          sessions: loadedAttendance,
-          teacher: profile || undefined,
-        }).catch(() => {});
+        if (activeClsObj) {
+          getExistingShareIdsForClass(currentClassId).then((existingShareIds) => {
+            if (existingShareIds.has(`att_share_${currentClassId}`)) {
+              syncPublicAttendanceShare({
+                classRoom: activeClsObj,
+                students: sequencedStudents,
+                sessions: loadedAttendance,
+                teacher: profile || undefined,
+              }).catch(() => {});
+            }
 
-        syncPublicGradesShare({
-          classRoom: activeClsObj,
-          students: sequencedStudents,
-          grades: loadedGrades,
-          gradeColumns: loadedGradeCols,
-          teacher: profile || undefined,
-        }).catch(() => {});
+            if (
+              existingShareIds.has(`grade_share_${currentClassId}`) ||
+              existingShareIds.has(`nilai_share_${currentClassId}`)
+            ) {
+              syncPublicGradesShare({
+                classRoom: activeClsObj,
+                students: sequencedStudents,
+                grades: loadedGrades,
+                gradeColumns: loadedGradeCols,
+                teacher: profile || undefined,
+              }).catch(() => {});
+            }
 
-        syncPublicSavingsShare({
-          classRoom: activeClsObj,
-          students: sequencedStudents,
-          transactions: loadedSavings,
-          teacher: profile || undefined,
-        }).catch(() => {});
+            if (
+              existingShareIds.has(`sav_share_${currentClassId}`) ||
+              existingShareIds.has(`tabungan_share_${currentClassId}`)
+            ) {
+              syncPublicSavingsShare({
+                classRoom: activeClsObj,
+                students: sequencedStudents,
+                transactions: loadedSavings,
+                teacher: profile || undefined,
+              }).catch(() => {});
+            }
+          }).catch(() => {});
+        }
       } else {
         setStudents([]);
         setAttendance([]);
@@ -489,6 +507,17 @@ export default function App() {
           // Token refreshed: Jangan reload data jika session masih valid dan cache masih fresh
         } else if (event === 'SIGNED_OUT') {
           SafeCache.clear();
+          try {
+            localStorage.removeItem('muhiba_teacher_profile');
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k && (k.startsWith('pub_share_') || k.startsWith('smk_'))) {
+                keysToRemove.push(k);
+              }
+            }
+            keysToRemove.forEach((k) => localStorage.removeItem(k));
+          } catch {}
           setTeacher(null);
           setClasses([]);
           setStudents([]);
