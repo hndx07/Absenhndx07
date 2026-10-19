@@ -35,7 +35,6 @@ import {
   History,
   ArrowLeft,
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { getSafeSupabaseClient } from '../services/supabase';
 import {
   getPublicShare,
@@ -893,7 +892,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   }
 
   // Unduh Berkas Excel Khusus Nilai di Link Preview Publik (Hanya Total Formatif, Total Sumatif, Nilai Akhir & Deskripsi Lengkap)
-  const handleDownloadGradesExcel = () => {
+  const handleDownloadGradesExcel = async () => {
     if (!computedGrades || computedGrades.length === 0) return;
 
     const rows = computedGrades.map((g: any, idx: number) => {
@@ -933,6 +932,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       return rowObj;
     });
 
+    const XLSX = await import('xlsx');
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Nilai Rapor Merdeka');
@@ -947,7 +947,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   };
 
   // Unduh Berkas Excel untuk Rapor Individu Murid
-  const handleDownloadSingleStudentExcel = (studentGrade: any) => {
+  const handleDownloadSingleStudentExcel = async (studentGrade: any) => {
     if (!studentGrade) return;
     const std = studentGrade.student;
     const m = getKurikulumMerdekaAssessment(
@@ -982,6 +982,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       { 'Komponen Asesmen': 'Deskripsi Capaian Pembelajaran', Nilai: m.deskripsi, Keterangan: 'Lengkap Raport Kurikulum Merdeka' },
     ];
 
+    const XLSX = await import('xlsx');
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Rapor Nilai Murid');

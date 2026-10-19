@@ -23,7 +23,6 @@ import {
   ArrowUpAZ,
   ArrowDownZA,
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { Student, ClassRoom, TeacherProfile } from '../types';
 import { exportStudentsToExcel, downloadStudentTemplateExcel } from '../utils/exportUtils';
 import { resequenceStudentsAlphabetically } from '../services/data';
@@ -463,10 +462,22 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
 
   // Handle file drop / upload with ArrayBuffer
   const handleFileUpload = (file: File) => {
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (!validExtensions.includes(ext)) {
+      alert('Format berkas tidak didukung. Harap pilih berkas dengan format .xlsx, .xls, atau .csv.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Ukuran berkas melebihi batas maksimal 5 MB.');
+      return;
+    }
+
     setImportFileName(file.name);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await import('xlsx');
         const buffer = e.target?.result as ArrayBuffer;
         const workbook = XLSX.read(buffer, { type: 'array' });
         if (!workbook.SheetNames || workbook.SheetNames.length === 0) {

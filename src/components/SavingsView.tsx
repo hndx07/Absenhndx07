@@ -21,7 +21,6 @@ import {
   ArrowUpAZ,
   ArrowDownZA,
 } from 'lucide-react';
-import QRCode from 'qrcode';
 import { SavingTransaction, Student, ClassRoom, TeacherProfile, PublicShareRecord } from '../types';
 import { createOrUpdatePublicShare, resequenceStudentsAlphabetically, sanitizePublicStudent } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
@@ -276,6 +275,7 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
     }
 
     try {
+      const QRCode = (await import('qrcode')).default;
       const qrData = await QRCode.toDataURL(targetLink, { width: 240, margin: 2 });
       setShareQrUrl(qrData);
     } catch (e) {

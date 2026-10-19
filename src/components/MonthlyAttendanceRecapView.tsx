@@ -17,7 +17,6 @@ import {
   ArrowDownZA,
   Flame,
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { AttendanceSession, ClassRoom, Student, TeacherProfile, AttendanceStatus } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
@@ -263,7 +262,8 @@ export const MonthlyAttendanceRecapView: React.FC<MonthlyAttendanceRecapViewProp
   const classLabel = selectedClassId === 'all' ? 'Seluruh Rombel' : (activeClassObj?.namaKelas || currentClass.namaKelas);
 
   // Export to Excel
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const XLSX = await import('xlsx');
     const dataRows = studentRecap.map((r) => ({
       No: r.noUrut,
       NISN: r.student.nisn,

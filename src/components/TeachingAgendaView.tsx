@@ -37,8 +37,6 @@ import {
   Copy,
   ExternalLink,
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import QRCode from 'qrcode';
 import { TeachingAgenda, ClassRoom, TeacherProfile, Student, AttendanceSession, PublicShareRecord } from '../types';
 import {
   exportAgendasToExcel,
@@ -539,6 +537,7 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
     }
 
     try {
+      const QRCode = (await import('qrcode')).default;
       const qr = await QRCode.toDataURL(targetLink, { width: 240, margin: 2 });
       setShareQrUrl(qr);
     } catch (e) {
@@ -697,13 +696,25 @@ export const TeachingAgendaView: React.FC<TeachingAgendaViewProps> = ({
   // ============================================================================
 
   const handleExcelFileUpload = (file: File) => {
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (!validExtensions.includes(ext)) {
+      setUploadError('Format berkas tidak didukung. Harap pilih berkas dengan format .xlsx, .xls, atau .csv.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('Ukuran berkas melebihi batas maksimal 5 MB.');
+      return;
+    }
+
     setImportFileName(file.name);
     setUploadError(null);
     setIsParsingExcel(true);
     const reader = new FileReader();
 
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await import('xlsx');
         const buffer = e.target?.result as ArrayBuffer;
         const workbook = XLSX.read(buffer, { type: 'array' });
         if (!workbook.SheetNames || workbook.SheetNames.length === 0) {

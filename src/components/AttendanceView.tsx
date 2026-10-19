@@ -36,7 +36,6 @@ import {
   MessageCircle,
   BookMarked,
 } from 'lucide-react';
-import QRCode from 'qrcode';
 import {
   AttendanceSession,
   AttendanceStatus,
@@ -807,6 +806,7 @@ Salam hormat & takzim,
       setShareLink(targetLink);
 
       try {
+        const QRCode = (await import('qrcode')).default;
         const qrData = await QRCode.toDataURL(targetLink, { width: 240, margin: 2 });
         setShareQrUrl(qrData);
       } catch (e) {

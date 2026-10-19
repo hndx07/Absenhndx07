@@ -1,6 +1,3 @@
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import {
   ClassRoom,
   Student,
@@ -39,11 +36,12 @@ export function notifyExcelDownloaded(fileName: string, title = 'File Excel') {
 /**
  * Menyimpan workbook Excel ke perangkat pengguna dan memicu notifikasi unduhan selesai.
  */
-export function saveExcelFileWithNotification(
-  wb: XLSX.WorkBook,
+export async function saveExcelFileWithNotification(
+  wb: any,
   fileName: string,
   docTitle = 'File Excel'
 ) {
+  const XLSX = await import('xlsx');
   XLSX.writeFile(wb, fileName);
   notifyExcelDownloaded(fileName, docTitle);
 }
@@ -61,12 +59,13 @@ export function downloadDataBackupJSON(data: any, fileName = 'backup_data_muhiba
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function exportStudentsToExcel(
+export async function exportStudentsToExcel(
   classRoom: ClassRoom | null,
   students: Student[],
   teacher?: TeacherProfile,
   allClasses: ClassRoom[] = []
 ) {
+  const XLSX = await import('xlsx');
   const rows = students.map((s, idx) => {
     const cls = allClasses.find((c) => c.id === s.classId);
     return {
@@ -88,7 +87,8 @@ export function exportStudentsToExcel(
   saveExcelFileWithNotification(wb, fname, `Data Murid - ${classRoom ? classRoom.namaKelas : 'Semua Kelas'}`);
 }
 
-export function downloadStudentTemplateExcel(classRoom?: ClassRoom) {
+export async function downloadStudentTemplateExcel(classRoom?: ClassRoom) {
+  const XLSX = await import('xlsx');
   const sampleRows = [
     {
       No: 1,
@@ -123,12 +123,13 @@ export function downloadStudentTemplateExcel(classRoom?: ClassRoom) {
   saveExcelFileWithNotification(wb, `Template_Data_Murid_${className}.xlsx`, `Template Impor Siswa - ${className}`);
 }
 
-export function exportAttendanceToExcel(
+export async function exportAttendanceToExcel(
   session: AttendanceSession,
   classRoom: ClassRoom,
   students: Student[],
   teacher: TeacherProfile
 ) {
+  const XLSX = await import('xlsx');
   const rows = students.map((s, idx) => {
     const rec = session.records?.[s.id];
     const statusMap: Record<string, string> = {
@@ -155,12 +156,14 @@ export function exportAttendanceToExcel(
   saveExcelFileWithNotification(wb, fname, `Presensi Harian P${session.pertemuanKe} - ${classRoom.namaKelas}`);
 }
 
-export function exportAttendanceToPDF(
+export async function exportAttendanceToPDF(
   session: AttendanceSession,
   classRoom: ClassRoom,
   students: Student[],
   teacher: TeacherProfile
 ) {
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
   const doc = new jsPDF('portrait');
   doc.setFontSize(14);
   doc.text(SCHOOL_CONFIG.namaSekolah, 14, 15);
@@ -205,7 +208,7 @@ export function exportAttendanceToPDF(
   doc.save(`Presensi_${classRoom.namaKelas.replace(/\s+/g, '_')}_P${session.pertemuanKe}.pdf`);
 }
 
-export function exportMonthlyRecapToExcel(
+export async function exportMonthlyRecapToExcel(
   classRoomOrRecap: any,
   studentsOrClass: any,
   sessionsOrTeacher: any,
@@ -213,6 +216,7 @@ export function exportMonthlyRecapToExcel(
   year: number,
   teacherParam?: TeacherProfile
 ) {
+  const XLSX = await import('xlsx');
   let rows: any[] = [];
   let monthName = typeof monthOrMonthName === 'string' ? monthOrMonthName : `Bulan_${monthOrMonthName}`;
 
@@ -287,7 +291,7 @@ export function exportMonthlyRecapToExcel(
   saveExcelFileWithNotification(wb, fname, `Rekap Presensi ${monthName} ${year}`);
 }
 
-export function exportMonthlyRecapToPDF(
+export async function exportMonthlyRecapToPDF(
   classRoomOrRecap: any,
   studentsOrClass: any,
   sessionsOrTeacher: any,
@@ -295,6 +299,8 @@ export function exportMonthlyRecapToPDF(
   year: number,
   teacherParam?: TeacherProfile
 ) {
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
   let tableRows: any[] = [];
   let monthName = typeof monthOrMonthName === 'string' ? monthOrMonthName : `Bulan_${monthOrMonthName}`;
   let classNameStr = 'Semua Kelas';
@@ -389,7 +395,7 @@ export function exportMonthlyRecapToPDF(
   doc.save(`Rekap_Presensi_${monthName}_${year}.pdf`);
 }
 
-export function exportGradesToExcel(
+export async function exportGradesToExcel(
   classRoom: ClassRoom,
   students: Student[],
   grades: StudentGrade[],
@@ -397,6 +403,7 @@ export function exportGradesToExcel(
   activeColumnsCountOrTeacher?: number | TeacherProfile,
   teacherParam?: TeacherProfile
 ) {
+  const XLSX = await import('xlsx');
   let activeColumnsCount = 4;
   if (typeof activeColumnsCountOrTeacher === 'number') {
     activeColumnsCount = activeColumnsCountOrTeacher;
@@ -437,13 +444,15 @@ export function exportGradesToExcel(
   saveExcelFileWithNotification(wb, fname, `Nilai Murid (Merdeka) - ${classRoom.namaKelas}`);
 }
 
-export function exportGradesToPDF(
+export async function exportGradesToPDF(
   classRoom: ClassRoom,
   students: Student[],
   grades: StudentGrade[],
   gradeColumnsOrTeacher: GradeColumn[] | TeacherProfile,
   teacherParam?: TeacherProfile
 ) {
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
   const teacher =
     teacherParam ||
     (gradeColumnsOrTeacher && 'namaGuru' in gradeColumnsOrTeacher
@@ -486,12 +495,13 @@ export function exportGradesToPDF(
   doc.save(`Nilai_${classRoom.namaKelas.replace(/\s+/g, '_')}.pdf`);
 }
 
-export function downloadGradesTemplateExcel(
+export async function downloadGradesTemplateExcel(
   classRoom: ClassRoom,
   students: Student[],
   activeColumnsCountOrColumns: number | any[] = 4,
   _teacher?: TeacherProfile
 ) {
+  const XLSX = await import('xlsx');
   const activeCount = Array.isArray(activeColumnsCountOrColumns)
     ? activeColumnsCountOrColumns.length
     : (typeof activeColumnsCountOrColumns === 'number' ? activeColumnsCountOrColumns : 4);
@@ -517,12 +527,13 @@ export function downloadGradesTemplateExcel(
   saveExcelFileWithNotification(wb, fname, `Template Nilai - ${classRoom.namaKelas}`);
 }
 
-export function exportAgendasToExcel(
+export async function exportAgendasToExcel(
   agendas: TeachingAgenda[],
   classRoom: ClassRoom | null,
   teacher: TeacherProfile,
   classesMap?: Record<string, string>
 ) {
+  const XLSX = await import('xlsx');
   const cMap = classesMap || {};
   const rows = agendas.map((ag, idx) => ({
     No: idx + 1,
@@ -547,10 +558,11 @@ export function exportAgendasToExcel(
   saveExcelFileWithNotification(wb, fname, 'Jurnal & Agenda Mengajar Pendidik');
 }
 
-export function downloadAgendaTemplateExcel(
+export async function downloadAgendaTemplateExcel(
   classes: ClassRoom[],
   teacher?: TeacherProfile
 ) {
+  const XLSX = await import('xlsx');
   const sampleClass = classes[0]?.namaKelas || 'X TO 1';
   const sampleMapel = classes[0]?.mataPelajaran || teacher?.mataPelajaranUtama || 'Dasar Program Keahlian';
 
@@ -607,12 +619,14 @@ export function downloadAgendaTemplateExcel(
   saveExcelFileWithNotification(wb, fname, 'Template Excel Jurnal & Agenda Mengajar');
 }
 
-export function exportAgendaToPDF(
+export async function exportAgendaToPDF(
   agendas: TeachingAgenda[],
   classRoom: ClassRoom | null,
   teacher: TeacherProfile,
   classesMap?: Record<string, string>
 ) {
+  const { default: jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
   const cMap = classesMap || {};
   const doc = new jsPDF('landscape');
   doc.setFontSize(14);
@@ -672,12 +686,13 @@ export function exportToWordDocument(fileName: string, htmlContent: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function exportSavingsToExcel(
+export async function exportSavingsToExcel(
   savings: SavingTransaction[],
   students: Student[],
   classRoom: ClassRoom | null,
   teacher?: TeacherProfile
 ) {
+  const XLSX = await import('xlsx');
   const rows = savings.map((tx, idx) => {
     const std = students.find((s) => s.id === tx.studentId);
     return {
