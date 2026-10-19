@@ -49,7 +49,7 @@ import { exportAttendanceToExcel, exportAttendanceToPDF } from '../utils/exportU
 import { createOrUpdatePublicShare, getStudents, getAttendanceSessions, resequenceStudentsAlphabetically, sanitizePublicStudent } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { SmoothHorizontalScroller } from './SmoothHorizontalScroller';
-import { TEACHING_PERIODS, formatPeriodsToJamKe } from './TeachingAgendaView';
+import { TEACHING_PERIODS, formatPeriodsToJamKe } from '../utils/teachingPeriods';
 
 const INDO_DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 

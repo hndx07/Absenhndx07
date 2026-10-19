@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import {
   CalendarCheck,
   Award,
@@ -83,22 +83,46 @@ import { exportDataToJsonBackup } from './utils/storage';
 
 // Components
 import { LoginView } from './components/LoginView';
-import { ClassManagementModal } from './components/ClassManagementModal';
-import { TeacherProfileModal } from './components/TeacherProfileModal';
-import { PublicSharePage } from './components/PublicSharePage';
 import { AttendanceView } from './components/AttendanceView';
-import { GradesView } from './components/GradesView';
-import { StudentManagementView } from './components/StudentManagementView';
-import { TeachingAgendaView } from './components/TeachingAgendaView';
-import { SavingsView } from './components/SavingsView';
-import { StatisticsView } from './components/StatisticsView';
-import { ParentReportView } from './components/ParentReportView';
-import { SchoolMapView } from './components/SchoolMapView';
-import { MonthlyAttendanceRecapView } from './components/MonthlyAttendanceRecapView';
 import { SmoothScrollToTop } from './components/SmoothScrollToTop';
 import { ScrollProgressBar } from './components/ScrollProgressBar';
 import { ExcelDownloadToast } from './components/ExcelDownloadToast';
 import { smoothScrollToTop } from './utils/smoothScroll';
+
+// Lazy loaded views and modals for optimal bundle splitting & memory efficiency
+const PublicSharePage = React.lazy(() =>
+  import('./components/PublicSharePage').then((m) => ({ default: m.PublicSharePage }))
+);
+const MonthlyAttendanceRecapView = React.lazy(() =>
+  import('./components/MonthlyAttendanceRecapView').then((m) => ({ default: m.MonthlyAttendanceRecapView }))
+);
+const GradesView = React.lazy(() =>
+  import('./components/GradesView').then((m) => ({ default: m.GradesView }))
+);
+const StudentManagementView = React.lazy(() =>
+  import('./components/StudentManagementView').then((m) => ({ default: m.StudentManagementView }))
+);
+const TeachingAgendaView = React.lazy(() =>
+  import('./components/TeachingAgendaView').then((m) => ({ default: m.TeachingAgendaView }))
+);
+const SavingsView = React.lazy(() =>
+  import('./components/SavingsView').then((m) => ({ default: m.SavingsView }))
+);
+const StatisticsView = React.lazy(() =>
+  import('./components/StatisticsView').then((m) => ({ default: m.StatisticsView }))
+);
+const ParentReportView = React.lazy(() =>
+  import('./components/ParentReportView').then((m) => ({ default: m.ParentReportView }))
+);
+const SchoolMapView = React.lazy(() =>
+  import('./components/SchoolMapView').then((m) => ({ default: m.SchoolMapView }))
+);
+const ClassManagementModal = React.lazy(() =>
+  import('./components/ClassManagementModal').then((m) => ({ default: m.ClassManagementModal }))
+);
+const TeacherProfileModal = React.lazy(() =>
+  import('./components/TeacherProfileModal').then((m) => ({ default: m.TeacherProfileModal }))
+);
 
 type NavTab =
 
@@ -1025,10 +1049,25 @@ export default function App() {
   // Public Share Zero-Login Route (Strictly isolated, zero access to login form)
   if (publicShare) {
     return (
-      <PublicSharePage
-        type={publicShare.type}
-        shareId={publicShare.shareId}
-      />
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
+            <div className="flex flex-col items-center gap-4 animate-in fade-in">
+              <div className="w-12 h-12 rounded-2xl bg-[#009B62]/30 border border-emerald-400/40 flex items-center justify-center">
+                <RefreshCw className="w-6 h-6 text-emerald-300 animate-spin" />
+              </div>
+              <p className="text-sm font-semibold tracking-wide text-slate-300">
+                Memuat portal publik SMK Muhammadiyah Bawang...
+              </p>
+            </div>
+          </div>
+        }
+      >
+        <PublicSharePage
+          type={publicShare.type}
+          shareId={publicShare.shareId}
+        />
+      </Suspense>
     );
   }
 
@@ -1544,101 +1583,110 @@ export default function App() {
               </div>
             )}
 
-            {activeTab === 'attendance' && (
-              <AttendanceView
-                currentClass={activeClass}
-                students={students}
-                sessions={attendance}
-                teacher={activeTeacher}
-                agendas={agendas}
-                onNavigateToAgenda={() => setActiveTab('agendas')}
-                onSaveSession={handleSaveAttendance}
-                onDeleteSession={handleDeleteAttendance}
-              />
-            )}
+            <Suspense
+              fallback={
+                <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
+                  <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
+                  <span className="text-xs font-semibold">Memuat tampilan...</span>
+                </div>
+              }
+            >
+              {activeTab === 'attendance' && (
+                <AttendanceView
+                  currentClass={activeClass}
+                  students={students}
+                  sessions={attendance}
+                  teacher={activeTeacher}
+                  agendas={agendas}
+                  onNavigateToAgenda={() => setActiveTab('agendas')}
+                  onSaveSession={handleSaveAttendance}
+                  onDeleteSession={handleDeleteAttendance}
+                />
+              )}
 
-            {activeTab === 'recap' && (
-              <MonthlyAttendanceRecapView
-                currentClass={activeClass}
-                classes={classes}
-                students={students}
-                sessions={attendance}
-                teacher={activeTeacher}
-              />
-            )}
+              {activeTab === 'recap' && (
+                <MonthlyAttendanceRecapView
+                  currentClass={activeClass}
+                  classes={classes}
+                  students={students}
+                  sessions={attendance}
+                  teacher={activeTeacher}
+                />
+              )}
 
-            {activeTab === 'grades' && (
-              <GradesView
-                currentClass={activeClass}
-                students={students}
-                grades={grades}
-                gradeColumns={gradeColumns}
-                teacher={activeTeacher}
-                onSaveGrade={handleSaveGrade}
-                onSaveGradeColumns={handleSaveGradeCols}
-              />
-            )}
+              {activeTab === 'grades' && (
+                <GradesView
+                  currentClass={activeClass}
+                  students={students}
+                  grades={grades}
+                  gradeColumns={gradeColumns}
+                  teacher={activeTeacher}
+                  onSaveGrade={handleSaveGrade}
+                  onSaveGradeColumns={handleSaveGradeCols}
+                />
+              )}
 
-            {activeTab === 'students' && (
-              <StudentManagementView
-                currentClass={activeClass}
-                students={students}
-                teacher={activeTeacher}
-                classes={classes}
-                onSaveStudent={handleSaveStudent}
-                onDeleteStudent={handleDeleteStudent}
-                onBatchAddStudents={handleBatchAddStudents}
-              />
-            )}
+              {activeTab === 'students' && (
+                <StudentManagementView
+                  currentClass={activeClass}
+                  students={students}
+                  teacher={activeTeacher}
+                  classes={classes}
+                  onSaveStudent={handleSaveStudent}
+                  onDeleteStudent={handleDeleteStudent}
+                  onBatchAddStudents={handleBatchAddStudents}
+                />
+              )}
 
-            {activeTab === 'agendas' && (
-              <TeachingAgendaView
-                classes={classes}
-                agendas={agendas}
-                teacher={activeTeacher}
-                currentClass={activeClass}
-                students={students}
-                sessions={attendance}
-                onSaveAgenda={handleSaveAgenda}
-                onDeleteAgenda={handleDeleteAgenda}
-                onBatchSaveAgendas={handleBatchSaveAgendas}
-              />
-            )}
+              {activeTab === 'agendas' && (
+                <TeachingAgendaView
+                  classes={classes}
+                  agendas={agendas}
+                  teacher={activeTeacher}
+                  currentClass={activeClass}
+                  students={students}
+                  sessions={attendance}
+                  onSaveAgenda={handleSaveAgenda}
+                  onDeleteAgenda={handleDeleteAgenda}
+                  onBatchSaveAgendas={handleBatchSaveAgendas}
+                />
+              )}
 
-            {activeTab === 'savings' && (
-              <SavingsView
-                currentClass={activeClass}
-                students={students}
-                savings={savings}
-                teacher={activeTeacher}
-                onSaveTransaction={handleSaveSaving}
-                onDeleteTransaction={handleDeleteSaving}
-              />
-            )}
+              {activeTab === 'savings' && (
+                <SavingsView
+                  currentClass={activeClass}
+                  students={students}
+                  savings={savings}
+                  teacher={activeTeacher}
+                  onSaveTransaction={handleSaveSaving}
+                  onDeleteTransaction={handleDeleteSaving}
+                />
+              )}
 
-            {activeTab === 'statistics' && (
-              <StatisticsView
-                activeClass={activeClass}
-                currentClass={activeClass}
-                students={students}
-                sessions={attendance}
-                grades={grades}
-                savings={savings}
-                teacher={activeTeacher}
-              />
-            )}
+              {activeTab === 'statistics' && (
+                <StatisticsView
+                  activeClass={activeClass}
+                  currentClass={activeClass}
+                  students={students}
+                  sessions={attendance}
+                  grades={grades}
+                  savings={savings}
+                  teacher={activeTeacher}
+                />
+              )}
 
-            {activeTab === 'parent_report' && (
-              <ParentReportView
-                currentClass={activeClass}
-                students={students}
-                sessions={attendance}
-                grades={grades}
-                teacher={activeTeacher}
-              />
-            )}
+              {activeTab === 'parent_report' && (
+                <ParentReportView
+                  currentClass={activeClass}
+                  students={students}
+                  sessions={attendance}
+                  grades={grades}
+                  teacher={activeTeacher}
+                />
+              )}
 
-            {activeTab === 'school_map' && <SchoolMapView />}
+              {activeTab === 'school_map' && <SchoolMapView />}
+            </Suspense>
           </>
         )}
       </main>
@@ -1655,7 +1703,7 @@ export default function App() {
             <a
               href={SCHOOL_CONFIG.websiteUrl}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="text-white underline decoration-white font-bold hover:text-white hover:decoration-white transition"
             >
               {SCHOOL_CONFIG.website}
@@ -1673,30 +1721,33 @@ export default function App() {
         </div>
       </footer>
 
+      {/* Modals with Suspense */}
+      <Suspense fallback={null}>
+        {isClassModalOpen && (
+          <ClassManagementModal
+            isOpen={isClassModalOpen}
+            onClose={() => setIsClassModalOpen(false)}
+            classes={classes}
+            activeClassId={activeClass.id}
+            onSelectClass={handleSelectClass}
+            onSaveClass={handleSaveClass}
+            onDeleteClass={handleDeleteClass}
+          />
+        )}
 
-      {/* Modals */}
-      <ClassManagementModal
-        isOpen={isClassModalOpen}
-        onClose={() => setIsClassModalOpen(false)}
-        classes={classes}
-        activeClassId={activeClass.id}
-        onSelectClass={handleSelectClass}
-        onSaveClass={handleSaveClass}
-        onDeleteClass={handleDeleteClass}
-      />
-
-
-
-      <TeacherProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        teacher={activeTeacher}
-        onSaveTeacher={handleSaveTeacherProfile}
-        onUpdateTeacher={handleSaveTeacherProfile}
-        onLogout={handleLogout}
-        onDataMigrated={() => loadUserData(activeClassId, true)}
-        onDownloadBackup={handleDownloadBackup}
-      />
+        {isProfileModalOpen && (
+          <TeacherProfileModal
+            isOpen={isProfileModalOpen}
+            onClose={() => setIsProfileModalOpen(false)}
+            teacher={activeTeacher}
+            onSaveTeacher={handleSaveTeacherProfile}
+            onUpdateTeacher={handleSaveTeacherProfile}
+            onLogout={handleLogout}
+            onDataMigrated={() => loadUserData(activeClassId, true)}
+            onDownloadBackup={handleDownloadBackup}
+          />
+        )}
+      </Suspense>
 
       {/* Toast Notifikasi Berhasil Refresh */}
       {refreshSuccessToast && (

@@ -596,12 +596,12 @@ export async function getStudents(classId?: string): Promise<Student[]> {
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     try {
-      let query = supabase.from('students').select('*');
+      let query = supabase.from('students').select('*').order('id', { ascending: true });
       if (classId) {
         query = query.eq('class_id', classId);
       }
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
+      const data = await fetchAllPaginated(query);
+      if (data && data.length > 0) {
         const raw: Student[] = data.map((s: any) => ({
           id: s.id,
           classId: s.class_id,

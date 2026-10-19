@@ -878,7 +878,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                             <a
                               href={`https://wa.me/${cleanPhone}?text=${greeting}`}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                               className="flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 hover:underline"
                               title="Kirim pesan WhatsApp santun ke Orang Tua"
                             >

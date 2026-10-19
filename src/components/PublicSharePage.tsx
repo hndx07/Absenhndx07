@@ -1072,7 +1072,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
               <a
                 href={SCHOOL_CONFIG.websiteUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="text-emerald-200 hover:text-white hover:underline"
               >
                 {SCHOOL_CONFIG.website}
@@ -3312,7 +3312,7 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
           </p>
           <p className="text-xs font-semibold text-white">
             {SCHOOL_CONFIG.alamat} &bull; Portal Resmi:{' '}
-            <a href={SCHOOL_CONFIG.websiteUrl} target="_blank" rel="noreferrer" className="text-white underline decoration-white font-bold hover:text-white hover:decoration-white transition">
+            <a href={SCHOOL_CONFIG.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-white underline decoration-white font-bold hover:text-white hover:decoration-white transition">
               {SCHOOL_CONFIG.website}
             </a>
           </p>
