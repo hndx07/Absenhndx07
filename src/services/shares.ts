@@ -276,6 +276,16 @@ export async function getPublicShare(
     ])
   ).filter(Boolean);
 
+  // Check memory-first stale cache
+  let staleCached: PublicShareRecord | null = null;
+  for (const cid of candidateIds) {
+    const cached = SafeCache.get<PublicShareRecord>(`pub_share_${cid}`);
+    if (cached) {
+      staleCached = cached;
+      break;
+    }
+  }
+
   const supabase = getSafeSupabaseClient();
   if (supabase) {
     // 1. Prioritas: Coba panggil RPC get_public_share terlebih dahulu (Security Definer)
@@ -288,6 +298,7 @@ export async function getPublicShare(
       if (!rpcError && rpcData) {
         // Respons unchanged dari server untuk hemat bandwidth
         if (rpcData.unchanged === true) {
+          if (staleCached) return staleCached;
           return {
             id: cleanKey,
             type: 'nilai',
@@ -299,13 +310,23 @@ export async function getPublicShare(
 
         // Cek status aktif & kadaluarsa di sisi client sebagai pertahanan lapis ganda
         if (rpcData.is_active === false) {
-          return null;
+          const err: any = new Error('Akses tautan publik telah dicabut oleh pendidik');
+          err.code = 'REVOKED';
+          throw err;
         }
         if (rpcData.expires_at && new Date(rpcData.expires_at).getTime() < Date.now()) {
-          return null;
+          const err: any = new Error('Masa berlaku tautan publik telah berakhir');
+          err.code = 'EXPIRED';
+          throw err;
         }
 
-        const payloadData = rpcData.payload || {};
+        const payloadData = { ...(rpcData.payload || {}) };
+
+        // Sanitasi NISN dan nomor handphone sebelum masuk ke memori atau state client
+        if (Array.isArray(payloadData.students)) {
+          payloadData.students = payloadData.students.map((s: any) => sanitizePublicStudent(s));
+        }
+
         const extractedClassId =
           rpcData.class_id ||
           payloadData.classId ||
@@ -325,24 +346,42 @@ export async function getPublicShare(
         if (rpcData.share_token) {
           (rec as any).share_token = rpcData.share_token;
           SafeCache.set(`pub_share_token_${rec.id}`, rpcData.share_token);
+          try {
+            sessionStorage.setItem(`pub_share_token_${rec.id}`, rpcData.share_token);
+          } catch {}
         }
 
+        // Simpan METADATA saja ke sessionStorage (tanpa data nilai/absensi murid)
+        try {
+          sessionStorage.setItem(
+            `pub_share_meta_${rec.id}`,
+            JSON.stringify({
+              id: rec.id,
+              type: rec.type,
+              updated_at: rpcData.updated_at,
+              expires_at: rpcData.expires_at,
+              is_active: rpcData.is_active,
+            })
+          );
+        } catch {}
+
+        // Simpan payload PENUH hanya di memori RAM (TTL 3 menit)
         candidateIds.forEach((cid) => {
-          SafeCache.set(`pub_share_${cid}`, rec);
+          SafeCache.set(`pub_share_${cid}`, rec, 3 * 60 * 1000);
         });
 
         return rec;
       }
-    } catch (rpcErr) {
+    } catch (rpcErr: any) {
+      if (rpcErr?.code === 'REVOKED' || rpcErr?.code === 'EXPIRED') {
+        throw rpcErr;
+      }
       console.warn('RPC get_public_share notice:', rpcErr);
     }
   }
 
-  // Fallback HANYA ke SafeCache (memori/sessionStorage aktif), tidak membaca data murid lama di localStorage
-  for (const cid of candidateIds) {
-    const cached = SafeCache.get<PublicShareRecord>(`pub_share_${cid}`);
-    if (cached) return cached;
-  }
+  // Fallback HANYA ke memory cache yang masih valid
+  if (staleCached) return staleCached;
 
   return null;
 }
