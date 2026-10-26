@@ -87,6 +87,7 @@ import { SmoothScrollToTop } from './components/SmoothScrollToTop';
 import { ScrollProgressBar } from './components/ScrollProgressBar';
 import { ExcelDownloadToast } from './components/ExcelDownloadToast';
 import { smoothScrollToTop } from './utils/smoothScroll';
+import { getPublicShareRefFromLocation, PublicShareRef } from './utils/publicShareUrl';
 
 // Lazy loaded views and modals for optimal bundle splitting & memory efficiency
 const AttendanceView = React.lazy(() =>
@@ -150,92 +151,17 @@ const NAV_ITEMS = [
   { id: 'school_map', label: 'Peta Kampus', icon: MapPin, desc: 'Profil & lokasi SMK Muhiba' },
 ];
 
-function parsePublicShareFromUrl(): {
-  type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
-  shareId: string;
-} | null {
-  if (typeof window === 'undefined') return null;
-
-  const checkParams = (params: URLSearchParams) => {
-    if (params.get('nilai_share')) {
-      return { type: 'nilai' as const, shareId: params.get('nilai_share')! };
-    }
-    if (params.get('absen_share')) {
-      return { type: 'absen' as const, shareId: params.get('absen_share')! };
-    }
-    if (params.get('tabungan_share')) {
-      return { type: 'tabungan' as const, shareId: params.get('tabungan_share')! };
-    }
-    if (params.get('agenda_share')) {
-      return { type: 'agenda' as const, shareId: params.get('agenda_share')! };
-    }
-    // Token-based shares: ?token=... or ?share_token=...
-    const tokenParam = params.get('token') || params.get('share_token');
-    if (tokenParam) {
-      const typeParam = params.get('type') as any;
-      let detectedType: 'absen' | 'nilai' | 'tabungan' | 'agenda' = 'nilai';
-      if (['absen', 'nilai', 'tabungan', 'agenda'].includes(typeParam)) {
-        detectedType = typeParam;
-      }
-      return { type: detectedType, shareId: tokenParam };
-    }
-
-    // Generic fallback for links like ?share=... or ?share_id=...
-    const genericShare = params.get('share') || params.get('share_id');
-    if (genericShare) {
-      let detectedType: 'absen' | 'nilai' | 'tabungan' | 'agenda' = 'nilai';
-      if (genericShare.startsWith('att_') || genericShare.includes('absen')) detectedType = 'absen';
-      else if (genericShare.startsWith('sav_') || genericShare.includes('tabungan')) detectedType = 'tabungan';
-      else if (genericShare.startsWith('age_') || genericShare.includes('agenda')) detectedType = 'agenda';
-      return { type: detectedType, shareId: genericShare };
-    }
-
-    const previewParam = params.get('preview') || params.get('public') || params.get('view');
-    if (previewParam) {
-      if (previewParam === 'absen' || previewParam === 'presensi') return { type: 'absen' as const, shareId: 'att_share_class_tkj_1' };
-      if (previewParam === 'nilai') return { type: 'nilai' as const, shareId: 'grade_share_class_tkj_1' };
-      if (previewParam === 'tabungan' || previewParam === 'kas') return { type: 'tabungan' as const, shareId: 'sav_share_class_tkj_1' };
-      if (previewParam === 'agenda') return { type: 'agenda' as const, shareId: 'agenda_share_class_tkj_1' };
-    }
-
-    if (params.get('type') && (params.get('id') || params.get('shareId'))) {
-      const t = params.get('type') as any;
-      const id = params.get('id') || params.get('shareId') || '';
-      if (['absen', 'nilai', 'tabungan', 'agenda'].includes(t)) {
-        return { type: t, shareId: id };
-      }
-    }
-    return null;
-  };
-
-  // 1. Search in window.location.search
-  const fromSearch = checkParams(new URLSearchParams(window.location.search));
-  if (fromSearch) return fromSearch;
-
-  // 2. Search in window.location.hash if present
-  if (window.location.hash) {
-    const hashClean = window.location.hash.replace(/^#\??/, '');
-    const fromHash = checkParams(new URLSearchParams(hashClean));
-    if (fromHash) return fromHash;
-  }
-
-  return null;
-}
-
 export default function App() {
   // 1. Check for Public Share parameters in URL (accessible without auth)
-  const [publicShare, setPublicShare] = useState<{
-    type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
-    shareId: string;
-  } | null>(() => parsePublicShareFromUrl());
+  const [publicShare, setPublicShare] = useState<PublicShareRef | null>(() =>
+    getPublicShareRefFromLocation()
+  );
 
   // Listen for navigation or URL query updates
   useEffect(() => {
     const handleUrlChange = () => {
-      const parsed = parsePublicShareFromUrl();
-      if (parsed) {
-        setPublicShare(parsed);
-      }
+      const parsed = getPublicShareRefFromLocation();
+      setPublicShare(parsed);
     };
     window.addEventListener('popstate', handleUrlChange);
     window.addEventListener('hashchange', handleUrlChange);

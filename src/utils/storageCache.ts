@@ -4,7 +4,19 @@ interface CacheEntry<T> {
 }
 const MEMORY_CACHE: Record<string, CacheEntry<any>> = {};
 
-// Bersihkan cache legacy 'cache_*' dan payload sensitif (nilai, absensi, tabungan, siswa, share payload) di localStorage saat startup aplikasi
+function isSensitiveCacheKey(key: string): boolean {
+  return (
+    key.startsWith('pub_share_') ||
+    key.startsWith('students_') ||
+    key.startsWith('grades_') ||
+    key.startsWith('att_') ||
+    key.startsWith('savings_') ||
+    key.startsWith('agendas_') ||
+    key.startsWith('class_data_')
+  );
+}
+
+// Bersihkan cache legacy 'cache_*' dan payload sensitif (nilai, absensi, tabungan, siswa, share payload) di localStorage & sessionStorage saat startup aplikasi
 if (typeof window !== 'undefined') {
   try {
     const sensitiveKeys: string[] = [];
@@ -24,6 +36,16 @@ if (typeof window !== 'undefined') {
       }
     }
     sensitiveKeys.forEach((k) => localStorage.removeItem(k));
+
+    // Bersihkan juga cache sensitif dari sessionStorage
+    const sessionKeysToRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const sk = sessionStorage.key(i);
+      if (sk && (sk.startsWith('cache_pub_share_') || sk.startsWith('cache_students_') || sk.startsWith('cache_grades_') || sk.startsWith('cache_att_') || sk.startsWith('cache_savings_') || sk.startsWith('cache_class_data_'))) {
+        sessionKeysToRemove.push(sk);
+      }
+    }
+    sessionKeysToRemove.forEach((sk) => sessionStorage.removeItem(sk));
   } catch {}
 }
 
@@ -38,6 +60,9 @@ export class SafeCache {
       }
     }
     if (typeof window === 'undefined') return null;
+    // Data sensitif hanya disimpan di memori
+    if (isSensitiveCacheKey(key)) return null;
+
     try {
       const item = sessionStorage.getItem(`cache_${key}`);
       if (!item) return null;
@@ -60,6 +85,13 @@ export class SafeCache {
     const expiresAt = Date.now() + ttlMs;
     MEMORY_CACHE[key] = { data, expiresAt };
     if (typeof window === 'undefined') return;
+
+    // JANGAN dump data murid / nilai / tabungan / presensi ke sessionStorage!
+    // Data sensitif tetap berada di RAM (in-memory) selama sesi aktif
+    if (isSensitiveCacheKey(key)) {
+      return;
+    }
+
     try {
       const payload = {
         data,
