@@ -4,15 +4,26 @@ interface CacheEntry<T> {
 }
 const MEMORY_CACHE: Record<string, CacheEntry<any>> = {};
 
-// Bersihkan cache legacy 'cache_*' di localStorage satu kali saat startup aplikasi
+// Bersihkan cache legacy 'cache_*' dan payload sensitif (nilai, absensi, tabungan, siswa, share payload) di localStorage saat startup aplikasi
 if (typeof window !== 'undefined') {
   try {
-    const legacyKeys: string[] = [];
+    const sensitiveKeys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.startsWith('cache_')) legacyKeys.push(k);
+      if (k) {
+        if (
+          k.startsWith('cache_') ||
+          k.startsWith('smk_grades') ||
+          k.startsWith('smk_attendance') ||
+          k.startsWith('smk_savings') ||
+          k.startsWith('smk_students') ||
+          (k.startsWith('pub_share_') && !k.startsWith('pub_share_token_'))
+        ) {
+          sensitiveKeys.push(k);
+        }
+      }
     }
-    legacyKeys.forEach((k) => localStorage.removeItem(k));
+    sensitiveKeys.forEach((k) => localStorage.removeItem(k));
   } catch {}
 }
 

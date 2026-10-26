@@ -83,13 +83,15 @@ import { exportDataToJsonBackup } from './utils/storage';
 
 // Components
 import { LoginView } from './components/LoginView';
-import { AttendanceView } from './components/AttendanceView';
 import { SmoothScrollToTop } from './components/SmoothScrollToTop';
 import { ScrollProgressBar } from './components/ScrollProgressBar';
 import { ExcelDownloadToast } from './components/ExcelDownloadToast';
 import { smoothScrollToTop } from './utils/smoothScroll';
 
 // Lazy loaded views and modals for optimal bundle splitting & memory efficiency
+const AttendanceView = React.lazy(() =>
+  import('./components/AttendanceView').then((m) => ({ default: m.AttendanceView }))
+);
 const PublicSharePage = React.lazy(() =>
   import('./components/PublicSharePage').then((m) => ({ default: m.PublicSharePage }))
 );

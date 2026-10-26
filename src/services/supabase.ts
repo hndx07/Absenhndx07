@@ -14,24 +14,46 @@ export function isValidHttpUrl(str: string | undefined | null): boolean {
   }
 }
 
+const rawEnvUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+const rawEnvKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+
+const hasValidEnvCredentials = Boolean(
+  rawEnvUrl &&
+  rawEnvKey &&
+  isValidHttpUrl(rawEnvUrl) &&
+  !rawEnvUrl.includes('your-project') &&
+  rawEnvKey !== 'your-anon-key-here'
+);
+
+// Lock configuration in production if valid environment credentials are provided
+export const IS_CONFIG_LOCKED: boolean = Boolean(
+  import.meta.env.PROD && hasValidEnvCredentials
+);
+
 export function getSupabaseUrl(): string {
+  if (IS_CONFIG_LOCKED) {
+    return rawEnvUrl;
+  }
   try {
     if (typeof window !== 'undefined') {
       const custom = localStorage.getItem('smk_supabase_url');
       if (custom && isValidHttpUrl(custom)) return custom.trim();
     }
   } catch {}
-  return (import.meta.env.VITE_SUPABASE_URL || '').trim();
+  return rawEnvUrl;
 }
 
 export function getSupabaseAnonKey(): string {
+  if (IS_CONFIG_LOCKED) {
+    return rawEnvKey;
+  }
   try {
     if (typeof window !== 'undefined') {
       const custom = localStorage.getItem('smk_supabase_anon_key');
       if (custom && custom.trim() !== '') return custom.trim();
     }
   } catch {}
-  return (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+  return rawEnvKey;
 }
 
 export function isSupabaseConfigured(): boolean {
@@ -48,6 +70,10 @@ export function isSupabaseConfigured(): boolean {
 }
 
 export function setCustomSupabaseConfig(url: string, key: string) {
+  if (IS_CONFIG_LOCKED) {
+    console.warn('Konfigurasi Supabase terkunci di environment production. Override localStorage diabaikan.');
+    return;
+  }
   if (typeof window !== 'undefined') {
     localStorage.setItem('smk_supabase_url', url.trim());
     localStorage.setItem('smk_supabase_anon_key', key.trim());
@@ -56,6 +82,10 @@ export function setCustomSupabaseConfig(url: string, key: string) {
 }
 
 export function clearCustomSupabaseConfig() {
+  if (IS_CONFIG_LOCKED) {
+    console.warn('Konfigurasi Supabase terkunci di environment production. Override localStorage diabaikan.');
+    return;
+  }
   if (typeof window !== 'undefined') {
     localStorage.removeItem('smk_supabase_url');
     localStorage.removeItem('smk_supabase_anon_key');

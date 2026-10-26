@@ -55,6 +55,9 @@ import { ScrollProgressBar } from './ScrollProgressBar';
 import { OfficialLetterhead } from './OfficialLetterhead';
 import { saveExcelFileWithNotification } from '../utils/exportUtils';
 import { ExcelDownloadToast } from './ExcelDownloadToast';
+import { PublicShareHeader } from './public-share/PublicShareHeader';
+import { PublicShareFooter } from './public-share/PublicShareFooter';
+import { PublicShareLoading, PublicShareError } from './public-share/PublicShareStatus';
 
 interface PublicSharePageProps {
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
@@ -842,53 +845,11 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
   }, [computedGrades, searchTerm, gradeFilterStatus, sortOrder]);
 
   if (loading && !data) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="w-16 h-16 rounded-3xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center mx-auto text-indigo-600 dark:text-indigo-400">
-            <RefreshCw className="w-8 h-8 animate-spin" />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-800 dark:text-slate-100 text-base">
-              Menghubungkan ke Portal Sekolah...
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Memuat data transparansi resmi SMK Muhammadiyah Bawang
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return <PublicShareLoading />;
   }
 
   if (!loading && !data) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-        <div className="text-center space-y-4 max-w-md bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="w-16 h-16 rounded-3xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 flex items-center justify-center mx-auto text-amber-600 dark:text-amber-400">
-            <AlertCircle className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-900 dark:text-slate-100 text-lg">
-              Tautan Publik Tidak Ditemukan
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-              Tautan publik ini mungkin belum dibagikan atau tautan yang Anda masukkan kurang tepat. Pastikan Anda membuka link resmi yang dibagikan oleh pendidik mata pelajaran SMK Muhammadiyah Bawang.
-            </p>
-          </div>
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => loadData(false)}
-              className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-indigo-600/20"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Coba Segarkan Lagi
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return <PublicShareError onRetry={() => loadData(false)} />;
   }
 
   // Unduh Berkas Excel Khusus Nilai di Link Preview Publik (Hanya Total Formatif, Total Sumatif, Nilai Akhir & Deskripsi Lengkap)
@@ -1014,73 +975,12 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       </div>
 
       {/* Official School Header - Muhammadiyah Visual Identity Gradient */}
-      <header className="relative z-20 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white shadow-lg sticky top-0 border-b border-[#008276]/40">
-        <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 truncate">
-            <img
-              src={SCHOOL_CONFIG.logoUrl}
-              alt="Logo SMK Muhammadiyah Bawang"
-              className="w-10 h-10 object-contain drop-shadow-md rounded-xl p-0.5 bg-white border border-white/30 shrink-0 shadow-xs"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
-              }}
-            />
-            <div className="truncate">
-              <h1 className="font-black text-sm sm:text-base leading-tight tracking-tight uppercase truncate">
-                {SCHOOL_CONFIG.namaSekolah}
-              </h1>
-              <p className="text-[11px] text-emerald-100 truncate">
-                Portal Informasi & Transparansi Akademik
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="hidden xs:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 border border-white/25 text-white text-[11px] font-bold shadow-2xs backdrop-blur-xs">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-200" />
-              <span>Akses Publik Resmi</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition text-xs font-semibold flex items-center gap-1 cursor-pointer border border-white/15 shadow-xs"
-              title="Salin Tautan Publik"
-            >
-              <Share2 className="w-4 h-4" />
-              <span className="hidden sm:inline">{copied ? 'Tersalin!' : 'Bagikan'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => loadData(false)}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer border border-white/15 shadow-xs"
-              title="Segarkan Data Real-Time"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-        </div>
-
-        {/* Subheader: Address & Official URL */}
-        <div className="bg-[#1c2363]/80 border-t border-white/10 py-1.5 px-4 text-[11px] text-emerald-100">
-          <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-            <div className="flex items-center gap-1.5 truncate">
-              <MapPin className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-              <span className="truncate">{SCHOOL_CONFIG.alamat}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Globe className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-              <a
-                href={SCHOOL_CONFIG.websiteUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-emerald-200 hover:text-white hover:underline"
-              >
-                {SCHOOL_CONFIG.website}
-              </a>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PublicShareHeader
+        copied={copied}
+        onCopyLink={handleCopyLink}
+        isRefreshing={isRefreshing}
+        onRefresh={() => loadData(false)}
+      />
 
       {/* Main Content */}
       <main className="relative z-10 max-w-5xl mx-auto px-4 py-6 space-y-6">
@@ -3304,26 +3204,8 @@ export const PublicSharePage: React.FC<PublicSharePageProps> = ({
       </div>
       </main>
 
-      {/* Official Footer matching Header Color Identity - No Opacity */}
-      <footer className="text-center py-8 mt-10 border-t border-[#008276] bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white shadow-lg">
-        <div className="max-w-5xl mx-auto px-4 space-y-2">
-          <p className="font-black text-sm text-white uppercase tracking-wider">
-            &copy; {SCHOOL_CONFIG.namaSekolah} &bull; BATANG, JAWA TENGAH
-          </p>
-          <p className="text-xs font-semibold text-white">
-            {SCHOOL_CONFIG.alamat} &bull; Portal Resmi:{' '}
-            <a href={SCHOOL_CONFIG.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-white underline decoration-white font-bold hover:text-white hover:decoration-white transition">
-              {SCHOOL_CONFIG.website}
-            </a>
-          </p>
-          <p className="text-xs font-extrabold text-white pt-1">
-            Sistem Informasi Presensi, Penilaian & Jurnal Pendidik &bull; Dikembangkan oleh{' '}
-            <span className="font-mono bg-white text-slate-900 px-2 py-0.5 rounded-md border border-white font-bold">
-              @hndx07
-            </span>
-          </p>
-        </div>
-      </footer>
+      {/* Official Footer matching Header Color Identity - Extracted Component */}
+      <PublicShareFooter />
 
       {/* Floating Animated Smooth Scroll To Top Button with Circular Progress */}
       <SmoothScrollToTop showPercent threshold={200} />
