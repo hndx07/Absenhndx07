@@ -1,15 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import {
-  getPublicShare,
-  getTeacherProfile,
-  getClasses,
-  getStudents,
-  getAttendanceSessions,
-  getStudentGrades,
-  getGradeColumns,
-  getSavingTransactions,
-  getTeachingAgendas,
-} from '../../../services/data';
+import { getPublicShare } from '../../../services/shares';
 import { TeacherProfile } from '../../../types';
 import { SCHOOL_CONFIG } from '../../../config/schoolConfig';
 import { PublicShareErrorType } from '../PublicShareError';
@@ -49,7 +39,6 @@ export function formatIndonesianDateTime(isoStr?: string): string {
 
 export function usePublicShareData({ initialType, shareId }: UsePublicShareDataProps) {
   const [data, setData] = useState<any>(null);
-  const [cloudTeacher, setCloudTeacher] = useState<TeacherProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorType, setErrorType] = useState<PublicShareErrorType | null>(null);
@@ -62,19 +51,20 @@ export function usePublicShareData({ initialType, shareId }: UsePublicShareDataP
   const effectiveType: 'absen' | 'nilai' | 'tabungan' | 'agenda' =
     data?.shareType || initialType;
 
+  // Metadata sekolah dan guru diambil dari payload share publik dengan fallback aman ke konfigurasi statis sekolah
   const satuanPendidikan =
-    data?.namaSekolah || data?.school || cloudTeacher?.namaSekolah || SCHOOL_CONFIG.namaSekolah;
+    data?.namaSekolah || data?.school || SCHOOL_CONFIG.namaSekolah;
   const guruPengampu =
-    data?.teacherName || data?.teacher || cloudTeacher?.namaGuru || 'Pendidik Pengampu';
-  const nbmGuru = data?.teacherNbm || cloudTeacher?.nbm || '';
+    data?.teacherName || data?.teacher || 'Pendidik Pengampu';
+  const nbmGuru = data?.teacherNbm || data?.nbm || '';
   const tahunAjaran =
-    data?.tahunAjaran || cloudTeacher?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran;
+    data?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran;
   const semester =
-    data?.semester || cloudTeacher?.semester || SCHOOL_CONFIG.semester;
+    data?.semester || SCHOOL_CONFIG.semester;
   const kepalaSekolah =
-    data?.namaKepalaSekolah || cloudTeacher?.namaKepalaSekolah || '';
+    data?.namaKepalaSekolah || '';
   const nbmKepala =
-    data?.nbmKepalaSekolah || cloudTeacher?.nbmKepalaSekolah || '';
+    data?.nbmKepalaSekolah || '';
 
   const lastUpdatedAtRef = useRef<string | null>(null);
 
@@ -94,14 +84,8 @@ export function usePublicShareData({ initialType, shareId }: UsePublicShareDataP
       }
 
       try {
-        const [sharePayload, teacherData] = await Promise.all([
-          getPublicShare(shareId, lastUpdatedAtRef.current),
-          getTeacherProfile().catch(() => null),
-        ]);
-
-        if (teacherData) {
-          setCloudTeacher(teacherData);
-        }
+        // Mode publik HANYA mengakses data via RPC get_public_share / cache terotentikasi publik
+        const sharePayload = await getPublicShare(shareId, lastUpdatedAtRef.current);
 
         // Jika respons unchanged dari server untuk hemat bandwidth
         if (
@@ -120,13 +104,6 @@ export function usePublicShareData({ initialType, shareId }: UsePublicShareDataP
           lastUpdatedAtRef.current = recUpdatedAt;
         }
 
-        const cleanClassId =
-          (sharePayload as any)?.classId ||
-          (sharePayload as any)?.payload?.classId ||
-          shareId
-            .replace(/^(att_share_|grade_share_|sav_share_|agenda_share_|att_|grade_|sav_|agenda_)/, '')
-            .trim();
-
         if (sharePayload) {
           const payloadContent =
             (sharePayload as any).payload || (sharePayload as any).data || sharePayload;
@@ -140,126 +117,7 @@ export function usePublicShareData({ initialType, shareId }: UsePublicShareDataP
           });
           setErrorType(null);
         } else {
-          // Fallback cerdas: query basis kelas jika ada
-          const loadedClasses = await getClasses().catch(() => []);
-          const targetClass =
-            loadedClasses.find((c) => c.id === cleanClassId) || loadedClasses[0] || null;
-          const clsId = targetClass?.id || cleanClassId || 'class_tkj_1';
-
-          if (initialType === 'absen') {
-            const [stds, sess] = await Promise.all([
-              getStudents(clsId).catch(() => []),
-              getAttendanceSessions(clsId).catch(() => []),
-            ]);
-            setData({
-              className: targetClass?.namaKelas || 'XII TKJ 1',
-              subject: targetClass?.mataPelajaran || 'Administrasi Infrastruktur Jaringan',
-              teacher: teacherData?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
-              teacherName: teacherData?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
-              namaSekolah: teacherData?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
-              tahunAjaran: teacherData?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
-              semester: teacherData?.semester || SCHOOL_CONFIG.semester,
-              students: stds,
-              sessions: sess,
-              shareType: 'absen',
-            });
-            setErrorType(null);
-          } else if (initialType === 'nilai') {
-            const [stds, grds, cols] = await Promise.all([
-              getStudents(clsId).catch(() => []),
-              getStudentGrades(clsId).catch(() => []),
-              getGradeColumns(clsId).catch(() => []),
-            ]);
-            setData({
-              className: targetClass?.namaKelas || 'XII TKJ 1',
-              subject: targetClass?.mataPelajaran || 'Administrasi Infrastruktur Jaringan',
-              teacherName: teacherData?.namaGuru || 'Guru SMK Muhammadiyah Bawang',
-              namaSekolah: teacherData?.namaSekolah || SCHOOL_CONFIG.namaSekolah,
-              tahunAjaran: teacherData?.tahunAjaran || SCHOOL_CONFIG.tahunAjaran,
-              semester: teacherData?.semester || SCHOOL_CONFIG.semester,
-              kkm: targetClass?.kkm || 75,
-              students: stds,
-              grades: grds,
-              gradeColumns: cols,
-              shareType: 'nilai',
-            });
-            setErrorType(null);
-          } else if (initialType === 'tabungan') {
-            const [stds, txs] = await Promise.all([
-              getStudents(clsId).catch(() => []),
-              getSavingTransactions(clsId).catch(() => []),
-            ]);
-            const classTxList = txs;
-            const classCashBalance = classTxList
-              .filter((tx) => tx.isClassCash)
-              .reduce(
-                (acc, tx) =>
-                  tx.tipe === 'masuk' ? acc + Number(tx.jumlah || 0) : acc - Number(tx.jumlah || 0),
-                0
-              );
-            const totalCashIn = classTxList
-              .filter((tx) => tx.isClassCash && tx.tipe === 'masuk')
-              .reduce((acc, tx) => acc + Number(tx.jumlah || 0), 0);
-            const totalCashOut = classTxList
-              .filter((tx) => tx.isClassCash && tx.tipe === 'keluar')
-              .reduce((acc, tx) => acc + Number(tx.jumlah || 0), 0);
-            const cashTransactions = classTxList.filter((tx) => tx.isClassCash);
-
-            const studentBalances: Record<string, number> = {};
-            const studentLatestDateMap: Record<string, string> = {};
-            stds.forEach((std) => {
-              const stdTxs = classTxList
-                .filter((tx) => !tx.isClassCash && tx.studentId === std.id)
-                .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
-              studentBalances[std.id] = stdTxs.reduce(
-                (acc, tx) =>
-                  tx.tipe === 'masuk' ? acc + Number(tx.jumlah || 0) : acc - Number(tx.jumlah || 0),
-                0
-              );
-              if (stdTxs.length > 0) {
-                studentLatestDateMap[std.id] = stdTxs[0].tanggal;
-              }
-            });
-
-            const detailedTransactions = classTxList.map((tx) => {
-              const std = stds.find((s) => s.id === tx.studentId);
-              return {
-                ...tx,
-                namaMurid: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
-                namaSiswa: std ? std.nama : tx.isClassCash ? 'Kas Kelas' : '-',
-              };
-            });
-
-            const studentsWithDatesAndBalances = stds.map((s) => ({
-              ...s,
-              saldo: studentBalances[s.id] || 0,
-              tanggalInput: studentLatestDateMap[s.id] || '',
-              lastTransactionDate: studentLatestDateMap[s.id] || '',
-            }));
-
-            setData({
-              className: targetClass?.namaKelas || 'XII TKJ 1',
-              classCashBalance,
-              totalCashIn,
-              totalCashOut,
-              cashTransactions,
-              students: studentsWithDatesAndBalances,
-              transactions: detailedTransactions,
-              allTransactions: detailedTransactions,
-              shareType: 'tabungan',
-            });
-            setErrorType(null);
-          } else if (initialType === 'agenda') {
-            const ags = await getTeachingAgendas(clsId).catch(() => []);
-            setData({
-              className: targetClass?.namaKelas || 'Semua Kelas',
-              agendas: ags,
-              shareType: 'agenda',
-            });
-            setErrorType(null);
-          } else {
-            setErrorType('not_found');
-          }
+          setErrorType('not_found');
         }
       } catch (err: any) {
         if (err?.code === 'REVOKED') {
@@ -272,6 +130,7 @@ export function usePublicShareData({ initialType, shareId }: UsePublicShareDataP
           setErrorType('network');
         } else {
           setErrorType('not_found');
+          setErrorMessage(err?.message || null);
         }
       } finally {
         setLoading(false);
@@ -358,7 +217,7 @@ export function usePublicShareData({ initialType, shareId }: UsePublicShareDataP
 
   return {
     data,
-    cloudTeacher,
+    cloudTeacher: (data?.cloudTeacher as TeacherProfile) || null,
     loading,
     isRefreshing,
     errorType,
