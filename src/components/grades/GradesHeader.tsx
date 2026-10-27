@@ -10,9 +10,12 @@ import {
   FileSpreadsheet,
   Printer,
   Share2,
+  Download,
+  Wrench,
 } from 'lucide-react';
 import { ClassRoom, GradeColumn, Student, StudentGrade, TeacherProfile } from '../../types';
 import { exportGradesToExcel } from '../../utils/exportUtils';
+import { ActionMenu, ActionMenuItem } from '../common/ActionMenu';
 
 interface GradesHeaderProps {
   currentClass: ClassRoom;
@@ -57,6 +60,56 @@ export const GradesHeader: React.FC<GradesHeaderProps> = ({
   onOpenShare,
   onChangeActiveColumnsCount,
 }) => {
+  // Menu Ekspor Terpadu (Excel + Dokumen Cetak)
+  const exportMenuItems: ActionMenuItem[] = [
+    {
+      id: 'export-excel',
+      label: 'Ekspor Excel (.xlsx)',
+      description: 'Unduh seluruh nilai format spreadsheet',
+      icon: FileSpreadsheet,
+      onClick: () =>
+        exportGradesToExcel(
+          currentClass,
+          classStudents,
+          Object.values(localGrades),
+          gradeColumns,
+          teacher
+        ),
+    },
+    {
+      id: 'print-preview',
+      label: 'Dokumen Siap Cetak',
+      description: 'Pratinjau leger nilai resmi A4 & tanda tangan',
+      icon: Printer,
+      onClick: onOpenPrintPreview,
+    },
+  ];
+
+  // Menu Alat Penilaian (Atur Kolom, Deskripsi Otomatis, Impor)
+  const toolMenuItems: ActionMenuItem[] = [
+    {
+      id: 'col-editor',
+      label: 'Atur Kolom Formatif',
+      description: 'Sesuaikan label TP / materi formatif (F1-F10)',
+      icon: Sliders,
+      onClick: onOpenColumnEditor,
+    },
+    {
+      id: 'merdeka-desc',
+      label: 'Deskripsi Merdeka Otomatis',
+      description: 'Terapkan capaian kompetensi otomatis ke seluruh murid',
+      icon: Sparkles,
+      onClick: onApplyMerdekaDescriptionsAll,
+    },
+    {
+      id: 'import-excel',
+      label: 'Unggah / Impor Excel',
+      description: 'Upload file nilai spreadsheet eksternal',
+      icon: Upload,
+      onClick: onOpenImport,
+    },
+  ];
+
   return (
     <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -70,23 +123,23 @@ export const GradesHeader: React.FC<GradesHeaderProps> = ({
             <span className="text-xs text-slate-400">&bull;</span>
 
             {/* Realtime Save Status Indicator */}
-            <div className="flex items-center gap-1.5 ml-2">
+            <div className="flex items-center gap-1.5 ml-1">
               {syncStatus === 'saved' && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  Tersimpan di Cloud
+                  <span className="hidden sm:inline">Tersimpan di Cloud</span>
                 </span>
               )}
               {syncStatus === 'saving' && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">
                   <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
-                  Menyimpan ke Cloud...
+                  <span>Menyimpan...</span>
                 </span>
               )}
               {syncStatus === 'error' && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
                   <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                  Gagal menyimpan
+                  <span>Gagal simpan</span>
                 </span>
               )}
             </div>
@@ -100,29 +153,31 @@ export const GradesHeader: React.FC<GradesHeaderProps> = ({
           </p>
         </div>
 
+        {/* Toolbar Aksi Terpadu: 1 Primer + 1 Bagikan + 1 Ekspor Menu + 1 Alat Menu */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Tombol Simpan Nilai ke Cloud */}
+          {/* Aksi Primer: Simpan Nilai ke Cloud (Satu-satunya tombol simpan di header) */}
           <button
             type="button"
             onClick={onSaveAllNow}
-            className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-md cursor-pointer ${
+            disabled={syncStatus === 'saving'}
+            className={`min-h-[42px] px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-md cursor-pointer ${
               syncStatus === 'saving'
                 ? 'bg-amber-600 hover:bg-amber-700 text-white animate-pulse'
                 : pendingSavesCount > 0
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 ring-2 ring-emerald-400 animate-pulse'
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 ring-2 ring-emerald-400'
                 : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
-            }`}
-            title="Upload & Simpan seluruh nilai murid ke database cloud Supabase secara real-time"
+            } disabled:opacity-50`}
+            title="Simpan seluruh nilai murid ke database cloud Supabase secara real-time"
           >
             {syncStatus === 'saving' ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Menyimpan ke Cloud...</span>
+                <span>Menyimpan...</span>
               </>
             ) : (
               <>
                 <Cloud className="w-4 h-4" />
-                <span>Upload Nilai ke Cloud</span>
+                <span>Simpan Nilai</span>
                 {pendingSavesCount > 0 && (
                   <span className="px-1.5 py-0.5 rounded-full bg-white text-emerald-800 text-[10px] font-mono font-bold">
                     {pendingSavesCount}
@@ -132,75 +187,36 @@ export const GradesHeader: React.FC<GradesHeaderProps> = ({
             )}
           </button>
 
-          <button
-            onClick={onOpenColumnEditor}
-            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-          >
-            <Sliders className="w-4 h-4" />
-            Atur Kolom Formatif
-          </button>
-
-          {/* Auto Apply Deskripsi Kurikulum Merdeka ke Seluruh Murid */}
+          {/* Bagikan Link Publik */}
           <button
             type="button"
-            onClick={onApplyMerdekaDescriptionsAll}
-            className="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="Isi deskripsi capaian kompetensi otomatis sesuai capaian nilai Kurikulum Merdeka ke seluruh murid"
-          >
-            <Sparkles className="w-4 h-4 text-indigo-600" />
-            <span>Deskripsi Merdeka Otomatis</span>
-          </button>
-
-          {/* Import Excel Button for Grades */}
-          <button
-            onClick={onOpenImport}
-            className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            title="Upload berkas Excel nilai murid dan sinkronkan ke database cloud Supabase"
-          >
-            <Upload className="w-4 h-4 text-emerald-600" />
-            Upload / Impor Excel
-          </button>
-
-          {/* Export Excel & Upload Group */}
-          <div className="flex items-center rounded-2xl bg-emerald-600 shadow-sm shadow-emerald-600/20 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => exportGradesToExcel(currentClass, classStudents, Object.values(localGrades), gradeColumns, teacher)}
-              className="px-3.5 py-2.5 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-              title="Download file Excel nilai murid (.xlsx)"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Ekspor Excel</span>
-            </button>
-            <div className="w-[1px] h-5 bg-emerald-500/50"></div>
-            <button
-              type="button"
-              onClick={onSaveAllNow}
-              className="px-3 py-2.5 hover:bg-emerald-700 text-emerald-100 hover:text-white text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-              title="Upload & Simpan data nilai ke Cloud"
-            >
-              <Cloud className="w-3.5 h-3.5 text-emerald-200" />
-              <span className="hidden sm:inline">Upload ke Cloud</span>
-            </button>
-          </div>
-
-          {/* Dokumen Siap Cetak Button */}
-          <button
-            onClick={onOpenPrintPreview}
-            className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-            title="Pratinjau Dokumen Siap Cetak Leger Nilai & Unduh File Excel"
-          >
-            <Printer className="w-4 h-4 text-emerald-400" />
-            Dokumen Siap Cetak
-          </button>
-
-          <button
             onClick={onOpenShare}
-            className="px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+            className="min-h-[42px] px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Bagikan Tautan Publik Nilai untuk Wali Murid"
           >
             <Share2 className="w-4 h-4" />
-            Link Publik
+            <span>Bagikan</span>
           </button>
+
+          {/* Menu Dropdown Ekspor (Excel + Dokumen Cetak) */}
+          <ActionMenu
+            label="Ekspor"
+            icon={Download}
+            items={exportMenuItems}
+            align="right"
+            variant="outline"
+            title="Opsi Ekspor & Dokumen Cetak"
+          />
+
+          {/* Menu Dropdown Alat (Formatif, Deskripsi Merdeka, Impor) */}
+          <ActionMenu
+            label="Alat"
+            icon={Wrench}
+            items={toolMenuItems}
+            align="right"
+            variant="secondary"
+            title="Alat Penilaian & Konfigurasi"
+          />
         </div>
       </div>
 

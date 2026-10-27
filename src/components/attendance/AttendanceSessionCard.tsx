@@ -108,20 +108,6 @@ export const AttendanceSessionCard: React.FC<AttendanceSessionCardProps> = ({
               Set Semua Hadir
             </button>
 
-            <button
-              type="button"
-              onClick={onSaveToCloud}
-              disabled={isSavingToCloud}
-              className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-              title="Simpan data sesi ini ke database cloud Supabase secara real-time dan sinkron ke agenda"
-            >
-              {isSavingToCloud ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Save className="w-3.5 h-3.5" />
-              )}
-              <span>Simpan ke Cloud</span>
-            </button>
 
             {onNavigateToAgenda && (
               <button

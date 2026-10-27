@@ -3,9 +3,6 @@ import {
   Plus,
   FileSpreadsheet,
   FileText,
-  Calendar,
-  Eye,
-  Download,
   Building2,
   BookOpen,
   Cloud,
@@ -15,9 +12,11 @@ import {
   Printer,
   Upload,
   Share2,
+  Download,
 } from 'lucide-react';
 import { ClassRoom, TeacherProfile } from '../../types';
 import { SCHOOL_CONFIG } from '../../config/schoolConfig';
+import { ActionMenu, ActionMenuItem } from '../common/ActionMenu';
 
 interface AgendaHeaderProps {
   teacher: TeacherProfile;
@@ -63,6 +62,38 @@ export const AgendaHeader: React.FC<AgendaHeaderProps> = ({
   onSyncAll,
   onOpenAdd,
 }) => {
+  // Menu Ekspor Terpadu (Excel, PDF, Word, Cetak A4)
+  const exportMenuItems: ActionMenuItem[] = [
+    {
+      id: 'export-excel',
+      label: 'Unduh Excel (.xlsx)',
+      description: 'Seluruh jurnal mengajar format tabel spreadsheet',
+      icon: FileSpreadsheet,
+      onClick: onExportExcel,
+    },
+    {
+      id: 'export-pdf',
+      label: 'Unduh PDF (.pdf)',
+      description: 'Berkas PDF jurnal mengajar siap cetak',
+      icon: Download,
+      onClick: onExportPDF,
+    },
+    {
+      id: 'export-word',
+      label: 'Dokumen Word (.doc)',
+      description: 'Format dokumen Microsoft Word lengkap dengan kop',
+      icon: FileText,
+      onClick: onExportWord,
+    },
+    {
+      id: 'print-preview',
+      label: 'Dokumen Siap Cetak (A4)',
+      description: 'Pratinjau lembar A4 resmi & tanda tangan',
+      icon: Printer,
+      onClick: onOpenPrintPreview,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Top Banner Card */}
@@ -89,108 +120,70 @@ export const AgendaHeader: React.FC<AgendaHeaderProps> = ({
           </p>
         </div>
 
-        {/* Action Buttons */}
+        {/* Toolbar Aksi Terpadu: 1 Primer Simpan + 1 Catat Baru + 1 Impor + 1 Bagikan + 1 Ekspor Menu */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={onOpenPrintPreview}
-            className="min-h-[44px] px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer"
-            title="Buka Dokumen Kertas Siap Cetak Resmi"
-          >
-            <Printer className="w-4 h-4" />
-            Dokumen Siap Cetak
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenPrintPreview}
-            className="min-h-[44px] px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-950/70 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Lihat format cetak PDF resmi"
-          >
-            <Eye className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-            Preview PDF
-          </button>
-
-          <button
-            type="button"
-            onClick={onExportPDF}
-            className="min-h-[44px] px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-rose-600/20 cursor-pointer"
-            title="Unduh berkas PDF siap cetak"
-          >
-            <Download className="w-4 h-4" />
-            Unduh PDF
-          </button>
-
-          {/* Tombol Unggah / Impor Excel Agenda Mengajar */}
-          <button
-            type="button"
-            onClick={onOpenUploadExcel}
-            className="min-h-[44px] px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 cursor-pointer"
-            title="Unggah dan impor berkas Excel agenda mengajar"
-          >
-            <Upload className="w-4 h-4" />
-            <span>Unggah Excel</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onExportExcel}
-            className="min-h-[44px] px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 border border-emerald-200 dark:border-emerald-900 cursor-pointer"
-            title="Unduh data agenda ke berkas Excel"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span>Unduh Excel</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onExportWord}
-            className="min-h-[44px] px-3.5 py-2.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-950/70 text-blue-800 dark:text-blue-300 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 border border-blue-200 dark:border-blue-900 cursor-pointer"
-          >
-            <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            Word
-          </button>
-
-          {/* Tombol Bagikan Link Publik Agenda Mengajar */}
-          <button
-            type="button"
-            onClick={onOpenShare}
-            className="min-h-[44px] px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/70 text-indigo-800 dark:text-indigo-300 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-900 cursor-pointer"
-            title="Bagikan Tautan Preview Publik Agenda Mengajar (Dilindungi Token Aman)"
-          >
-            <Share2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <span>Bagikan Link</span>
-          </button>
-
-          {/* Tombol Simpan Agenda ke Cloud Supabase */}
+          {/* Aksi Primer: Simpan Agenda ke Cloud */}
           <button
             type="button"
             onClick={onSyncAll}
             disabled={isSavingAll || !hasFilteredAgendas}
-            className="min-h-[44px] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer disabled:opacity-50"
-            title="Simpan dan sinkronkan seluruh agenda mengajar ke database cloud Supabase secara real-time"
+            className="min-h-[42px] px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer disabled:opacity-50"
+            title="Simpan seluruh agenda mengajar ke database cloud Supabase secara real-time"
           >
             {isSavingAll ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Menyimpan ke Cloud...</span>
+                <span>Menyimpan...</span>
               </>
             ) : (
               <>
                 <Cloud className="w-4 h-4" />
-                <span>Simpan Agenda ke Cloud</span>
+                <span>Simpan Agenda</span>
               </>
             )}
           </button>
 
+          {/* Catat Agenda Baru (CTA Utama) */}
           <button
             type="button"
             onClick={onOpenAdd}
-            className="min-h-[44px] px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20 cursor-pointer"
+            className="min-h-[42px] px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            Catat Agenda Baru
+            <span>Catat Agenda</span>
           </button>
+
+          {/* Impor Excel */}
+          <button
+            type="button"
+            onClick={onOpenUploadExcel}
+            className="min-h-[42px] px-3 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Unggah dan impor berkas Excel agenda mengajar"
+          >
+            <Upload className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="hidden sm:inline">Unggah Excel</span>
+          </button>
+
+          {/* Bagikan Link Publik */}
+          <button
+            type="button"
+            onClick={onOpenShare}
+            className="min-h-[42px] px-3.5 py-2 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Bagikan Tautan Preview Publik Agenda Mengajar"
+          >
+            <Share2 className="w-4 h-4" />
+            <span>Bagikan</span>
+          </button>
+
+          {/* Menu Dropdown Ekspor Terpadu (Excel, PDF, Word, Cetak) */}
+          <ActionMenu
+            label="Ekspor"
+            icon={Download}
+            items={exportMenuItems}
+            align="right"
+            variant="outline"
+            title="Opsi Ekspor Berkas & Dokumen Cetak"
+          />
         </div>
       </div>
 

@@ -7,8 +7,10 @@ import {
   Cloud,
   RefreshCw,
   CheckCheck,
+  Download,
 } from 'lucide-react';
 import { ClassRoom, TeacherProfile, AttendanceSession } from '../../types';
+import { ActionMenu } from '../common/ActionMenu';
 
 interface AttendanceHeaderProps {
   currentClass: ClassRoom;
@@ -39,6 +41,23 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
   onExportExcel,
   onExportPdf,
 }) => {
+  const exportMenuItems = [
+    {
+      id: 'export-excel',
+      label: 'Unduh Excel (.xlsx)',
+      description: 'Rekap kehadiran format spreadsheet',
+      icon: FileSpreadsheet,
+      onClick: onExportExcel,
+    },
+    {
+      id: 'export-pdf',
+      label: 'Cetak Dokumen / PDF',
+      description: 'Format cetak resmi sekolah',
+      icon: FileText,
+      onClick: onExportPdf,
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -58,15 +77,16 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
           </p>
         </div>
 
+        {/* Toolbar Aksi Terpadu: 1 Primer + 1 Aksi Sesi + 1 Bagikan + 1 Ekspor Group */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Tombol Simpan Presensi ke Cloud di Header Toolbar */}
+          {/* Aksi Primer: Simpan Presensi */}
           <button
             type="button"
             onClick={onSaveToCloud}
             disabled={isSavingToCloud || !currentSession}
-            className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-md cursor-pointer ${
+            className={`min-h-[42px] px-4 py-2 rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-md cursor-pointer ${
               hasUnsavedChanges
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 ring-2 ring-emerald-400 animate-pulse'
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/30 ring-2 ring-emerald-400'
                 : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
             } disabled:opacity-50`}
             title="Simpan data presensi murid ke cloud Supabase secara real-time"
@@ -74,12 +94,12 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
             {isSavingToCloud ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Menyimpan ke Cloud...</span>
+                <span>Menyimpan...</span>
               </>
             ) : (
               <>
                 <Cloud className="w-4 h-4" />
-                <span>Simpan Presensi ke Cloud</span>
+                <span>Simpan Presensi</span>
                 {hasUnsavedChanges && (
                   <span className="w-2 h-2 rounded-full bg-amber-300 animate-ping" />
                 )}
@@ -87,41 +107,36 @@ export const AttendanceHeader: React.FC<AttendanceHeaderProps> = ({
             )}
           </button>
 
+          {/* Aksi Sekunder: Buat Pertemuan */}
           <button
+            type="button"
             onClick={onOpenCreateSession}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20 cursor-pointer"
+            className="min-h-[42px] px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            Buat Pertemuan Baru
+            <span>Pertemuan Baru</span>
           </button>
 
+          {/* Bagikan Link Publik */}
           <button
+            type="button"
             onClick={onOpenShare}
-            className="px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
-            title="Bagikan Tautan Publik untuk Orang Tua"
+            className="min-h-[42px] px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Bagikan Tautan Publik untuk Wali Murid"
           >
             <Share2 className="w-4 h-4" />
-            Link Publik Wali Murid
+            <span className="hidden sm:inline">Bagikan</span>
           </button>
 
-          <div className="flex items-center rounded-2xl border border-slate-200 p-1 bg-slate-50">
-            <button
-              onClick={onExportExcel}
-              className="px-3 py-1.5 hover:bg-white text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
-              title="Unduh file Excel"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              Excel
-            </button>
-            <button
-              onClick={onExportPdf}
-              className="px-3 py-1.5 hover:bg-white text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
-              title="Cetak format PDF resmi"
-            >
-              <FileText className="w-3.5 h-3.5 text-rose-600" />
-              PDF
-            </button>
-          </div>
+          {/* Dropdown Ekspor Terpadu (Excel + PDF) */}
+          <ActionMenu
+            label="Ekspor"
+            icon={Download}
+            items={exportMenuItems}
+            align="right"
+            variant="outline"
+            title="Opsi Ekspor Berkas Presensi"
+          />
         </div>
       </div>
 

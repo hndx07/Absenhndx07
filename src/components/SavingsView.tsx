@@ -327,25 +327,28 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
             ) : (
               <>
                 <Cloud className="w-4 h-4" />
-                <span>Simpan Tabungan ke Cloud</span>
+                <span>Simpan Tabungan</span>
               </>
             )}
           </button>
 
           <button
+            type="button"
             onClick={handleOpenShare}
-            className="px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+            className="min-h-[42px] px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Bagikan Tautan Publik Tabungan & Kas untuk Orang Tua"
           >
             <Share2 className="w-4 h-4" />
-            Link Publik untuk Orang Tua
+            <span>Bagikan</span>
           </button>
 
           <button
+            type="button"
             onClick={() => handleOpenAdd(activeTab === 'class_cash')}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
+            className="min-h-[42px] px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            Catat Transaksi Baru
+            <span>Catat Transaksi</span>
           </button>
         </div>
       </div>
