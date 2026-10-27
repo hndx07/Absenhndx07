@@ -132,11 +132,18 @@ export interface SavingTransaction {
 
 export interface PublicShareRecord {
   id: string;
+  share_token?: string;
+  shareToken?: string;
   classId?: string;
+  class_id?: string;
   type: 'absen' | 'nilai' | 'tabungan' | 'agenda';
   title: string;
   payload?: any;
   data?: any;
+  is_active?: boolean;
+  isActive?: boolean;
+  expires_at?: string | null;
+  expiresAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
   created_at?: string;

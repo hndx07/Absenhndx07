@@ -59,9 +59,15 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-700/80 text-xs font-mono text-rose-300 break-words max-h-36 overflow-y-auto">
-              {this.state.error?.message || 'Terjadi kesalahan tidak terduga saat memuat halaman.'}
-            </div>
+            {import.meta.env.DEV ? (
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-700/80 text-xs font-mono text-rose-300 break-words max-h-36 overflow-y-auto">
+                {this.state.error?.message || 'Terjadi kesalahan tidak terduga saat memuat halaman.'}
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-700/60 text-xs text-slate-350 leading-relaxed">
+                Mohon maaf, terjadi kendala saat memuat data antarmuka. Silakan coba muat ulang halaman atau hubungi pengampu mata pelajaran.
+              </div>
+            )}
 
             <div className="space-y-2.5">
               <button
