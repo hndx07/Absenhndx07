@@ -1,102 +1,25 @@
-import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
-import {
-  CalendarCheck,
-  Award,
-  Users,
-  BookMarked,
-  Wallet,
-  BarChart3,
-  MessageSquare,
-  MapPin,
-  Cloud,
-  RefreshCw,
-  Settings,
-  ChevronDown,
-  GraduationCap,
-  AlertCircle,
-  LogOut,
-  FileCheck,
-  Menu,
-  X,
-  Eye,
-  EyeOff,
-  Download,
-  CheckCircle2,
-} from 'lucide-react';
-import { SCHOOL_CONFIG } from './config/schoolConfig';
-
-// Supabase Services
-import {
-  getAuthSession,
-  getSafeSupabaseClient,
-  signOutSupabase,
-  checkSupabaseConnection,
-} from './services/supabase';
-import {
-  getTeacherProfile,
-  createOrUpdateTeacherProfile,
-  getClasses,
-  createClass,
-  updateClass,
-  deleteClass,
-  getStudents,
-  createStudent,
-  updateStudent,
-  deleteStudent,
-  batchInsertStudents,
-  resequenceStudentsAlphabetically,
-  getAttendanceSessions,
-  saveAttendanceSession,
-  deleteAttendanceSession,
-  getStudentGrades,
-  saveStudentGrade,
-  getGradeColumns,
-  saveGradeColumns,
-  getTeachingAgendas,
-  saveTeachingAgenda,
-  deleteTeachingAgenda,
-  syncAttendanceSessionToAgenda,
-  batchSaveTeachingAgendas,
-  getSavingTransactions,
-  saveSavingTransaction,
-  deleteSavingTransaction,
-  syncPublicAttendanceShare,
-  syncPublicGradesShare,
-  syncPublicAgendasShare,
-  syncPublicSavingsShare,
-  getExistingShareIdsForClass,
-} from './services/data';
-
-// Types
-import {
-  TeacherProfile,
-  ClassRoom,
-  Student,
-  AttendanceSession,
-  StudentGrade,
-  GradeColumn,
-  TeachingAgenda,
-  SavingTransaction,
-} from './types';
-import { UiStatePersistence, SafeCache } from './utils/storageCache';
-import { exportDataToJsonBackup } from './utils/storage';
-
-// TanStack Query (Teacher Data Cache)
-import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useEffect, Suspense } from 'react';
+import { RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { createQueryClient } from './lib/queryClient';
-import { queryKeys } from './lib/queryKeys';
-import { useClassesQuery, useClassMutations } from './hooks/useClassesQuery';
-import { useStudentsQuery, useStudentMutations } from './hooks/useStudentsQuery';
 
-// Components
+// Types & Custom Hooks
+import { NavTab } from './components/layout/types';
+import { useTeacherData } from './hooks/useTeacherData';
+import { getPublicShareRefFromLocation, PublicShareRef } from './utils/publicShareUrl';
+
+// Layout Components
+import { AppHeader } from './components/layout/AppHeader';
+import { AppSidebar } from './components/layout/AppSidebar';
+import { AppFooter } from './components/layout/AppFooter';
+
+// UI Utility Components
 import { LoginView } from './components/LoginView';
 import { SmoothScrollToTop } from './components/SmoothScrollToTop';
 import { ScrollProgressBar } from './components/ScrollProgressBar';
 import { ExcelDownloadToast } from './components/ExcelDownloadToast';
-import { smoothScrollToTop } from './utils/smoothScroll';
-import { getPublicShareRefFromLocation, PublicShareRef } from './utils/publicShareUrl';
 
-// Lazy loaded views and modals for optimal bundle splitting & memory efficiency
+// Lazy Loaded Domain Views & Modals (Code Splitting)
 const AttendanceView = React.lazy(() =>
   import('./components/AttendanceView').then((m) => ({ default: m.AttendanceView }))
 );
@@ -134,41 +57,19 @@ const TeacherProfileModal = React.lazy(() =>
   import('./components/TeacherProfileModal').then((m) => ({ default: m.TeacherProfileModal }))
 );
 
-type NavTab =
-
-  | 'attendance'
-  | 'recap'
-  | 'grades'
-  | 'students'
-  | 'agendas'
-  | 'savings'
-  | 'statistics'
-  | 'parent_report'
-  | 'school_map';
-
-const NAV_ITEMS = [
-  { id: 'attendance', label: 'Presensi Murid', icon: CalendarCheck, desc: 'Input kehadiran harian murid' },
-  { id: 'recap', label: 'Rekap Absensi', icon: FileCheck, desc: 'Rekap bulanan, cetak & ekspor Excel' },
-  { id: 'grades', label: 'Penilaian & KKM', icon: Award, desc: 'Asesmen sumatif & formatif' },
-  { id: 'students', label: 'Data Murid', icon: Users, desc: 'Kelola murid & impor Excel' },
-  { id: 'agendas', label: 'Buku Jurnal Pendidik', icon: BookMarked, desc: 'Catatan agenda kegiatan KBM' },
-  { id: 'savings', label: 'Tabungan & Kas', icon: Wallet, desc: 'Buku kas & tabungan kelas' },
-  { id: 'statistics', label: 'Statistik & Resume', icon: BarChart3, desc: 'Grafik & ringkasan analitik' },
-  { id: 'parent_report', label: 'Laporan WhatsApp Wali', icon: MessageSquare, desc: 'Kirim rekap ke orang tua / wali' },
-  { id: 'school_map', label: 'Peta Kampus', icon: MapPin, desc: 'Profil & lokasi SMK Muhiba' },
-];
-
+/**
+ * AppContent serves strictly as an orchestrator:
+ * connects global layout, tabs, modals, and reactive server-state.
+ */
 function AppContent() {
-  // 1. Check for Public Share parameters in URL (accessible without auth)
+  // 1. Public Share Zero-Login Route Detection
   const [publicShare, setPublicShare] = useState<PublicShareRef | null>(() =>
     getPublicShareRefFromLocation()
   );
 
-  // Listen for navigation or URL query updates
   useEffect(() => {
     const handleUrlChange = () => {
-      const parsed = getPublicShareRefFromLocation();
-      setPublicShare(parsed);
+      setPublicShare(getPublicShareRefFromLocation());
     };
     window.addEventListener('popstate', handleUrlChange);
     window.addEventListener('hashchange', handleUrlChange);
@@ -178,860 +79,54 @@ function AppContent() {
     };
   }, []);
 
-  // 2. Auth Session State (Source of Truth)
-  const [session, setSession] = useState<any>(null);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  // 2. Data & Business Logic via TanStack Query Orchestrator Hook
+  const {
+    session,
+    isAuthChecking,
+    activeTab,
+    setActiveTab,
+    activeClassId,
+    activeClass,
+    activeTeacher,
+    classes,
+    students,
+    attendance,
+    grades,
+    gradeColumns,
+    agendas,
+    savings,
+    isLoadingData,
+    isManualRefreshing,
+    refreshSuccessToast,
+    dataError,
+    loadUserData,
+    handleSelectClass,
+    handleManualRefresh,
+    handleSaveTeacherProfile,
+    handleSaveClass,
+    handleDeleteClass,
+    handleSaveStudent,
+    handleDeleteStudent,
+    handleBatchAddStudents,
+    handleSaveAttendance,
+    handleDeleteAttendance,
+    handleSaveGrade,
+    handleSaveGradeCols,
+    handleSaveAgenda,
+    handleBatchSaveAgendas,
+    handleDeleteAgenda,
+    handleSaveSaving,
+    handleDeleteSaving,
+    handleDownloadBackup,
+    handleLogout,
+  } = useTeacherData();
 
-  // TanStack Query Client & Teacher Scoping
-  const queryClient = useQueryClient();
-  const userId = session?.user?.id;
-
-  // 3. Database State from Supabase
-  const [teacher, setTeacher] = useState<TeacherProfile | null>(null);
-  const [classes, setClasses] = useState<ClassRoom[]>([]);
-  const [activeClassId, setActiveClassIdState] = useState<string>(() =>
-    UiStatePersistence.get('activeClassId', '')
-  );
-  const setActiveClassId = (clsId: string) => {
-    setActiveClassIdState(clsId);
-    UiStatePersistence.set('activeClassId', clsId);
-  };
-
-  const [students, setStudents] = useState<Student[]>([]);
-  const [attendance, setAttendance] = useState<AttendanceSession[]>([]);
-  const [grades, setGrades] = useState<StudentGrade[]>([]);
-  const [gradeColumns, setGradeColumns] = useState<GradeColumn[]>([]);
-  const [agendas, setAgendas] = useState<TeachingAgenda[]>([]);
-  const [savings, setSavings] = useState<SavingTransaction[]>([]);
-
-  // TanStack Queries (Classes & Students by Active Class)
-  const { data: queryClasses } = useClassesQuery({
-    userId,
-    enabled: Boolean(session),
-  });
-
-  const { data: queryStudents } = useStudentsQuery({
-    userId,
-    classId: activeClassId,
-    enabled: Boolean(session && activeClassId),
-  });
-
-  const classMutations = useClassMutations(userId);
-  const studentMutations = useStudentMutations(userId, activeClassId);
-
-  // Sync classes cache into state
-  useEffect(() => {
-    if (queryClasses && queryClasses.length > 0) {
-      setClasses(queryClasses);
-      if (!activeClassId) {
-        const saved = UiStatePersistence.get('activeClassId', '') || teacher?.activeClassId;
-        const matched = queryClasses.find((c) => c.id === saved) || queryClasses[0];
-        if (matched) {
-          setActiveClassId(matched.id);
-        }
-      }
-    }
-  }, [queryClasses, activeClassId, teacher?.activeClassId]);
-
-  // Sync students cache into state
-  useEffect(() => {
-    if (queryStudents && queryStudents.length > 0) {
-      const sequenced = resequenceStudentsAlphabetically(queryStudents, activeClassId);
-      setStudents(sequenced);
-    }
-  }, [queryStudents, activeClassId]);
-
-  // 4. UI States with safe persistence
-  const [isLoadingData, setIsLoadingData] = useState(false);
-  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
-  const [refreshSuccessToast, setRefreshSuccessToast] = useState<string | null>(null);
-  const [dataError, setDataError] = useState<string | null>(null);
-  const [activeTab, setActiveTabState] = useState<NavTab>(() =>
-    UiStatePersistence.get<NavTab>('activeTab', 'attendance')
-  );
-  const setActiveTab = (tab: NavTab) => {
-    setActiveTabState(tab);
-    UiStatePersistence.set('activeTab', tab);
-    smoothScrollToTop(400);
-  };
-
+  // 3. Modal & Navigation States
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSideNavOpen, setIsSideNavOpen] = useState(false);
 
-  const toggleSideNav = () => {
-    setIsSideNavOpen((prev) => !prev);
-  };
-
-  // Load user data: Cache-First + Background Revalidation Strategy
-  const loadUserData = useCallback(async (targetClassId?: string, force = false) => {
-    setDataError(null);
-
-    // 1. Baca SafeCache terlebih dahulu (jika tidak force) untuk tampilan instan tanpa membebani server
-    const cachedTeacher = !force ? SafeCache.get<TeacherProfile>('teacher_profile') : null;
-    const cachedClasses = !force ? SafeCache.get<ClassRoom[]>('all_classes') : null;
-    const cachedAgendas = !force ? SafeCache.get<TeachingAgenda[]>('all_agendas') : null;
-
-    if (cachedTeacher) setTeacher(cachedTeacher);
-    if (cachedClasses && cachedClasses.length > 0) setClasses(cachedClasses);
-    if (cachedAgendas) setAgendas(cachedAgendas);
-
-    let currentClassId = targetClassId || activeClassId || cachedTeacher?.activeClassId || '';
-    if (!currentClassId && cachedClasses && cachedClasses.length > 0) {
-      currentClassId = cachedClasses[0].id;
-    }
-    if (currentClassId && currentClassId !== activeClassId) {
-      setActiveClassId(currentClassId);
-    }
-
-    const cachedClassData =
-      !force && currentClassId ? SafeCache.get<any>(`class_data_${currentClassId}`) : null;
-
-    if (cachedClassData) {
-      setStudents(cachedClassData.students || []);
-      setAttendance(cachedClassData.attendance || []);
-      setGrades(cachedClassData.grades || []);
-      setGradeColumns(cachedClassData.gradeColumns || []);
-      setSavings(cachedClassData.savings || []);
-    }
-
-    // Jika seluruh data ada di cache dan tidak expired (TTL aktif), lewati panggilan network ke Supabase
-    if (!force && cachedTeacher && cachedClasses && cachedAgendas && (cachedClassData || !currentClassId)) {
-      return;
-    }
-
-    // Jika cache kosong, expired, atau user melakukan manual refresh (force = true)
-    setIsLoadingData(true);
-
-    try {
-      // 1. Fetch profil guru dari Supabase Cloud
-      let profile = await getTeacherProfile(force);
-      if (!profile) {
-        profile = await createOrUpdateTeacherProfile({
-          namaGuru: 'Guru SMK Muhammadiyah Bawang',
-          namaSekolah: 'SMK Muhammadiyah Bawang',
-          mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
-          tahunAjaran: '2025/2026',
-          semester: 'Genap',
-        });
-      }
-      setTeacher(profile);
-      SafeCache.set('teacher_profile', profile);
-
-      // 2. Fetch classes dari Supabase
-      const loadedClasses = await getClasses();
-      setClasses(loadedClasses);
-      SafeCache.set('all_classes', loadedClasses);
-
-      // Tentukan kelas aktif
-      if (!currentClassId && profile.activeClassId) {
-        currentClassId = profile.activeClassId;
-      }
-      if (!currentClassId && loadedClasses.length > 0) {
-        currentClassId = loadedClasses[0].id;
-      }
-      if (currentClassId && currentClassId !== activeClassId) {
-        setActiveClassId(currentClassId);
-      }
-
-      // 3. Fetch agenda mengajar
-      const loadedAgendas = await getTeachingAgendas();
-      setAgendas(loadedAgendas);
-      SafeCache.set('all_agendas', loadedAgendas);
-
-      // 4. Fetch data spesifik per kelas
-      if (currentClassId) {
-        const [
-          loadedStudents,
-          loadedAttendance,
-          loadedGrades,
-          loadedGradeCols,
-          loadedSavings,
-        ] = await Promise.all([
-          getStudents(currentClassId),
-          getAttendanceSessions(currentClassId),
-          getStudentGrades(currentClassId),
-          getGradeColumns(currentClassId),
-          getSavingTransactions(currentClassId),
-        ]);
-
-        const sequencedStudents = resequenceStudentsAlphabetically(loadedStudents, currentClassId);
-        setStudents(sequencedStudents);
-        setAttendance(loadedAttendance);
-        setGrades(loadedGrades);
-        setGradeColumns(loadedGradeCols);
-        setSavings(loadedSavings);
-
-        SafeCache.set(`class_data_${currentClassId}`, {
-          students: sequencedStudents,
-          attendance: loadedAttendance,
-          grades: loadedGrades,
-          gradeColumns: loadedGradeCols,
-          savings: loadedSavings,
-        });
-
-        // Sinkronisasi Public Share HANYA jika baris share untuk kelas ini sudah pernah dibuat oleh pemilik
-        // Dilarang membuat share baru secara otomatis tanpa persetujuan eksplisit pengguna
-        const activeClsObj = loadedClasses.find((c) => c.id === currentClassId);
-        if (activeClsObj) {
-          getExistingShareIdsForClass(currentClassId).then((existingShareIds) => {
-            if (existingShareIds.has(`att_share_${currentClassId}`)) {
-              syncPublicAttendanceShare({
-                classRoom: activeClsObj,
-                students: sequencedStudents,
-                sessions: loadedAttendance,
-                teacher: profile || undefined,
-              }).catch(() => {});
-            }
-
-            if (
-              existingShareIds.has(`grade_share_${currentClassId}`) ||
-              existingShareIds.has(`nilai_share_${currentClassId}`)
-            ) {
-              syncPublicGradesShare({
-                classRoom: activeClsObj,
-                students: sequencedStudents,
-                grades: loadedGrades,
-                gradeColumns: loadedGradeCols,
-                teacher: profile || undefined,
-              }).catch(() => {});
-            }
-
-            if (
-              existingShareIds.has(`sav_share_${currentClassId}`) ||
-              existingShareIds.has(`tabungan_share_${currentClassId}`)
-            ) {
-              syncPublicSavingsShare({
-                classRoom: activeClsObj,
-                students: sequencedStudents,
-                transactions: loadedSavings,
-                teacher: profile || undefined,
-              }).catch(() => {});
-            }
-          }).catch(() => {});
-        }
-      } else {
-        setStudents([]);
-        setAttendance([]);
-        setGrades([]);
-        setGradeColumns([]);
-        setSavings([]);
-      }
-    } catch (err: any) {
-      console.error('Error loading data from Supabase:', err);
-      setDataError(
-        err?.message ||
-          'Tidak dapat terhubung ke server PostgreSQL Supabase. Periksa koneksi internet Anda.'
-      );
-    } finally {
-      setIsLoadingData(false);
-    }
-  }, [activeClassId]);
-
-  // Handler Refresh Manual (Bypass cache dengan force = true)
-  const handleManualRefresh = async () => {
-    setIsManualRefreshing(true);
-    try {
-      if (userId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.classes(userId) });
-        if (activeClassId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.students(userId, activeClassId) });
-        }
-      }
-      await loadUserData(activeClassId, true);
-      setRefreshSuccessToast('Data diperbarui dari cloud Supabase');
-      setTimeout(() => setRefreshSuccessToast(null), 3000);
-    } catch (err: any) {
-      alert(`Gagal memuat ulang data: ${err?.message || 'Koneksi error'}`);
-    } finally {
-      setIsManualRefreshing(false);
-    }
-  };
-
-  // Handler Simpan Profil Guru Nyata ke Cloud
-  const handleSaveTeacherProfile = async (formData: TeacherProfile): Promise<void> => {
-    try {
-      const saved = await createOrUpdateTeacherProfile(formData);
-      // Re-fetch untuk menjamin konsistensi dari database cloud
-      const refreshed = await getTeacherProfile(true);
-      const finalTeacher = refreshed || saved;
-      setTeacher(finalTeacher);
-      SafeCache.set('teacher_profile', finalTeacher);
-      try {
-        localStorage.setItem('muhiba_teacher_profile', JSON.stringify(finalTeacher));
-      } catch {}
-    } catch (err: any) {
-      console.error('Failed to save teacher profile:', err);
-      throw err;
-    }
-  };
-
-  // Stable ref for loadUserData to avoid re-triggering auth useEffect
-  const loadUserDataRef = useRef(loadUserData);
-  loadUserDataRef.current = loadUserData;
-
-  // Check auth session on startup & subscribe to auth changes
-  useEffect(() => {
-    let isMounted = true;
-
-    async function initAuth() {
-      try {
-        const currentSession = await getAuthSession();
-        if (isMounted) {
-          setSession(currentSession);
-          setIsAuthChecking(false);
-          if (currentSession) {
-            loadUserDataRef.current();
-          }
-        }
-      } catch (err) {
-        console.error('Session check error:', err);
-        if (isMounted) {
-          setIsAuthChecking(false);
-        }
-      }
-    }
-
-    initAuth();
-
-    // Supabase Auth State Change Listener
-    const supabase = getSafeSupabaseClient();
-    if (supabase) {
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-        if (!isMounted) return;
-
-        setSession(newSession);
-        setIsAuthChecking(false);
-
-        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-          if (newSession) {
-            loadUserDataRef.current();
-          }
-        } else if (event === 'TOKEN_REFRESHED') {
-          // Token refreshed: Jangan reload data jika session masih valid dan cache masih fresh
-        } else if (event === 'SIGNED_OUT') {
-          queryClient.clear();
-          SafeCache.clear();
-          try {
-            localStorage.removeItem('muhiba_teacher_profile');
-            const keysToRemove: string[] = [];
-            for (let i = 0; i < localStorage.length; i++) {
-              const k = localStorage.key(i);
-              if (k && (k.startsWith('pub_share_') || k.startsWith('smk_'))) {
-                keysToRemove.push(k);
-              }
-            }
-            keysToRemove.forEach((k) => localStorage.removeItem(k));
-          } catch {}
-          setTeacher(null);
-          setClasses([]);
-          setStudents([]);
-          setAttendance([]);
-          setGrades([]);
-          setAgendas([]);
-          setSavings([]);
-        }
-      });
-
-      return () => {
-        isMounted = false;
-        subscription.unsubscribe();
-      };
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Handle active class change with cache-first and background sync
-  const handleSelectClass = async (clsId: string) => {
-    setActiveClassId(clsId);
-    if (teacher) {
-      const updated = { ...teacher, activeClassId: clsId };
-      setTeacher(updated);
-      createOrUpdateTeacherProfile({ activeClassId: clsId }).catch(console.error);
-    }
-
-    // Check safe cache first for instant switch without UI blocking
-    const cached = SafeCache.get<any>(`class_data_${clsId}`);
-    if (cached) {
-      setStudents(cached.students || []);
-      setAttendance(cached.attendance || []);
-      setGrades(cached.grades || []);
-      setGradeColumns(cached.gradeColumns || []);
-      setSavings(cached.savings || []);
-      return; // Cache-first: data sudah tersedia instan, hindari query berulang
-    }
-
-    setIsLoadingData(true);
-    try {
-      const [
-        loadedStudents,
-        loadedAttendance,
-        loadedGrades,
-        loadedGradeCols,
-        loadedSavings,
-      ] = await Promise.all([
-        getStudents(clsId),
-        getAttendanceSessions(clsId),
-        getStudentGrades(clsId),
-        getGradeColumns(clsId),
-        getSavingTransactions(clsId),
-      ]);
-
-      const sequencedStudents = resequenceStudentsAlphabetically(loadedStudents, clsId);
-      setStudents(sequencedStudents);
-      setAttendance(loadedAttendance);
-      setGrades(loadedGrades);
-      setGradeColumns(loadedGradeCols);
-      setSavings(loadedSavings);
-
-      SafeCache.set(`class_data_${clsId}`, {
-        students: sequencedStudents,
-        attendance: loadedAttendance,
-        grades: loadedGrades,
-        gradeColumns: loadedGradeCols,
-        savings: loadedSavings,
-      });
-    } catch (e: any) {
-      console.error('Error switching class data:', e);
-    } finally {
-      setIsLoadingData(false);
-    }
-  };
-
-  // 1. Classes Handlers (Integrated with TanStack Query)
-  const handleSaveClass = async (cls: ClassRoom) => {
-    const exists = classes.some((c) => c.id === cls.id);
-    let result: ClassRoom;
-    if (exists) {
-      result = await classMutations.updateClass(cls);
-      setClasses((prev) => prev.map((c) => (c.id === result.id ? result : c)));
-    } else {
-      result = await classMutations.createClass(cls);
-      setClasses((prev) => [...prev, result]);
-      if (!activeClassId) {
-        handleSelectClass(result.id);
-      }
-    }
-    SafeCache.invalidate('all_classes');
-  };
-
-  const handleDeleteClass = async (clsId: string) => {
-    await classMutations.deleteClass(clsId);
-    const updated = classes.filter((c) => c.id !== clsId);
-    setClasses(updated);
-    SafeCache.invalidate(`class_data_${clsId}`);
-    SafeCache.invalidate('all_classes');
-
-    if (activeClassId === clsId) {
-      if (updated.length > 0) {
-        handleSelectClass(updated[0].id);
-      } else {
-        setActiveClassId('');
-        setStudents([]);
-        setAttendance([]);
-        setGrades([]);
-      }
-    }
-  };
-
-  // 2. Students Handlers (Integrated with TanStack Query)
-  const handleSaveStudent = async (std: Student) => {
-    const targetClassId = std.classId;
-    const exists = students.some((s) => s.id === std.id);
-    const updatedList = exists
-      ? students.map((s) => (s.id === std.id ? std : s))
-      : [...students, std];
-
-    // Otomatis urutkan dan sesuaikan nomor absen murid berdasarkan abjad nama (A-Z)
-    const resequencedAll = resequenceStudentsAlphabetically(updatedList, targetClassId);
-    setStudents(resequencedAll);
-
-    const savedTarget = resequencedAll.find((s) => s.id === std.id) || std;
-    if (exists) {
-      await studentMutations.updateStudent(savedTarget);
-    } else {
-      await studentMutations.createStudent(savedTarget);
-    }
-
-    // Sinkronkan seluruh nomor absen kelas ke database jika urutan bergeser
-    const classOnly = resequencedAll.filter((s) => s.classId === targetClassId);
-    try {
-      await studentMutations.batchInsertStudents(classOnly);
-    } catch (e) {
-      console.warn('Sync resequence student to cloud notice:', e);
-    }
-
-    if (activeClassId) {
-      SafeCache.invalidate(`class_data_${activeClassId}`);
-      SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
-      SafeCache.invalidate(`pub_share_grade_share_${activeClassId}`);
-      SafeCache.invalidate(`pub_share_sav_share_${activeClassId}`);
-    }
-  };
-
-  const handleDeleteStudent = async (stdId: string) => {
-    const deletedStd = students.find((s) => s.id === stdId);
-    const targetClassId = deletedStd?.classId || activeClassId;
-
-    // Otomatis re-sequence nomor absen siswa tersisa sesuai abjad nama (1..N) tanpa jeda
-    const remaining = students.filter((s) => s.id !== stdId);
-    const resequencedAll = resequenceStudentsAlphabetically(remaining, targetClassId);
-    setStudents(resequencedAll);
-
-    // Hapus dari cloud database via mutation
-    await studentMutations.deleteStudent({ studentId: stdId, targetClassId });
-
-    // Perbarui urutan absen murid yang tersisa di database cloud
-    const classRemaining = resequencedAll.filter((s) => s.classId === targetClassId);
-    if (classRemaining.length > 0) {
-      try {
-        await studentMutations.batchInsertStudents(classRemaining);
-      } catch (err) {
-        console.warn('Batch resequence after delete notice:', err);
-      }
-    }
-
-    if (activeClassId) {
-      SafeCache.invalidate(`class_data_${activeClassId}`);
-      SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
-      SafeCache.invalidate(`pub_share_grade_share_${activeClassId}`);
-      SafeCache.invalidate(`pub_share_sav_share_${activeClassId}`);
-    }
-  };
-
-  const handleBatchAddStudents = async (newStds: Student[]) => {
-    if (!newStds || newStds.length === 0) return;
-    const targetClassId = newStds[0].classId || activeClassId;
-
-    const existingOther = students.filter((s) => s.classId !== targetClassId);
-    const existingClass = students.filter((s) => s.classId === targetClassId);
-
-    // Merge updates for existing students (matched by ID or case-insensitive name)
-    const updateMap = new Map<string, Student>();
-    const toAdd: Student[] = [];
-
-    newStds.forEach((std) => {
-      const lowerName = std.nama.trim().toLowerCase();
-      const existingMatch = existingClass.find(
-        (s) => s.id === std.id || s.nama.trim().toLowerCase() === lowerName
-      );
-      if (existingMatch) {
-        const merged: Student = {
-          ...existingMatch,
-          ...std,
-          id: existingMatch.id, // Strictly preserve existing ID
-          classId: existingMatch.classId,
-          nisn: std.nisn !== undefined && std.nisn !== '' ? std.nisn : existingMatch.nisn,
-          noHpOrangTua:
-            std.noHpOrangTua !== undefined && std.noHpOrangTua !== ''
-              ? std.noHpOrangTua
-              : existingMatch.noHpOrangTua,
-          catatanUmum:
-            std.catatanUmum && std.catatanUmum !== 'Impor Excel'
-              ? std.catatanUmum
-              : existingMatch.catatanUmum,
-          updated_at: new Date().toISOString(),
-        };
-        updateMap.set(existingMatch.id, merged);
-      } else {
-        toAdd.push(std);
-      }
-    });
-
-    const mergedExistingClass = existingClass.map((s) => updateMap.get(s.id) || s);
-    const combinedClass = [...mergedExistingClass, ...toAdd];
-
-    // Gabungkan dan susun nomor absen otomatis sesuai abjad nama (A-Z)
-    const resequencedClass = resequenceStudentsAlphabetically(combinedClass, targetClassId)
-      .filter((s) => s.classId === targetClassId);
-
-    setStudents([...existingOther, ...resequencedClass]);
-
-    if (activeClassId) {
-      SafeCache.invalidate(`class_data_${activeClassId}`);
-      SafeCache.invalidate(`pub_share_att_share_${activeClassId}`);
-      SafeCache.invalidate(`pub_share_grade_share_${activeClassId}`);
-      SafeCache.invalidate(`pub_share_sav_share_${activeClassId}`);
-    }
-
-    // Persist to Supabase via mutation with automatic cache invalidation
-    try {
-      await studentMutations.batchInsertStudents(resequencedClass);
-      if (activeClassId) {
-        const fresh = await getStudents(activeClassId);
-        if (fresh && fresh.length > 0) {
-          setStudents((prev) => {
-            const others = prev.filter((p) => p.classId !== activeClassId);
-            return [...others, ...fresh];
-          });
-        }
-      }
-    } catch (err) {
-      console.warn('Supabase batch insert notification (data preserved locally):', err);
-    }
-  };
-
-  // 3. Attendance Handlers
-  const handleSaveAttendance = async (sessionData: AttendanceSession) => {
-    const saved = await saveAttendanceSession(sessionData);
-    const updatedSessions = [saved, ...attendance.filter((s) => s.id !== saved.id)];
-    setAttendance(updatedSessions);
-    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
-
-    const cls = classes.find((c) => c.id === sessionData.classId);
-    const clsStudents = students.filter((s) => s.classId === sessionData.classId);
-
-    // Sinkronisasi Langsung ke Public Share Tanpa Delay
-    syncPublicAttendanceShare({
-      classRoom: cls,
-      students: clsStudents,
-      sessions: updatedSessions,
-      teacher: teacher || undefined,
-    }).catch((err) => console.warn('Sync public attendance notice:', err));
-
-    // Sinkronisasi Langsung & Efektif ke Agenda Mengajar
-    try {
-      const syncedAgenda = await syncAttendanceSessionToAgenda(
-        saved,
-        cls,
-        teacher || undefined,
-        clsStudents
-      );
-      if (syncedAgenda) {
-        const nextAgendas = [syncedAgenda, ...agendas.filter((a) => a.id !== syncedAgenda.id)];
-        setAgendas(nextAgendas);
-        SafeCache.invalidate('all_agendas');
-        syncPublicAgendasShare({
-          agendas: nextAgendas,
-          classRoom: cls,
-          teacher: teacher || undefined,
-        }).catch(() => {});
-      }
-    } catch (syncErr) {
-      console.warn('Sinkronisasi otomatis agenda mengajar notice:', syncErr);
-    }
-  };
-
-  const handleDeleteAttendance = async (sessionId: string) => {
-    await deleteAttendanceSession(sessionId);
-    const updatedSessions = attendance.filter((s) => s.id !== sessionId);
-    setAttendance(updatedSessions);
-    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
-
-    const cls = classes.find((c) => c.id === activeClassId);
-    const clsStudents = students.filter((s) => s.classId === activeClassId);
-    syncPublicAttendanceShare({
-      classRoom: cls,
-      students: clsStudents,
-      sessions: updatedSessions,
-      teacher: teacher || undefined,
-    }).catch(() => {});
-  };
-
-  // 4. Grades Handlers
-  const handleSaveGrade = async (gradeData: StudentGrade) => {
-    const saved = await saveStudentGrade(gradeData);
-    let updatedGrades: StudentGrade[] = [];
-    setGrades((prev) => {
-      updatedGrades = [saved, ...prev.filter((g) => g.id !== saved.id)];
-      return updatedGrades;
-    });
-    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
-
-    const cls = classes.find((c) => c.id === gradeData.classId);
-    let clsStudents = students.filter((s) => s.classId === gradeData.classId);
-    if (clsStudents.length === 0) {
-      clsStudents = await getStudents(gradeData.classId).catch(() => []);
-    }
-    syncPublicGradesShare({
-      classRoom: cls,
-      students: clsStudents,
-      grades: updatedGrades.length > 0 ? updatedGrades : [saved, ...grades.filter((g) => g.id !== saved.id)],
-      gradeColumns,
-      teacher: teacher || undefined,
-    }).catch(() => {});
-  };
-
-  const handleSaveGradeCols = async (cols: GradeColumn[]) => {
-    if (!activeClassId) return;
-    await saveGradeColumns(cols, activeClassId);
-    setGradeColumns(cols);
-    SafeCache.invalidate(`class_data_${activeClassId}`);
-
-    const cls = classes.find((c) => c.id === activeClassId);
-    let clsStudents = students.filter((s) => s.classId === activeClassId);
-    if (clsStudents.length === 0) {
-      clsStudents = await getStudents(activeClassId).catch(() => []);
-    }
-    syncPublicGradesShare({
-      classRoom: cls,
-      students: clsStudents,
-      grades,
-      gradeColumns: cols,
-      teacher: teacher || undefined,
-    }).catch(() => {});
-  };
-
-  // 5. Teaching Agenda Handlers (Decoupled from active class)
-  const handleSaveAgenda = async (agendaData: TeachingAgenda) => {
-    const saved = await saveTeachingAgenda(agendaData);
-    const updatedAgendas = [saved, ...agendas.filter((a) => a.id !== saved.id)];
-    setAgendas(updatedAgendas);
-    SafeCache.invalidate('all_agendas');
-
-    const cls = classes.find((c) => c.id === agendaData.classId);
-    syncPublicAgendasShare({
-      agendas: updatedAgendas,
-      classRoom: cls,
-      teacher: teacher || undefined,
-    }).catch(() => {});
-  };
-
-  const handleBatchSaveAgendas = async (newAgendas: TeachingAgenda[]) => {
-    const updatedAll = await batchSaveTeachingAgendas(newAgendas);
-    setAgendas(updatedAll);
-    SafeCache.invalidate('all_agendas');
-
-    syncPublicAgendasShare({
-      agendas: updatedAll,
-      teacher: teacher || undefined,
-    }).catch(() => {});
-  };
-
-  const handleDeleteAgenda = async (agendaId: string) => {
-    await deleteTeachingAgenda(agendaId);
-    const updatedAgendas = agendas.filter((a) => a.id !== agendaId);
-    setAgendas(updatedAgendas);
-    SafeCache.invalidate('all_agendas');
-
-    syncPublicAgendasShare({
-      agendas: updatedAgendas,
-      teacher: teacher || undefined,
-    }).catch(() => {});
-  };
-
-  // 6. Savings Handlers
-  const handleSaveSaving = async (txData: SavingTransaction) => {
-    const saved = await saveSavingTransaction(txData);
-    let updatedSavings: SavingTransaction[] = [];
-    setSavings((prev) => {
-      updatedSavings = [saved, ...prev.filter((s) => s.id !== saved.id)];
-      return updatedSavings;
-    });
-    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
-
-    const cls = classes.find((c) => c.id === txData.classId);
-    let clsStudents = students.filter((s) => s.classId === txData.classId);
-    if (clsStudents.length === 0) {
-      clsStudents = await getStudents(txData.classId).catch(() => []);
-    }
-    syncPublicSavingsShare({
-      classRoom: cls,
-      students: clsStudents,
-      transactions: updatedSavings.length > 0 ? updatedSavings : [saved, ...savings.filter((s) => s.id !== saved.id)],
-      teacher: teacher || undefined,
-    }).catch(() => {});
-  };
-
-  const handleDeleteSaving = async (txId: string) => {
-    await deleteSavingTransaction(txId);
-    let updatedSavings: SavingTransaction[] = [];
-    setSavings((prev) => {
-      updatedSavings = prev.filter((s) => s.id !== txId);
-      return updatedSavings;
-    });
-    if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
-
-    const cls = classes.find((c) => c.id === activeClassId);
-    let clsStudents = students.filter((s) => s.classId === activeClassId);
-    if (clsStudents.length === 0 && activeClassId) {
-      clsStudents = await getStudents(activeClassId).catch(() => []);
-    }
-    syncPublicSavingsShare({
-      classRoom: cls,
-      students: clsStudents,
-      transactions: updatedSavings,
-      teacher: teacher || undefined,
-    }).catch(() => {});
-  };
-
-  // Download JSON backup
-  const handleDownloadBackup = () => {
-    const jsonStr = exportDataToJsonBackup({
-      teacher,
-      classes,
-      students,
-      attendance,
-      grades,
-      gradeColumns,
-      agendas,
-      savings,
-    });
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Backup_SMK_Muh_Bawang_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  // Handler Log Out Akun Guru
-  const handleLogout = async () => {
-    try {
-      await signOutSupabase();
-    } catch (err) {
-      console.warn('Sign out notice:', err);
-    }
-    queryClient.clear();
-    SafeCache.clear();
-
-    // Hapus semua key localStorage milik aplikasi selain smk_saved_login_email
-    try {
-      if (typeof window !== 'undefined') {
-        const savedEmail = localStorage.getItem('smk_saved_login_email');
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (
-            key &&
-            key !== 'smk_saved_login_email' &&
-            (key.startsWith('smk_') ||
-              key.startsWith('muhiba_') ||
-              key.startsWith('cache_') ||
-              key.startsWith('ui_') ||
-              key.startsWith('pub_share_'))
-          ) {
-            keysToRemove.push(key);
-          }
-        }
-        keysToRemove.forEach((k) => localStorage.removeItem(k));
-        if (savedEmail) {
-          localStorage.setItem('smk_saved_login_email', savedEmail);
-        }
-      }
-    } catch (clearErr) {
-      console.warn('Clear localStorage error on logout:', clearErr);
-    }
-
-    setSession(null);
-    setTeacher(null);
-    setClasses([]);
-    setStudents([]);
-    setAttendance([]);
-    setGrades([]);
-    setAgendas([]);
-    setSavings([]);
-  };
-
-  // Public Share Zero-Login Route (Strictly isolated, zero access to login form)
+  // Strict Public Share Bypass (No teacher state or login requirement)
   if (publicShare) {
     return (
       <Suspense
@@ -1048,15 +143,12 @@ function AppContent() {
           </div>
         }
       >
-        <PublicSharePage
-          type={publicShare.type}
-          shareId={publicShare.shareId}
-        />
+        <PublicSharePage type={publicShare.type} shareId={publicShare.shareId} />
       </Suspense>
     );
   }
 
-  // Loading Session on startup
+  // Startup Session Verification
   if (isAuthChecking) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 text-white">
@@ -1072,641 +164,225 @@ function AppContent() {
     );
   }
 
-  // Not Logged In -> Login Screen (Supabase Auth Only)
+  // Unauthenticated -> Login View
   if (!session) {
-    return (
-      <LoginView
-        onLoginSuccess={() => loadUserData()}
-      />
-    );
+    return <LoginView onLoginSuccess={() => loadUserData()} />;
   }
-
-  // Active Class Entity
-  const activeClass: ClassRoom = classes.find((c) => c.id === activeClassId) || {
-    id: activeClassId || 'empty_cls',
-    namaKelas: classes.length > 0 ? classes[0].namaKelas : 'Belum Ada Kelas',
-    mataPelajaran: classes.length > 0 ? classes[0].mataPelajaran : 'Silakan Buat Kelas',
-    kkm: 75,
-    jurusan: 'TKJ',
-    createdAt: new Date().toISOString(),
-  };
-
-  const activeTeacher: TeacherProfile = teacher || {
-    id: session?.user?.id || 'guru_offline_id',
-    namaGuru: session?.user?.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
-    nip: '',
-    nbm: '',
-    namaSekolah: 'SMK Muhammadiyah Bawang',
-    mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
-    tahunAjaran: '2025/2026',
-    semester: 'Genap',
-    email: session?.user?.email || 'guru@smkmuhbawang.sch.id',
-    isLoggedIn: true,
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-indigo-500 selection:text-white relative">
-      {/* Scroll Reading Progress Bar with Smooth Animation */}
       <ScrollProgressBar />
 
-      {/* Top Main Navigation Header - Muhammadiyah Visual Identity Gradient (#009B62 Green to #292E82 Deep Blue) */}
-      <header className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white border-b border-[#008276]/40 sticky top-0 z-40 shadow-lg backdrop-blur-md transition-all">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
-            {/* Hamburger (Menu Samping) & Logo Sekolah */}
-            <div className="flex items-center gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={toggleSideNav}
-                className="p-2 sm:p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition border border-white/20 shadow-xs flex items-center justify-center shrink-0 cursor-pointer lg:hidden"
-                title="Buka Menu Navigasi Samping"
-                aria-label="Buka Menu Navigasi Samping"
-              >
-                <Menu className="w-5 h-5 text-white" />
-              </button>
+      {/* Top Application Header */}
+      <AppHeader
+        activeClass={activeClass}
+        onToggleSideNav={() => setIsSideNavOpen((prev) => !prev)}
+        onOpenClassModal={() => setIsClassModalOpen(true)}
+      />
 
-              <div className="flex items-center gap-2.5">
-                <img
-                  src={SCHOOL_CONFIG.logoUrl}
-                  alt="Logo SMK Muhammadiyah Bawang"
-                  className="w-10 h-10 object-contain drop-shadow-sm rounded-xl p-0.5 bg-white border border-white/30 shadow-xs"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
-                  }}
-                />
-                <div className="hidden sm:flex flex-col">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-white tracking-tight text-sm sm:text-base drop-shadow-xs">
-                      SMK Muhammadiyah Bawang
-                    </span>
-                    <span className="px-2 py-0.5 rounded-md bg-white/20 text-white text-[10px] font-bold border border-white/25">
-                      Kurikulum Merdeka
-                    </span>
-                  </div>
-                  <span className="text-xs text-emerald-100 font-medium">
-                    Sistem Presensi, Penilaian & Jurnal Pendidik
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Pilihan Kelas */}
-            <div className="flex items-center justify-center flex-1 max-w-md mx-2">
-              <button
-                type="button"
-                onClick={() => setIsClassModalOpen(true)}
-                className="flex items-center justify-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs sm:text-sm font-bold transition shadow-xs border border-white/25 backdrop-blur-xs cursor-pointer"
-                title="Pilih atau kelola kelas"
-              >
-                <GraduationCap className="w-4 h-4 text-emerald-100 shrink-0" />
-                <span className="truncate max-w-[130px] sm:max-w-none">
-                  Kelas: {activeClass.namaKelas}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-emerald-100" />
-              </button>
-            </div>
-
-            {/* Penanda Cloud Supabase Aktif */}
-            <div className="flex items-center gap-2 shrink-0">
-              <div
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold shadow-2xs backdrop-blur-xs"
-                title="Database PostgreSQL Supabase Cloud Aktif & Sinkron (RLS)"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-80"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-                </span>
-                <span className="hidden sm:inline">Cloud Supabase Aktif</span>
-                <span className="sm:hidden text-[11px]">Cloud Aktif</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Side Navigation Drawer (Navbar Kesamping untuk Mobile) */}
+      {/* Mobile Sidebar Drawer */}
       {isSideNavOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden lg:hidden">
-          {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200 cursor-pointer"
             onClick={() => setIsSideNavOpen(false)}
           />
-
-          {/* Drawer Sidebar */}
           <div className="fixed inset-y-0 left-0 max-w-full flex">
-            <aside className="w-80 max-w-[85vw] bg-white text-slate-900 shadow-2xl flex flex-col border-r border-slate-200 animate-in slide-in-from-left duration-200">
-              {/* Drawer Header - Muhammadiyah Visual Identity Gradient */}
-              <div className="p-4 sm:p-5 border-b border-[#008276]/30 flex items-center justify-between gap-3 bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white">
-                <div className="flex items-center gap-3 truncate">
-                  <img
-                    src={SCHOOL_CONFIG.logoUrl}
-                    alt="Logo SMK Muhammadiyah Bawang"
-                    className="w-10 h-10 object-contain drop-shadow-sm rounded-xl p-0.5 bg-white border border-white/30 shrink-0"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = SCHOOL_CONFIG.logoFallback;
-                    }}
-                  />
-                  <div className="truncate">
-                    <p className="font-extrabold text-sm text-white truncate">
-                      SMK Muhammadiyah Bawang
-                    </p>
-                    <p className="text-[11px] text-emerald-100 truncate">
-                      Sistem Pendidik & Presensi
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsSideNavOpen(false)}
-                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer shrink-0"
-                  title="Tutup Menu"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Class Info Box inside Drawer */}
-              <div className="p-4 bg-emerald-50/60 border-b border-emerald-100">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="truncate">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-700 block">
-                      Kelas Aktif
-                    </span>
-                    <p className="font-extrabold text-sm text-slate-900 truncate">
-                      {activeClass.namaKelas}
-                    </p>
-                    <p className="text-[11px] text-slate-500 truncate">
-                      {activeClass.jurusan}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSideNavOpen(false);
-                      setIsClassModalOpen(true);
-                    }}
-                    className="px-2.5 py-1.5 rounded-lg bg-[#009B62] text-white text-[11px] font-bold hover:bg-[#008276] transition shrink-0 cursor-pointer"
-                  >
-                    Ganti
-                  </button>
-                </div>
-              </div>
-
-              {/* Navigation Items in Side Drawer */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-                {NAV_ITEMS.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveTab(item.id as NavTab);
-                        setIsSideNavOpen(false);
-                      }}
-                      className={`w-full text-left p-3 rounded-2xl transition flex items-start gap-3 cursor-pointer ${
-                        isActive
-                          ? 'bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white shadow-md font-bold'
-                          : 'hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      <div className={`p-2 rounded-xl shrink-0 ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-xs font-bold leading-tight ${isActive ? 'text-white' : 'text-slate-900'}`}>
-                          {item.label}
-                        </p>
-                        <p className={`text-[10px] mt-0.5 truncate ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>
-                          {item.desc}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-
-                {/* Penanda Warna Cloud Supabase Aktif & Download Backup JSON */}
-                <div className="pt-2 border-t border-slate-100 my-2 space-y-2">
-                  <div className="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                      </span>
-                      <div>
-                        <p className="text-xs font-bold text-emerald-900">
-                          Cloud Supabase Aktif
-                        </p>
-                        <p className="text-[10px] text-emerald-700/80">
-                          PostgreSQL & Row Level Security
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/70 text-emerald-800">
-                      Aktif
-                    </span>
-                  </div>
-
-                  {/* Tombol Manual Refresh Data Cloud */}
-                  <button
-                    type="button"
-                    disabled={isManualRefreshing || isLoadingData}
-                    onClick={handleManualRefresh}
-                    className="w-full p-2.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 shadow-2xs"
-                    title="Muat ulang seluruh data langsung dari database Cloud Supabase"
-                  >
-                    <RefreshCw className={`w-4 h-4 text-emerald-700 ${isManualRefreshing || isLoadingData ? 'animate-spin' : ''}`} />
-                    <span>{isManualRefreshing || isLoadingData ? 'Memperbarui Data...' : 'Refresh Data dari Cloud'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSideNavOpen(false);
-                      handleDownloadBackup();
-                    }}
-                    className="w-full p-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
-                    title="Download File Backup JSON Seluruh Data"
-                  >
-                    <Download className="w-4 h-4 text-emerald-700" />
-                    <span>Download Backup Data (JSON)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Drawer Footer: Profil Pendidik & Akun */}
-              <div className="p-3 border-t border-slate-100 bg-slate-50/80 space-y-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSideNavOpen(false);
-                    setIsProfileModalOpen(true);
-                  }}
-                  className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-white hover:bg-slate-100 text-left transition border border-slate-200/80 cursor-pointer shadow-2xs"
-                  title="Buka Pengaturan Profil Pendidik"
-                >
-                  <div className="flex items-center gap-2.5 truncate">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#009B62] to-[#292E82] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
-                      {activeTeacher.namaGuru.charAt(0)}
-                    </div>
-                    <div className="truncate">
-                      <p className="text-xs font-bold text-slate-900 truncate">
-                        {activeTeacher.namaGuru}
-                      </p>
-                      <p className="text-[10px] text-slate-400 truncate">
-                        {activeTeacher.email}
-                      </p>
-                    </div>
-                  </div>
-                  <Settings className="w-4 h-4 text-slate-400 shrink-0" />
-                </button>
-
-                {/* Tombol Log Out Drawer */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSideNavOpen(false);
-                    handleLogout();
-                  }}
-                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition cursor-pointer shadow-2xs"
-                  title="Keluar dari Akun (Log Out)"
-                >
-                  <LogOut className="w-4 h-4 text-rose-600" />
-                  <span>Log Out Akun</span>
-                </button>
-              </div>
-            </aside>
+            <AppSidebar
+              isDrawer
+              activeTab={activeTab}
+              onSelectTab={setActiveTab}
+              activeClass={activeClass}
+              onOpenClassModal={() => setIsClassModalOpen(true)}
+              teacher={activeTeacher}
+              onOpenProfile={() => setIsProfileModalOpen(true)}
+              onLogout={handleLogout}
+              onManualRefresh={handleManualRefresh}
+              onDownloadBackup={handleDownloadBackup}
+              isRefreshing={isManualRefreshing || isLoadingData}
+              onCloseDrawer={() => setIsSideNavOpen(false)}
+            />
           </div>
         </div>
       )}
 
-      {/* Main Layout Wrapper: Bilah Samping (Sidebar) & Main Content Area */}
+      {/* Main Layout: Desktop Sidebar & Tab Router */}
       <div className="flex-1 flex w-full max-w-7xl mx-auto gap-4 items-start px-2 sm:px-4">
-        {/* Desktop Permanent Bilah Samping (Sidebar) - Satu-Satunya Tempat Navigasi Tanpa Double Button */}
-        <aside className="hidden lg:flex w-72 flex-col shrink-0 bg-white text-slate-900 shadow-sm border border-slate-200/80 rounded-3xl sticky top-24 my-6 overflow-hidden max-h-[calc(100vh-7.5rem)] no-print">
-          {/* Class Info Box */}
-          <div className="p-4 bg-emerald-50/60 border-b border-emerald-100">
-            <div className="flex items-center justify-between gap-2">
-              <div className="truncate">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-700 block">
-                  Kelas Aktif
-                </span>
-                <p className="font-extrabold text-sm text-slate-900 truncate">
-                  {activeClass.namaKelas}
-                </p>
-                <p className="text-[11px] text-slate-500 truncate">
-                  {activeClass.jurusan}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsClassModalOpen(true)}
-                className="px-2.5 py-1.5 rounded-lg bg-[#009B62] text-white text-[11px] font-bold hover:bg-[#008276] transition shrink-0 cursor-pointer"
-              >
-                Ganti
-              </button>
-            </div>
-          </div>
+        {/* Desktop Sticky Sidebar */}
+        <div className="hidden lg:block shrink-0">
+          <AppSidebar
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
+            activeClass={activeClass}
+            onOpenClassModal={() => setIsClassModalOpen(true)}
+            teacher={activeTeacher}
+            onOpenProfile={() => setIsProfileModalOpen(true)}
+            onLogout={handleLogout}
+            onManualRefresh={handleManualRefresh}
+            onDownloadBackup={handleDownloadBackup}
+            isRefreshing={isManualRefreshing || isLoadingData}
+          />
+        </div>
 
-          {/* Navigation Items in Desktop Sidebar */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveTab(item.id as NavTab)}
-                  className={`w-full text-left p-3 rounded-2xl transition flex items-start gap-3 cursor-pointer ${
-                    isActive
-                      ? 'bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white shadow-md font-bold'
-                      : 'hover:bg-slate-100 text-slate-700'
-                  }`}
-                >
-                  <div className={`p-2 rounded-xl shrink-0 ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-bold leading-tight ${isActive ? 'text-white' : 'text-slate-900'}`}>
-                      {item.label}
-                    </p>
-                    <p className={`text-[10px] mt-0.5 truncate ${isActive ? 'text-emerald-100' : 'text-slate-400'}`}>
-                      {item.desc}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-
-            {/* Penanda Warna Cloud Supabase Aktif & Refresh / Backup */}
-            <div className="pt-2 border-t border-slate-100 my-2 space-y-2">
-              <div className="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                  </span>
-                  <div>
-                    <p className="text-xs font-bold text-emerald-900">Cloud Supabase Aktif</p>
-                    <p className="text-[10px] text-emerald-700/80">PostgreSQL & RLS</p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/70 text-emerald-800">
-                  Aktif
-                </span>
-              </div>
-
-              <button
-                type="button"
-                disabled={isManualRefreshing || isLoadingData}
-                onClick={handleManualRefresh}
-                className="w-full p-2.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 shadow-2xs"
-                title="Muat ulang seluruh data langsung dari database Cloud Supabase"
-              >
-                <RefreshCw className={`w-4 h-4 text-emerald-700 ${isManualRefreshing || isLoadingData ? 'animate-spin' : ''}`} />
-                <span>{isManualRefreshing || isLoadingData ? 'Memperbarui...' : 'Refresh Data Cloud'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleDownloadBackup}
-                className="w-full p-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
-                title="Download File Backup JSON Seluruh Data"
-              >
-                <Download className="w-4 h-4 text-emerald-700" />
-                <span>Download Backup (JSON)</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Drawer Footer: Profil Pendidik & Akun */}
-          <div className="p-3 border-t border-slate-100 bg-slate-50/80 space-y-2">
-            <button
-              type="button"
-              onClick={() => setIsProfileModalOpen(true)}
-              className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-white hover:bg-slate-100 text-left transition border border-slate-200/80 cursor-pointer shadow-2xs"
-              title="Buka Pengaturan Profil Pendidik"
-            >
-              <div className="flex items-center gap-2.5 truncate">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#009B62] to-[#292E82] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
-                  {activeTeacher.namaGuru.charAt(0)}
-                </div>
-                <div className="truncate">
-                  <p className="text-xs font-bold text-slate-900 truncate">
-                    {activeTeacher.namaGuru}
-                  </p>
-                  <p className="text-[10px] text-slate-400 truncate">
-                    {activeTeacher.email}
-                  </p>
-                </div>
-              </div>
-              <Settings className="w-4 h-4 text-slate-400 shrink-0" />
-            </button>
-
-            {/* Tombol Log Out Sidebar Desktop */}
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 p-2.5 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition cursor-pointer shadow-2xs"
-              title="Keluar dari Akun (Log Out)"
-            >
-              <LogOut className="w-4 h-4 text-rose-600" />
-              <span>Log Out Akun</span>
-            </button>
-          </div>
-        </aside>
-
-        {/* Main Content Area */}
+        {/* Main Tab Content */}
         <main className="flex-1 min-w-0 py-6">
-        {/* Error state if Supabase connection fails */}
-        {dataError && (
-          <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center justify-between gap-3 animate-in fade-in">
-            <div className="flex items-center gap-2.5">
-              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-              <div>
-                <p className="font-bold">Gagal memuat data dari Supabase</p>
-                <p className="text-slate-600">{dataError}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => loadUserData(activeClassId)}
-              className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition flex items-center gap-1.5 shrink-0"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Coba Lagi
-            </button>
-          </div>
-        )}
-
-        {/* Loading Spinner for data fetching */}
-        {isLoadingData && (
-          <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
-            <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
-            <span className="text-xs font-semibold">Mengambil data dari PostgreSQL Supabase...</span>
-          </div>
-        )}
-
-        {!isLoadingData && (
-          <>
-            {classes.length === 0 && (
-              <div className="mb-6 p-6 rounded-3xl bg-indigo-50 border border-indigo-200 text-indigo-950 flex flex-col sm:flex-row items-center justify-between gap-4">
+          {dataError && (
+            <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center justify-between gap-3 animate-in fade-in">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
                 <div>
-                  <h3 className="font-bold text-base">Selamat Datang di Sistem Absensi & Nilai!</h3>
-                  <p className="text-xs text-indigo-700 mt-1">
-                    Anda belum memiliki kelas yang terdaftar di akun ini. Silakan buat kelas pertama Anda untuk mulai mengelola presensi dan nilai murid.
-                  </p>
+                  <p className="font-bold">Gagal memuat data dari Supabase</p>
+                  <p className="text-slate-600">{dataError}</p>
                 </div>
-                <button
-                  onClick={() => setIsClassModalOpen(true)}
-                  className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition shrink-0 shadow-md"
-                >
-                  + Tambah Kelas Pertama
-                </button>
               </div>
-            )}
+              <button
+                onClick={() => loadUserData(activeClassId)}
+                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition flex items-center gap-1.5 shrink-0"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Coba Lagi
+              </button>
+            </div>
+          )}
 
-            <Suspense
-              fallback={
-                <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
-                  <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
-                  <span className="text-xs font-semibold">Memuat tampilan...</span>
+          {isLoadingData && (
+            <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
+              <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
+              <span className="text-xs font-semibold">Mengambil data dari PostgreSQL Supabase...</span>
+            </div>
+          )}
+
+          {!isLoadingData && (
+            <>
+              {classes.length === 0 && (
+                <div className="mb-6 p-6 rounded-3xl bg-indigo-50 border border-indigo-200 text-indigo-950 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-base">Selamat Datang di Sistem Absensi & Nilai!</h3>
+                    <p className="text-xs text-indigo-700 mt-1">
+                      Anda belum memiliki kelas yang terdaftar di akun ini. Silakan buat kelas pertama Anda untuk mulai mengelola presensi dan nilai murid.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsClassModalOpen(true)}
+                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition shrink-0 shadow-md"
+                  >
+                    + Tambah Kelas Pertama
+                  </button>
                 </div>
-              }
-            >
-              {activeTab === 'attendance' && (
-                <AttendanceView
-                  currentClass={activeClass}
-                  students={students}
-                  sessions={attendance}
-                  teacher={activeTeacher}
-                  agendas={agendas}
-                  onNavigateToAgenda={() => setActiveTab('agendas')}
-                  onSaveSession={handleSaveAttendance}
-                  onDeleteSession={handleDeleteAttendance}
-                />
               )}
 
-              {activeTab === 'recap' && (
-                <MonthlyAttendanceRecapView
-                  currentClass={activeClass}
-                  classes={classes}
-                  students={students}
-                  sessions={attendance}
-                  teacher={activeTeacher}
-                />
-              )}
+              <Suspense
+                fallback={
+                  <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
+                    <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
+                    <span className="text-xs font-semibold">Memuat tampilan...</span>
+                  </div>
+                }
+              >
+                {activeTab === 'attendance' && (
+                  <AttendanceView
+                    currentClass={activeClass}
+                    students={students}
+                    sessions={attendance}
+                    teacher={activeTeacher}
+                    agendas={agendas}
+                    onNavigateToAgenda={() => setActiveTab('agendas')}
+                    onSaveSession={handleSaveAttendance}
+                    onDeleteSession={handleDeleteAttendance}
+                  />
+                )}
 
-              {activeTab === 'grades' && (
-                <GradesView
-                  currentClass={activeClass}
-                  students={students}
-                  grades={grades}
-                  gradeColumns={gradeColumns}
-                  teacher={activeTeacher}
-                  onSaveGrade={handleSaveGrade}
-                  onSaveGradeColumns={handleSaveGradeCols}
-                />
-              )}
+                {activeTab === 'recap' && (
+                  <MonthlyAttendanceRecapView
+                    currentClass={activeClass}
+                    classes={classes}
+                    students={students}
+                    sessions={attendance}
+                    teacher={activeTeacher}
+                  />
+                )}
 
-              {activeTab === 'students' && (
-                <StudentManagementView
-                  currentClass={activeClass}
-                  students={students}
-                  teacher={activeTeacher}
-                  classes={classes}
-                  onSaveStudent={handleSaveStudent}
-                  onDeleteStudent={handleDeleteStudent}
-                  onBatchAddStudents={handleBatchAddStudents}
-                />
-              )}
+                {activeTab === 'grades' && (
+                  <GradesView
+                    currentClass={activeClass}
+                    students={students}
+                    grades={grades}
+                    gradeColumns={gradeColumns}
+                    teacher={activeTeacher}
+                    onSaveGrade={handleSaveGrade}
+                    onSaveGradeColumns={handleSaveGradeCols}
+                  />
+                )}
 
-              {activeTab === 'agendas' && (
-                <TeachingAgendaView
-                  classes={classes}
-                  agendas={agendas}
-                  teacher={activeTeacher}
-                  currentClass={activeClass}
-                  students={students}
-                  sessions={attendance}
-                  onSaveAgenda={handleSaveAgenda}
-                  onDeleteAgenda={handleDeleteAgenda}
-                  onBatchSaveAgendas={handleBatchSaveAgendas}
-                />
-              )}
+                {activeTab === 'students' && (
+                  <StudentManagementView
+                    currentClass={activeClass}
+                    students={students}
+                    teacher={activeTeacher}
+                    classes={classes}
+                    onSaveStudent={handleSaveStudent}
+                    onDeleteStudent={handleDeleteStudent}
+                    onBatchAddStudents={handleBatchAddStudents}
+                  />
+                )}
 
-              {activeTab === 'savings' && (
-                <SavingsView
-                  currentClass={activeClass}
-                  students={students}
-                  savings={savings}
-                  teacher={activeTeacher}
-                  onSaveTransaction={handleSaveSaving}
-                  onDeleteTransaction={handleDeleteSaving}
-                />
-              )}
+                {activeTab === 'agendas' && (
+                  <TeachingAgendaView
+                    classes={classes}
+                    agendas={agendas}
+                    teacher={activeTeacher}
+                    currentClass={activeClass}
+                    students={students}
+                    sessions={attendance}
+                    onSaveAgenda={handleSaveAgenda}
+                    onDeleteAgenda={handleDeleteAgenda}
+                    onBatchSaveAgendas={handleBatchSaveAgendas}
+                  />
+                )}
 
-              {activeTab === 'statistics' && (
-                <StatisticsView
-                  activeClass={activeClass}
-                  currentClass={activeClass}
-                  students={students}
-                  sessions={attendance}
-                  grades={grades}
-                  savings={savings}
-                  teacher={activeTeacher}
-                />
-              )}
+                {activeTab === 'savings' && (
+                  <SavingsView
+                    currentClass={activeClass}
+                    students={students}
+                    savings={savings}
+                    teacher={activeTeacher}
+                    onSaveTransaction={handleSaveSaving}
+                    onDeleteTransaction={handleDeleteSaving}
+                  />
+                )}
 
-              {activeTab === 'parent_report' && (
-                <ParentReportView
-                  currentClass={activeClass}
-                  students={students}
-                  sessions={attendance}
-                  grades={grades}
-                  teacher={activeTeacher}
-                />
-              )}
+                {activeTab === 'statistics' && (
+                  <StatisticsView
+                    activeClass={activeClass}
+                    currentClass={activeClass}
+                    students={students}
+                    sessions={attendance}
+                    grades={grades}
+                    savings={savings}
+                    teacher={activeTeacher}
+                  />
+                )}
 
-              {activeTab === 'school_map' && <SchoolMapView />}
-            </Suspense>
-          </>
-        )}
-      </main>
+                {activeTab === 'parent_report' && (
+                  <ParentReportView
+                    currentClass={activeClass}
+                    students={students}
+                    sessions={attendance}
+                    grades={grades}
+                    teacher={activeTeacher}
+                  />
+                )}
+
+                {activeTab === 'school_map' && <SchoolMapView />}
+              </Suspense>
+            </>
+          )}
+        </main>
       </div>
 
-      {/* Footer inheriting Muhammadiyah Visual Identity (Matches Header Colors) */}
-      <footer className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] border-t border-[#008276] mt-12 py-8 text-center text-white shadow-lg transition-colors">
-        <div className="max-w-7xl mx-auto px-4 space-y-2">
-          <p className="font-black text-sm sm:text-base text-white tracking-wide uppercase drop-shadow-xs">
-            &copy; {SCHOOL_CONFIG.namaSekolah} &bull; BATANG, JAWA TENGAH
-          </p>
-          <p className="text-xs sm:text-sm font-semibold text-white">
-            {SCHOOL_CONFIG.alamat} &bull; Portal Tautan Resmi:{' '}
-            <a
-              href={SCHOOL_CONFIG.websiteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-white underline decoration-white font-bold hover:text-white hover:decoration-white transition"
-            >
-              {SCHOOL_CONFIG.website}
-            </a>
-          </p>
-          <p className="text-xs sm:text-sm font-bold text-white">
-            Sistem Informasi Presensi, Penilaian & Jurnal Pendidik &bull; Dikembangkan oleh{' '}
-            <span className="font-mono font-black text-emerald-950 bg-white px-2 py-0.5 rounded-md border border-white">
-              @hndx07
-            </span>
-          </p>
-          <p className="text-xs font-semibold text-white pt-0.5">
-            Backend Resmi 100% PostgreSQL & Auth Supabase Cloud (Row Level Security Aktif)
-          </p>
-        </div>
-      </footer>
+      <AppFooter />
 
-      {/* Modals with Suspense */}
+      {/* Modals */}
       <Suspense fallback={null}>
         {isClassModalOpen && (
           <ClassManagementModal
@@ -1734,7 +410,7 @@ function AppContent() {
         )}
       </Suspense>
 
-      {/* Toast Notifikasi Berhasil Refresh */}
+      {/* Floating Notifications & Controls */}
       {refreshSuccessToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#009B62] text-white px-4 py-2.5 rounded-2xl shadow-xl border border-white/20 text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-bottom duration-200">
           <CheckCircle2 className="w-4 h-4 text-emerald-100" />
@@ -1742,10 +418,7 @@ function AppContent() {
         </div>
       )}
 
-      {/* Floating Animated Smooth Scroll To Top Button with Circular Progress Ring */}
       <SmoothScrollToTop showPercent threshold={200} />
-
-      {/* Toast Notifikasi Terpusat Unduh File Excel */}
       <ExcelDownloadToast />
     </div>
   );
