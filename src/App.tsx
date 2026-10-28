@@ -81,6 +81,13 @@ import {
 import { UiStatePersistence, SafeCache } from './utils/storageCache';
 import { exportDataToJsonBackup } from './utils/storage';
 
+// TanStack Query (Teacher Data Cache)
+import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { createQueryClient } from './lib/queryClient';
+import { queryKeys } from './lib/queryKeys';
+import { useClassesQuery, useClassMutations } from './hooks/useClassesQuery';
+import { useStudentsQuery, useStudentMutations } from './hooks/useStudentsQuery';
+
 // Components
 import { LoginView } from './components/LoginView';
 import { SmoothScrollToTop } from './components/SmoothScrollToTop';
@@ -151,7 +158,7 @@ const NAV_ITEMS = [
   { id: 'school_map', label: 'Peta Kampus', icon: MapPin, desc: 'Profil & lokasi SMK Muhiba' },
 ];
 
-export default function App() {
+function AppContent() {
   // 1. Check for Public Share parameters in URL (accessible without auth)
   const [publicShare, setPublicShare] = useState<PublicShareRef | null>(() =>
     getPublicShareRefFromLocation()
@@ -175,6 +182,10 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
+  // TanStack Query Client & Teacher Scoping
+  const queryClient = useQueryClient();
+  const userId = session?.user?.id;
+
   // 3. Database State from Supabase
   const [teacher, setTeacher] = useState<TeacherProfile | null>(null);
   const [classes, setClasses] = useState<ClassRoom[]>([]);
@@ -192,6 +203,43 @@ export default function App() {
   const [gradeColumns, setGradeColumns] = useState<GradeColumn[]>([]);
   const [agendas, setAgendas] = useState<TeachingAgenda[]>([]);
   const [savings, setSavings] = useState<SavingTransaction[]>([]);
+
+  // TanStack Queries (Classes & Students by Active Class)
+  const { data: queryClasses } = useClassesQuery({
+    userId,
+    enabled: Boolean(session),
+  });
+
+  const { data: queryStudents } = useStudentsQuery({
+    userId,
+    classId: activeClassId,
+    enabled: Boolean(session && activeClassId),
+  });
+
+  const classMutations = useClassMutations(userId);
+  const studentMutations = useStudentMutations(userId, activeClassId);
+
+  // Sync classes cache into state
+  useEffect(() => {
+    if (queryClasses && queryClasses.length > 0) {
+      setClasses(queryClasses);
+      if (!activeClassId) {
+        const saved = UiStatePersistence.get('activeClassId', '') || teacher?.activeClassId;
+        const matched = queryClasses.find((c) => c.id === saved) || queryClasses[0];
+        if (matched) {
+          setActiveClassId(matched.id);
+        }
+      }
+    }
+  }, [queryClasses, activeClassId, teacher?.activeClassId]);
+
+  // Sync students cache into state
+  useEffect(() => {
+    if (queryStudents && queryStudents.length > 0) {
+      const sequenced = resequenceStudentsAlphabetically(queryStudents, activeClassId);
+      setStudents(sequenced);
+    }
+  }, [queryStudents, activeClassId]);
 
   // 4. UI States with safe persistence
   const [isLoadingData, setIsLoadingData] = useState(false);
@@ -384,6 +432,12 @@ export default function App() {
   const handleManualRefresh = async () => {
     setIsManualRefreshing(true);
     try {
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.classes(userId) });
+        if (activeClassId) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.students(userId, activeClassId) });
+        }
+      }
       await loadUserData(activeClassId, true);
       setRefreshSuccessToast('Data diperbarui dari cloud Supabase');
       setTimeout(() => setRefreshSuccessToast(null), 3000);
@@ -458,6 +512,7 @@ export default function App() {
         } else if (event === 'TOKEN_REFRESHED') {
           // Token refreshed: Jangan reload data jika session masih valid dan cache masih fresh
         } else if (event === 'SIGNED_OUT') {
+          queryClient.clear();
           SafeCache.clear();
           try {
             localStorage.removeItem('muhiba_teacher_profile');
@@ -548,24 +603,25 @@ export default function App() {
     }
   };
 
-  // 1. Classes Handlers
+  // 1. Classes Handlers (Integrated with TanStack Query)
   const handleSaveClass = async (cls: ClassRoom) => {
     const exists = classes.some((c) => c.id === cls.id);
+    let result: ClassRoom;
     if (exists) {
-      const updated = await updateClass(cls);
-      setClasses((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      result = await classMutations.updateClass(cls);
+      setClasses((prev) => prev.map((c) => (c.id === result.id ? result : c)));
     } else {
-      const created = await createClass(cls);
-      setClasses((prev) => [...prev, created]);
+      result = await classMutations.createClass(cls);
+      setClasses((prev) => [...prev, result]);
       if (!activeClassId) {
-        handleSelectClass(created.id);
+        handleSelectClass(result.id);
       }
     }
     SafeCache.invalidate('all_classes');
   };
 
   const handleDeleteClass = async (clsId: string) => {
-    await deleteClass(clsId);
+    await classMutations.deleteClass(clsId);
     const updated = classes.filter((c) => c.id !== clsId);
     setClasses(updated);
     SafeCache.invalidate(`class_data_${clsId}`);
@@ -583,7 +639,7 @@ export default function App() {
     }
   };
 
-  // 2. Students Handlers
+  // 2. Students Handlers (Integrated with TanStack Query)
   const handleSaveStudent = async (std: Student) => {
     const targetClassId = std.classId;
     const exists = students.some((s) => s.id === std.id);
@@ -597,15 +653,15 @@ export default function App() {
 
     const savedTarget = resequencedAll.find((s) => s.id === std.id) || std;
     if (exists) {
-      await updateStudent(savedTarget);
+      await studentMutations.updateStudent(savedTarget);
     } else {
-      await createStudent(savedTarget);
+      await studentMutations.createStudent(savedTarget);
     }
 
     // Sinkronkan seluruh nomor absen kelas ke database jika urutan bergeser
     const classOnly = resequencedAll.filter((s) => s.classId === targetClassId);
     try {
-      await batchInsertStudents(classOnly);
+      await studentMutations.batchInsertStudents(classOnly);
     } catch (e) {
       console.warn('Sync resequence student to cloud notice:', e);
     }
@@ -627,14 +683,14 @@ export default function App() {
     const resequencedAll = resequenceStudentsAlphabetically(remaining, targetClassId);
     setStudents(resequencedAll);
 
-    // Hapus dari cloud database
-    await deleteStudent(stdId);
+    // Hapus dari cloud database via mutation
+    await studentMutations.deleteStudent({ studentId: stdId, targetClassId });
 
     // Perbarui urutan absen murid yang tersisa di database cloud
     const classRemaining = resequencedAll.filter((s) => s.classId === targetClassId);
     if (classRemaining.length > 0) {
       try {
-        await batchInsertStudents(classRemaining);
+        await studentMutations.batchInsertStudents(classRemaining);
       } catch (err) {
         console.warn('Batch resequence after delete notice:', err);
       }
@@ -703,9 +759,9 @@ export default function App() {
       SafeCache.invalidate(`pub_share_sav_share_${activeClassId}`);
     }
 
-    // Persist to Supabase if configured and online
+    // Persist to Supabase via mutation with automatic cache invalidation
     try {
-      await batchInsertStudents(resequencedClass);
+      await studentMutations.batchInsertStudents(resequencedClass);
       if (activeClassId) {
         const fresh = await getStudents(activeClassId);
         if (fresh && fresh.length > 0) {
@@ -934,6 +990,7 @@ export default function App() {
     } catch (err) {
       console.warn('Sign out notice:', err);
     }
+    queryClient.clear();
     SafeCache.clear();
 
     // Hapus semua key localStorage milik aplikasi selain smk_saved_login_email
@@ -1691,5 +1748,20 @@ export default function App() {
       {/* Toast Notifikasi Terpusat Unduh File Excel */}
       <ExcelDownloadToast />
     </div>
+  );
+}
+
+/**
+ * Root Application Component for Teachers.
+ * Wraps teacher views with TanStack QueryClientProvider while ensuring
+ * public share paths remain unburdened and independent.
+ */
+export default function App() {
+  const [client] = useState(() => createQueryClient());
+
+  return (
+    <QueryClientProvider client={client}>
+      <AppContent />
+    </QueryClientProvider>
   );
 }
