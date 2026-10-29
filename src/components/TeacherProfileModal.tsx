@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Save, School, BookOpen, Mail, Award, Check } from 'lucide-react';
+import { X, User, Save, School, BookOpen, Mail, Award, Check, AlertCircle } from 'lucide-react';
 import { TeacherProfile } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
+import { formatUserFriendlyError } from '../utils/errorHandler';
 
 interface TeacherProfileModalProps {
   isOpen: boolean;
@@ -41,9 +42,11 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   const [formData, setFormData] = useState<TeacherProfile>({ ...activeProfile });
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     setFormData({ ...activeProfile });
+    setSaveError(null);
   }, [profile, teacher, isOpen]);
 
   if (!isOpen) return null;
@@ -51,6 +54,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+    setSaveError(null);
     try {
       if (onSaveTeacher) {
         await onSaveTeacher(formData);
@@ -64,9 +68,9 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
         setIsSuccess(false);
         onClose();
       }, 700);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving teacher profile:', err);
-      alert(`Gagal menyimpan profil pendidik ke cloud: ${err?.message || 'Terjadi kesalahan jaringan atau server.'}`);
+      setSaveError(formatUserFriendlyError(err));
     } finally {
       setIsSaving(false);
     }
@@ -249,6 +253,13 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
               </div>
             </div>
           </div>
+
+          {saveError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{saveError}</span>
+            </div>
+          )}
 
           <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
             <button

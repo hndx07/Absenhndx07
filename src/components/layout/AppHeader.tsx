@@ -7,12 +7,14 @@ interface AppHeaderProps {
   activeClass: ClassRoom;
   onToggleSideNav: () => void;
   onOpenClassModal: () => void;
+  isDemoMode?: boolean;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
   activeClass,
   onToggleSideNav,
   onOpenClassModal,
+  isDemoMode,
 }) => {
   return (
     <header className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] text-white border-b border-[#008276]/40 sticky top-0 z-40 shadow-lg backdrop-blur-md transition-all">
@@ -71,19 +73,32 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             </button>
           </div>
 
-          {/* Penanda Cloud Supabase Aktif */}
+          {/* Penanda Status Supabase / Demo */}
           <div className="flex items-center gap-2 shrink-0">
-            <div
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold shadow-2xs backdrop-blur-xs"
-              title="Database PostgreSQL Supabase Cloud Aktif & Sinkron (RLS)"
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-80"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-              </span>
-              <span className="hidden sm:inline">Cloud Supabase Aktif</span>
-              <span className="sm:hidden text-[11px]">Cloud Aktif</span>
-            </div>
+            {isDemoMode ? (
+              <div
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-400/25 border border-amber-300/40 text-amber-100 text-xs font-bold shadow-2xs backdrop-blur-xs"
+                title="Mode Demo (Uji Coba Sistem) - Berjalan dalam isolasi sesi lokal"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
+                </span>
+                <span className="hidden sm:inline">Mode Demo (Uji Coba)</span>
+                <span className="sm:hidden text-[11px]">Demo</span>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold shadow-2xs backdrop-blur-xs"
+                title="Database PostgreSQL Supabase Cloud Aktif & Sinkron (RLS)"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-80"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                </span>
+                <span className="hidden sm:inline">Cloud Supabase Aktif</span>
+                <span className="sm:hidden text-[11px]">Cloud Aktif</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

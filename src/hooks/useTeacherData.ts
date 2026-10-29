@@ -30,6 +30,7 @@ import { smoothScrollToTop } from '../utils/smoothScroll';
 import { queryKeys } from '../lib/queryKeys';
 import { NavTab } from '../components/layout/types';
 import { formatUserFriendlyError } from '../utils/errorHandler';
+import { DEMO_SESSION, isDemoSession, isDemoActive, clearDemoSession } from '../utils/demoMode';
 
 // Domain Query Hooks
 import { useTeacherProfileQuery, useTeacherProfileMutation } from './useTeacherProfileQuery';
@@ -197,12 +198,23 @@ export function useTeacherData() {
       try {
         const currentSession = await getAuthSession();
         if (isMounted) {
-          setSession(currentSession);
+          if (currentSession) {
+            setSession(currentSession);
+          } else if (isDemoActive()) {
+            setSession(DEMO_SESSION);
+          } else {
+            setSession(null);
+          }
           setIsAuthChecking(false);
         }
       } catch (err: unknown) {
         console.error('Session check error:', err);
         if (isMounted) {
+          if (isDemoActive()) {
+            setSession(DEMO_SESSION);
+          } else {
+            setSession(null);
+          }
           setIsAuthChecking(false);
         }
       }
@@ -572,6 +584,7 @@ export function useTeacherData() {
 
   // Logout
   const handleLogout = async () => {
+    clearDemoSession();
     try {
       await signOutSupabase();
     } catch (err: unknown) {
@@ -640,9 +653,12 @@ export function useTeacherData() {
     };
   }, [teacher, session]);
 
+  const isDemoMode = Boolean(session && isDemoSession(session));
+
   return {
     session,
     isAuthChecking,
+    isDemoMode,
     userId,
     activeTab,
     setActiveTab,

@@ -28,6 +28,7 @@ import { exportStudentsToExcel, downloadStudentTemplateExcel } from '../utils/ex
 import { resequenceStudentsAlphabetically } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
 import { ActionMenu } from './common/ActionMenu';
+import { formatUserFriendlyError } from '../utils/errorHandler';
 
 interface StudentManagementViewProps {
   currentClass: ClassRoom;
@@ -75,6 +76,8 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   const [importFileName, setImportFileName] = useState<string>('');
   const [isImporting, setIsImporting] = useState(false);
   const [isSavingStudent, setIsSavingStudent] = useState(false);
+  const [isDeletingStudent, setIsDeletingStudent] = useState(false);
+  const [studentFormError, setStudentFormError] = useState<string | null>(null);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'no' | 'name-asc' | 'name-desc'>('name-asc');
@@ -103,6 +106,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
 
   // Manual Add Student
   const handleOpenAdd = () => {
+    setStudentFormError(null);
     const nextNo = classStudents.length > 0 ? Math.max(...classStudents.map((s) => s.no)) + 1 : 1;
     setEditingStudent({
       id: `std_${Date.now()}`,
@@ -119,6 +123,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
 
   // Manual Edit Student
   const handleOpenEdit = (s: Student) => {
+    setStudentFormError(null);
     setEditingStudent({ ...s });
     setIsModalOpen(true);
   };
@@ -126,10 +131,11 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
   const handleSubmitStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent?.nama?.trim()) {
-      alert('Nama murid wajib diisi!');
+      setStudentFormError('Nama murid wajib diisi.');
       return;
     }
     setIsSavingStudent(true);
+    setStudentFormError(null);
     try {
       await onSaveStudent(editingStudent as Student);
       const timeStr = new Date().toLocaleTimeString('id-ID', {
@@ -142,8 +148,8 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
       setTimeout(() => setSyncStatusMsg(null), 4000);
       setIsModalOpen(false);
       setEditingStudent(null);
-    } catch (err: any) {
-      alert(`Gagal menyimpan ke cloud: ${err.message || 'Koneksi terputus'}`);
+    } catch (err: unknown) {
+      setStudentFormError(formatUserFriendlyError(err));
     } finally {
       setIsSavingStudent(false);
     }
@@ -163,18 +169,27 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
       setLastSyncTime(timeStr);
       setSyncStatusMsg(`Seluruh ${classStudents.length} data murid kelas ${currentClass.namaKelas} berhasil disimpan ke Cloud Supabase!`);
       setTimeout(() => setSyncStatusMsg(null), 4000);
-    } catch (err: any) {
-      alert(`Gagal menyimpan ke cloud: ${err.message || 'Koneksi terputus'}`);
+    } catch (err: unknown) {
+      setSyncStatusMsg(`Gagal menyimpan ke cloud: ${formatUserFriendlyError(err)}`);
+      setTimeout(() => setSyncStatusMsg(null), 4000);
     } finally {
       setIsSavingStudent(false);
     }
   };
 
   // Manual Delete Student with confirmation
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (deletingStudent) {
-      onDeleteStudent(deletingStudent.id);
-      setDeletingStudent(null);
+      setIsDeletingStudent(true);
+      try {
+        await onDeleteStudent(deletingStudent.id);
+        setDeletingStudent(null);
+      } catch (err: unknown) {
+        setSyncStatusMsg(formatUserFriendlyError(err));
+        setTimeout(() => setSyncStatusMsg(null), 4000);
+      } finally {
+        setIsDeletingStudent(false);
+      }
     }
   };
 
@@ -1035,6 +1050,13 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
                 />
               </div>
 
+              {studentFormError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{studentFormError}</span>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 pt-3 border-t">
                 <button
                   type="button"
@@ -1102,9 +1124,10 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow-sm"
+                disabled={isDeletingStudent}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition shadow-sm cursor-pointer disabled:opacity-50"
               >
-                Ya, Hapus Murid Ini
+                {isDeletingStudent ? 'Menghapus...' : 'Ya, Hapus Murid Ini'}
               </button>
             </div>
           </div>

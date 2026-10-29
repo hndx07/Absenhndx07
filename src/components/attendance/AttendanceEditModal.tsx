@@ -349,7 +349,8 @@ export const AttendanceEditModal: React.FC<AttendanceEditModalProps> = ({
             <button
               type="button"
               onClick={onDelete}
-              className="px-3 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              disabled={isSavingToCloud}
+              className="px-3 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Hapus Sesi</span>
