@@ -8,9 +8,11 @@ import {
   Cloud,
   RefreshCw,
   Save,
+  Users,
 } from 'lucide-react';
 import { AttendanceSession, AttendanceStatus, Student } from '../../types';
 import { SmoothHorizontalScroller } from '../SmoothHorizontalScroller';
+import { TableEmptyRow } from '../common/StateFeedback';
 
 interface AttendanceStudentTableProps {
   currentSession: AttendanceSession;
@@ -134,7 +136,19 @@ export const AttendanceStudentTable: React.FC<AttendanceStudentTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
-            {filteredStudents.map((std, idx) => {
+            {filteredStudents.length === 0 ? (
+              <TableEmptyRow
+                colSpan={6}
+                icon={Users}
+                title="Belum ada data murid"
+                description={
+                  filterQuery
+                    ? `Tidak ada murid yang cocok dengan kata kunci "${filterQuery}".`
+                    : 'Belum ada murid yang terdaftar di kelas ini. Tambahkan murid melalui tab Manajemen Murid.'
+                }
+              />
+            ) : (
+              filteredStudents.map((std, idx) => {
               const record = currentSession.records?.[std.id];
               const status = record?.status;
               const catatan = record?.catatan || '';
@@ -220,7 +234,8 @@ export const AttendanceStudentTable: React.FC<AttendanceStudentTableProps> = ({
                   </td>
                 </tr>
               );
-            })}
+            })
+          )}
           </tbody>
         </table>
       </SmoothHorizontalScroller>

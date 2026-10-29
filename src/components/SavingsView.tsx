@@ -24,6 +24,7 @@ import {
 import { SavingTransaction, Student, ClassRoom, TeacherProfile, PublicShareRecord } from '../types';
 import { createOrUpdatePublicShare, resequenceStudentsAlphabetically, sanitizePublicStudent } from '../services/data';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
+import { TableEmptyRow } from './common/StateFeedback';
 
 interface SavingsViewProps {
   currentClass: ClassRoom;
@@ -468,11 +469,12 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {cashTransactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
-                      Belum ada transaksi kas kelas.
-                    </td>
-                  </tr>
+                  <TableEmptyRow
+                    colSpan={6}
+                    icon={Wallet}
+                    title="Belum ada transaksi kas kelas"
+                    description="Klik tombol 'Catat Transaksi' di atas untuk mencatat pemasukan atau pengeluaran kas kelas."
+                  />
                 ) : (
                   cashTransactions.map((tx) => (
                     <tr key={tx.id} className="hover:bg-slate-50/60 transition">
@@ -621,38 +623,51 @@ export const SavingsView: React.FC<SavingsViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
-                  {sortedAndFilteredClassStudents.map((std) => {
-                    const saldo = studentBalances[std.id] || 0;
-                    return (
-                      <tr key={std.id} className="hover:bg-slate-50/60 transition">
-                        <td className="py-3 px-4 text-center font-mono font-bold text-slate-600">
-                          {std.no}
-                        </td>
-                        <td className="py-3 px-4 font-bold text-slate-800">
-                          {std.nama}
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="font-semibold text-slate-500">{std.gender}</span>
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono font-black text-sm text-emerald-700">
-                          {formatRupiah(saldo)}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => {
-                                handleOpenAdd(false, std.id);
-                              }}
-                              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition flex items-center gap-1 border border-emerald-200"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              Setor / Tarik
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {sortedAndFilteredClassStudents.length === 0 ? (
+                    <TableEmptyRow
+                      colSpan={5}
+                      icon={Wallet}
+                      title="Belum ada data tabungan murid"
+                      description={
+                        studentSearchQuery
+                          ? `Tidak ada murid yang cocok dengan kata kunci "${studentSearchQuery}".`
+                          : 'Belum ada murid di kelas ini. Tambahkan murid melalui tab Manajemen Murid.'
+                      }
+                    />
+                  ) : (
+                    sortedAndFilteredClassStudents.map((std) => {
+                      const saldo = studentBalances[std.id] || 0;
+                      return (
+                        <tr key={std.id} className="hover:bg-slate-50/60 transition">
+                          <td className="py-3 px-4 text-center font-mono font-bold text-slate-600">
+                            {std.no}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-slate-800">
+                            {std.nama}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="font-semibold text-slate-500">{std.gender}</span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-black text-sm text-emerald-700">
+                            {formatRupiah(saldo)}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => {
+                                  handleOpenAdd(false, std.id);
+                                }}
+                                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition flex items-center gap-1 border border-emerald-200"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                Setor / Tarik
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>

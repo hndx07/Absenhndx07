@@ -2,6 +2,7 @@ import React from 'react';
 import { BarChart3, Users, Award, Calendar, Wallet, CheckCircle2, AlertTriangle, TrendingUp } from 'lucide-react';
 import { ClassRoom, Student, AttendanceSession, StudentGrade, SavingTransaction, TeacherProfile } from '../types';
 import { calculateGradeMetrics } from '../utils/gradeCalculations';
+import { EmptyState } from './common/StateFeedback';
 
 interface StatisticsViewProps {
   activeClass?: ClassRoom | null;
@@ -90,53 +91,61 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
             <span className="text-lg font-black">{kkm}</span>
           </div>
         </div>
-
-        {/* High-level Metric Badges */}
-        <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50/50">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase">Total Siswa</span>
-              <Users className="w-4 h-4 text-[#009B62]" />
-            </div>
-            <p className="text-2xl font-black text-slate-800 mt-1">{totalStudents}</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              {maleCount} Laki-laki • {femaleCount} Perempuan
-            </p>
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase">Rata-rata Presensi</span>
-              <Calendar className="w-4 h-4 text-[#008276]" />
-            </div>
-            <p className="text-2xl font-black text-slate-800 mt-1">{avgAttendance}%</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">{sessions.length} sesi pertemuan</p>
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase">Rata-rata Nilai</span>
-              <Award className="w-4 h-4 text-[#292E82]" />
-            </div>
-            <p className="text-2xl font-black text-slate-800 mt-1">{avgClassScore}</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">{gradedStudentsCount} siswa dinilai</p>
-          </div>
-
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase">Kas & Tabungan</span>
-              <Wallet className="w-4 h-4 text-emerald-600" />
-            </div>
-            <p className="text-xl font-black text-slate-800 mt-1">
-              Rp {netSavings.toLocaleString('id-ID')}
-            </p>
-            <p className="text-[11px] text-slate-500 mt-0.5">{savings.length} transaksi</p>
-          </div>
-        </div>
       </div>
 
-      {/* Grade Predicate Distribution & Pass Rate */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {totalStudents === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="Belum Ada Data Siswa"
+          description={`Kelas ${activeClass?.namaKelas || 'ini'} belum memiliki murid terdaftar. Tambahkan murid melalui tab Manajemen Murid untuk melihat analisis statistik kehadiran, capaian TP Kurikulum Merdeka, dan kas keuangan.`}
+        />
+      ) : (
+        <>
+          {/* High-level Metric Badges */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50/50">
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase">Total Siswa</span>
+                <Users className="w-4 h-4 text-[#009B62]" />
+              </div>
+              <p className="text-2xl font-black text-slate-800 mt-1">{totalStudents}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {maleCount} Laki-laki • {femaleCount} Perempuan
+              </p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase">Rata-rata Presensi</span>
+                <Calendar className="w-4 h-4 text-[#008276]" />
+              </div>
+              <p className="text-2xl font-black text-slate-800 mt-1">{avgAttendance}%</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">{sessions.length} sesi pertemuan</p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase">Rata-rata Nilai</span>
+                <Award className="w-4 h-4 text-[#292E82]" />
+              </div>
+              <p className="text-2xl font-black text-slate-800 mt-1">{avgClassScore}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">{gradedStudentsCount} siswa dinilai</p>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase">Kas & Tabungan</span>
+                <Wallet className="w-4 h-4 text-emerald-600" />
+              </div>
+              <p className="text-xl font-black text-slate-800 mt-1">
+                Rp {netSavings.toLocaleString('id-ID')}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5">{savings.length} transaksi</p>
+            </div>
+          </div>
+
+          {/* Grade Predicate Distribution & Pass Rate */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Predicate Breakdown Card */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="bg-gradient-to-r from-[#009B62] via-[#008276] to-[#292E82] p-4 text-white">
@@ -197,6 +206,8 @@ export const StatisticsView: React.FC<StatisticsViewProps> = ({
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

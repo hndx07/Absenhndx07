@@ -78,15 +78,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       } else {
         setErrorMessage('Gagal memverifikasi sesi login. Silakan coba lagi.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn('Supabase Auth error:', err);
-      const rawMsg = err?.message || '';
+      const rawMsg = err instanceof Error ? err.message : String(err || '');
       if (rawMsg.includes('Invalid login credentials') || rawMsg.includes('invalid_credentials')) {
         setErrorMessage('Alamat email atau kata sandi tidak cocok. Silakan periksa kembali.');
       } else if (rawMsg.includes('Email not confirmed')) {
         setErrorMessage('Alamat email belum dikonfirmasi di Supabase Auth.');
       } else {
-        setErrorMessage(err?.message || 'Gagal masuk akun. Periksa koneksi internet atau kredensial Anda.');
+        setErrorMessage(rawMsg || 'Gagal masuk akun. Periksa koneksi internet atau kredensial Anda.');
       }
     } finally {
       setIsSubmitting(false);

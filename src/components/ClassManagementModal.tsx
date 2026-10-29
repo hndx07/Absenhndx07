@@ -178,7 +178,16 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {classes.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-slate-500 my-2">
+                  <GraduationCap className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-slate-700">Belum ada kelas yang terdaftar</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Klik tombol "+ Tambah Kelas" di atas untuk menambahkan rombel pertama Anda.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {classes.map((cls) => {
                   const isActive = cls.id === activeClassId;
                   return (
@@ -232,7 +241,8 @@ export const ClassManagementModal: React.FC<ClassManagementModalProps> = ({
                   );
                 })}
               </div>
-            </>
+            )}
+          </>
           ) : (
             <form onSubmit={handleFormSubmit} className="space-y-4">
               <div className="border-b pb-3 mb-2 flex items-center justify-between">

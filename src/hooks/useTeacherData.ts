@@ -29,6 +29,7 @@ import { exportDataToJsonBackup } from '../utils/storage';
 import { smoothScrollToTop } from '../utils/smoothScroll';
 import { queryKeys } from '../lib/queryKeys';
 import { NavTab } from '../components/layout/types';
+import { formatUserFriendlyError } from '../utils/errorHandler';
 
 // Domain Query Hooks
 import { useTeacherProfileQuery, useTeacherProfileMutation } from './useTeacherProfileQuery';
@@ -154,12 +155,21 @@ export function useTeacherData() {
     (classesQuery.isLoading && classes.length === 0) ||
     (Boolean(activeClassId) && studentsQuery.isLoading && students.length === 0);
 
+  const activeTabError = useMemo(() => {
+    if (activeTab === 'attendance' || activeTab === 'recap') return attendanceQuery.error;
+    if (activeTab === 'grades') return gradesQuery.error || gradeColumnsQuery.error;
+    if (activeTab === 'agendas') return journalsQuery.error;
+    if (activeTab === 'savings') return financesQuery.error;
+    return null;
+  }, [activeTab, attendanceQuery.error, gradesQuery.error, gradeColumnsQuery.error, journalsQuery.error, financesQuery.error]);
+
   const queryError =
     classesQuery.error ||
     profileQuery.error ||
-    (activeClassId ? studentsQuery.error : null);
+    (activeClassId ? studentsQuery.error : null) ||
+    activeTabError;
 
-  const dataError = queryError instanceof Error ? queryError.message : null;
+  const dataError = queryError ? formatUserFriendlyError(queryError) : null;
 
   // Auto-select initial active class once classes load
   useEffect(() => {

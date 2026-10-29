@@ -12,9 +12,11 @@ import {
   ArrowUpDown,
   ArrowUpAZ,
   ArrowDownZA,
+  Users,
 } from 'lucide-react';
 import { ClassRoom, Student, AttendanceSession, StudentGrade, TeacherProfile } from '../types';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
+import { EmptyState } from './common/StateFeedback';
 
 interface ParentReportViewProps {
   currentClass: ClassRoom;
@@ -262,72 +264,84 @@ Pendidik Mata Pelajaran ${currentClass.mataPelajaran}
       </div>
 
       {/* Student List for WhatsApp notification */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredStudents.map((std) => {
-          const rec = targetSession?.records?.[std.id];
-          const st = rec?.status || 'H';
+      {filteredStudents.length === 0 ? (
+        <EmptyState
+          icon={classStudents.length === 0 ? Users : Search}
+          title={classStudents.length === 0 ? 'Belum Ada Murid di Kelas Ini' : 'Murid Tidak Ditemukan'}
+          description={
+            classStudents.length === 0
+              ? `Kelas ${currentClass.namaKelas} belum memiliki data murid. Silakan tambahkan murid melalui tab Manajemen Murid untuk mengirim laporan presensi ke orang tua.`
+              : `Tidak ditemukan murid yang sesuai dengan kata kunci "${searchTerm}". Coba periksa ejaan nama atau NISN murid.`
+          }
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredStudents.map((std) => {
+            const rec = targetSession?.records?.[std.id];
+            const st = rec?.status || 'H';
 
-          return (
-            <div
-              key={std.id}
-              className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-4 hover:border-indigo-200 transition"
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-sm">{std.nama}</h4>
-                    <p className="text-xs text-slate-400 font-mono mt-0.5">NISN: {std.nisn || '-'}</p>
+            return (
+              <div
+                key={std.id}
+                className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex flex-col justify-between space-y-4 hover:border-indigo-200 transition"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{std.nama}</h4>
+                      <p className="text-xs text-slate-400 font-mono mt-0.5">NISN: {std.nisn || '-'}</p>
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-xl text-xs font-bold font-mono ${
+                        st === 'H'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : st === 'S'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : st === 'I'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : 'bg-rose-50 text-rose-700 border border-rose-200'
+                      }`}
+                    >
+                      {st === 'H' ? 'Hadir' : st === 'S' ? 'Sakit' : st === 'I' ? 'Izin' : 'Alfa'}
+                    </span>
                   </div>
-                  <span
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold font-mono ${
-                      st === 'H'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : st === 'S'
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                        : st === 'I'
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                        : 'bg-rose-50 text-rose-700 border border-rose-200'
-                    }`}
-                  >
-                    {st === 'H' ? 'Hadir' : st === 'S' ? 'Sakit' : st === 'I' ? 'Izin' : 'Alfa'}
-                  </span>
-                </div>
 
-                <div className="mt-3 pt-3 border-t border-slate-100 space-y-1 text-xs">
-                  <p className="text-slate-500 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-slate-400" />
-                    WA: <span className="font-mono font-bold text-slate-700">{std.noHpOrangTua || 'Belum diisi'}</span>
-                  </p>
-                  {rec?.catatan && (
-                    <p className="text-slate-600 italic">
-                      Catatan: "{rec.catatan}"
+                  <div className="mt-3 pt-3 border-t border-slate-100 space-y-1 text-xs">
+                    <p className="text-slate-500 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-slate-400" />
+                      WA: <span className="font-mono font-bold text-slate-700">{std.noHpOrangTua || 'Belum diisi'}</span>
                     </p>
-                  )}
+                    {rec?.catatan && (
+                      <p className="text-slate-600 italic">
+                        Catatan: "{rec.catatan}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    onClick={() => handleCopyText(std)}
+                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 flex-1"
+                  >
+                    {copiedId === std.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedId === std.id ? 'Tersalin' : 'Salin Pesan'}
+                  </button>
+
+                  <button
+                    onClick={() => handleSendWhatsApp(std)}
+                    disabled={!std.noHpOrangTua}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    Kirim WA
+                  </button>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                <button
-                  onClick={() => handleCopyText(std)}
-                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 flex-1"
-                >
-                  {copiedId === std.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copiedId === std.id ? 'Tersalin' : 'Salin Pesan'}
-                </button>
-
-                <button
-                  onClick={() => handleSendWhatsApp(std)}
-                  disabled={!std.noHpOrangTua}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  Kirim WA
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

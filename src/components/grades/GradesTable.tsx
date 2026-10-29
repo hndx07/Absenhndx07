@@ -142,7 +142,7 @@ export const GradesTable: React.FC<GradesTableProps> = ({
                     {/* TP Inputs - Zero Delay with rawInputs state */}
                     {Array.from({ length: activeColumnsCount }).map((_, colIdx) => {
                       const fieldKey = `formatif${colIdx + 1}` as keyof StudentGrade;
-                      const scoreVal = grade ? (grade as any)[fieldKey] : null;
+                      const scoreVal = grade ? (grade[fieldKey] as number | null | undefined) ?? null : null;
                       const cellKey = `${student.id}_${fieldKey}`;
                       const displayVal = rawInputs[cellKey] ?? (scoreVal !== null && scoreVal !== undefined ? String(scoreVal) : '');
 
