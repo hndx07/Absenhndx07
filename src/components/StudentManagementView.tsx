@@ -154,8 +154,7 @@ export const StudentManagementView: React.FC<StudentManagementViewProps> = ({
     if (classStudents.length === 0) return;
     setIsSavingStudent(true);
     try {
-      const promises = classStudents.map((std) => onSaveStudent(std));
-      await Promise.all(promises);
+      await onBatchAddStudents(classStudents);
       const timeStr = new Date().toLocaleTimeString('id-ID', {
         hour: '2-digit',
         minute: '2-digit',

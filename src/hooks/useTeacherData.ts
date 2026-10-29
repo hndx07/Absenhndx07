@@ -1,26 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Session } from '@supabase/supabase-js';
 import {
   getAuthSession,
   getSafeSupabaseClient,
   signOutSupabase,
 } from '../services/supabase';
 import {
-  getTeacherProfile,
-  createOrUpdateTeacherProfile,
-  getClasses,
-  getStudents,
-  getAttendanceSessions,
-  getStudentGrades,
-  getGradeColumns,
-  getTeachingAgendas,
-  getSavingTransactions,
   syncAttendanceSessionToAgenda,
   syncPublicAttendanceShare,
   syncPublicGradesShare,
   syncPublicAgendasShare,
   syncPublicSavingsShare,
-  getExistingShareIdsForClass,
   resequenceStudentsAlphabetically,
 } from '../services/data';
 import {
@@ -52,7 +43,7 @@ export function useTeacherData() {
   const queryClient = useQueryClient();
 
   // 1. Auth Session
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const userId = session?.user?.id;
 
@@ -74,24 +65,12 @@ export function useTeacherData() {
     UiStatePersistence.set('activeClassId', clsId);
   };
 
-  // 3. UI states
-  const [isLoadingData, setIsLoadingData] = useState(false);
+  // 3. Feedback Toasts
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [refreshSuccessToast, setRefreshSuccessToast] = useState<string | null>(null);
-  const [dataError, setDataError] = useState<string | null>(null);
 
-  // 4. Local reactive state mirrors for immediate responsiveness
-  const [teacher, setTeacher] = useState<TeacherProfile | null>(null);
-  const [classes, setClasses] = useState<ClassRoom[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [attendance, setAttendance] = useState<AttendanceSession[]>([]);
-  const [grades, setGrades] = useState<StudentGrade[]>([]);
-  const [gradeColumns, setGradeColumns] = useState<GradeColumn[]>([]);
-  const [agendas, setAgendas] = useState<TeachingAgenda[]>([]);
-  const [savings, setSavings] = useState<SavingTransaction[]>([]);
-
-  // 5. TanStack Queries with Lazy Loading Strategy:
-  // - Profile & Classes: Loaded at startup
+  // 4. TanStack Queries with Lazy Loading Strategy:
+  // - Profile & Classes: Essential data loaded at startup
   const profileQuery = useTeacherProfileQuery({
     userId,
     enabled: Boolean(session),
@@ -102,14 +81,14 @@ export function useTeacherData() {
     enabled: Boolean(session),
   });
 
-  // - Students: Loaded when activeClassId is selected
+  // - Students: Lazy loaded whenever an activeClassId is selected
   const studentsQuery = useStudentsQuery({
     userId,
     classId: activeClassId,
     enabled: Boolean(session && activeClassId),
   });
 
-  // - Attendance: Lazy loaded when tab is relevant
+  // - Attendance: Lazy loaded strictly when on attendance/recap/agendas/stats/parent tabs
   const isAttendanceTabActive = ['attendance', 'recap', 'agendas', 'statistics', 'parent_report'].includes(activeTab);
   const attendanceQuery = useAttendanceQuery({
     userId,
@@ -117,7 +96,7 @@ export function useTeacherData() {
     enabled: Boolean(session && activeClassId && isAttendanceTabActive),
   });
 
-  // - Grades & Grade Columns: Lazy loaded when tab is relevant
+  // - Grades & Grade Columns: Lazy loaded strictly when on grades/stats/parent tabs
   const isGradesTabActive = ['grades', 'statistics', 'parent_report'].includes(activeTab);
   const gradesQuery = useGradesQuery({
     userId,
@@ -130,7 +109,7 @@ export function useTeacherData() {
     enabled: Boolean(session && activeClassId && isGradesTabActive),
   });
 
-  // - Agendas/Journals: Lazy loaded when tab is relevant
+  // - Agendas/Journals: Lazy loaded strictly when on agendas/attendance tabs
   const isAgendasTabActive = ['agendas', 'attendance'].includes(activeTab);
   const journalsQuery = useJournalsQuery({
     userId,
@@ -138,7 +117,7 @@ export function useTeacherData() {
     enabled: Boolean(session && isAgendasTabActive),
   });
 
-  // - Finances/Savings: Lazy loaded when tab is relevant
+  // - Finances/Savings: Lazy loaded strictly when on savings/stats tabs
   const isSavingsTabActive = ['savings', 'statistics'].includes(activeTab);
   const financesQuery = useFinancesQuery({
     userId,
@@ -146,7 +125,7 @@ export function useTeacherData() {
     enabled: Boolean(session && activeClassId && isSavingsTabActive),
   });
 
-  // Mutations
+  // 5. TanStack Mutations
   const profileMutation = useTeacherProfileMutation(userId);
   const classMutations = useClassMutations(userId);
   const studentMutations = useStudentMutations(userId, activeClassId);
@@ -155,217 +134,52 @@ export function useTeacherData() {
   const journalsMutations = useJournalsMutations(userId);
   const financesMutations = useFinancesMutations(userId, activeClassId);
 
-  // Sync Query Data to Reactive State
-  useEffect(() => {
-    if (profileQuery.data) {
-      setTeacher(profileQuery.data);
-    }
-  }, [profileQuery.data]);
+  // Derived Reactive Data
+  const teacher = profileQuery.data || null;
+  const classes = useMemo(() => classesQuery.data || [], [classesQuery.data]);
 
+  const students = useMemo(() => {
+    if (!studentsQuery.data || studentsQuery.data.length === 0) return [];
+    return resequenceStudentsAlphabetically(studentsQuery.data, activeClassId);
+  }, [studentsQuery.data, activeClassId]);
+
+  const attendance = useMemo(() => attendanceQuery.data || [], [attendanceQuery.data]);
+  const grades = useMemo(() => gradesQuery.data || [], [gradesQuery.data]);
+  const gradeColumns = useMemo(() => gradeColumnsQuery.data || [], [gradeColumnsQuery.data]);
+  const agendas = useMemo(() => journalsQuery.data || [], [journalsQuery.data]);
+  const savings = useMemo(() => financesQuery.data || [], [financesQuery.data]);
+
+  // Loading & Error States
+  const isLoadingData =
+    (classesQuery.isLoading && classes.length === 0) ||
+    (Boolean(activeClassId) && studentsQuery.isLoading && students.length === 0);
+
+  const queryError =
+    classesQuery.error ||
+    profileQuery.error ||
+    (activeClassId ? studentsQuery.error : null);
+
+  const dataError = queryError instanceof Error ? queryError.message : null;
+
+  // Auto-select initial active class once classes load
   useEffect(() => {
-    if (classesQuery.data && classesQuery.data.length > 0) {
-      setClasses(classesQuery.data);
+    if (classes.length > 0) {
       if (!activeClassId) {
         const saved = UiStatePersistence.get('activeClassId', '') || teacher?.activeClassId;
-        const matched = classesQuery.data.find((c) => c.id === saved) || classesQuery.data[0];
+        const matched = classes.find((c) => c.id === saved) || classes[0];
         if (matched) {
           setActiveClassId(matched.id);
         }
-      }
-    }
-  }, [classesQuery.data, activeClassId, teacher?.activeClassId]);
-
-  useEffect(() => {
-    if (studentsQuery.data && studentsQuery.data.length > 0) {
-      const sequenced = resequenceStudentsAlphabetically(studentsQuery.data, activeClassId);
-      setStudents(sequenced);
-    }
-  }, [studentsQuery.data, activeClassId]);
-
-  useEffect(() => {
-    if (attendanceQuery.data) {
-      setAttendance(attendanceQuery.data);
-    }
-  }, [attendanceQuery.data]);
-
-  useEffect(() => {
-    if (gradesQuery.data) {
-      setGrades(gradesQuery.data);
-    }
-  }, [gradesQuery.data]);
-
-  useEffect(() => {
-    if (gradeColumnsQuery.data) {
-      setGradeColumns(gradeColumnsQuery.data);
-    }
-  }, [gradeColumnsQuery.data]);
-
-  useEffect(() => {
-    if (journalsQuery.data) {
-      setAgendas(journalsQuery.data);
-    }
-  }, [journalsQuery.data]);
-
-  useEffect(() => {
-    if (financesQuery.data) {
-      setSavings(financesQuery.data);
-    }
-  }, [financesQuery.data]);
-
-  // Comprehensive Cache-First + Background Revalidation loader
-  const loadUserData = useCallback(async (targetClassId?: string, force = false) => {
-    setDataError(null);
-
-    const cachedTeacher = !force ? SafeCache.get<TeacherProfile>('teacher_profile') : null;
-    const cachedClasses = !force ? SafeCache.get<ClassRoom[]>('all_classes') : null;
-    const cachedAgendas = !force ? SafeCache.get<TeachingAgenda[]>('all_agendas') : null;
-
-    if (cachedTeacher) setTeacher(cachedTeacher);
-    if (cachedClasses && cachedClasses.length > 0) setClasses(cachedClasses);
-    if (cachedAgendas) setAgendas(cachedAgendas);
-
-    let currentClassId = targetClassId || activeClassId || cachedTeacher?.activeClassId || '';
-    if (!currentClassId && cachedClasses && cachedClasses.length > 0) {
-      currentClassId = cachedClasses[0].id;
-    }
-    if (currentClassId && currentClassId !== activeClassId) {
-      setActiveClassId(currentClassId);
-    }
-
-    const cachedClassData =
-      !force && currentClassId ? SafeCache.get<any>(`class_data_${currentClassId}`) : null;
-
-    if (cachedClassData) {
-      setStudents(cachedClassData.students || []);
-      setAttendance(cachedClassData.attendance || []);
-      setGrades(cachedClassData.grades || []);
-      setGradeColumns(cachedClassData.gradeColumns || []);
-      setSavings(cachedClassData.savings || []);
-    }
-
-    if (!force && cachedTeacher && cachedClasses && cachedAgendas && (cachedClassData || !currentClassId)) {
-      return;
-    }
-
-    setIsLoadingData(true);
-
-    try {
-      let profile = await getTeacherProfile(force);
-      if (!profile) {
-        profile = await createOrUpdateTeacherProfile({
-          namaGuru: 'Guru SMK Muhammadiyah Bawang',
-          namaSekolah: 'SMK Muhammadiyah Bawang',
-          mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
-          tahunAjaran: '2025/2026',
-          semester: 'Genap',
-        });
-      }
-      setTeacher(profile);
-      SafeCache.set('teacher_profile', profile);
-
-      const loadedClasses = await getClasses();
-      setClasses(loadedClasses);
-      SafeCache.set('all_classes', loadedClasses);
-
-      if (!currentClassId && profile.activeClassId) {
-        currentClassId = profile.activeClassId;
-      }
-      if (!currentClassId && loadedClasses.length > 0) {
-        currentClassId = loadedClasses[0].id;
-      }
-      if (currentClassId && currentClassId !== activeClassId) {
-        setActiveClassId(currentClassId);
-      }
-
-      const loadedAgendas = await getTeachingAgendas();
-      setAgendas(loadedAgendas);
-      SafeCache.set('all_agendas', loadedAgendas);
-
-      if (currentClassId) {
-        const [
-          loadedStudents,
-          loadedAttendance,
-          loadedGrades,
-          loadedGradeCols,
-          loadedSavings,
-        ] = await Promise.all([
-          getStudents(currentClassId),
-          getAttendanceSessions(currentClassId),
-          getStudentGrades(currentClassId),
-          getGradeColumns(currentClassId),
-          getSavingTransactions(currentClassId),
-        ]);
-
-        const sequencedStudents = resequenceStudentsAlphabetically(loadedStudents, currentClassId);
-        setStudents(sequencedStudents);
-        setAttendance(loadedAttendance);
-        setGrades(loadedGrades);
-        setGradeColumns(loadedGradeCols);
-        setSavings(loadedSavings);
-
-        SafeCache.set(`class_data_${currentClassId}`, {
-          students: sequencedStudents,
-          attendance: loadedAttendance,
-          grades: loadedGrades,
-          gradeColumns: loadedGradeCols,
-          savings: loadedSavings,
-        });
-
-        // Sync to Public Shares if authorized
-        const activeClsObj = loadedClasses.find((c) => c.id === currentClassId);
-        if (activeClsObj) {
-          getExistingShareIdsForClass(currentClassId).then((existingShareIds) => {
-            if (existingShareIds.has(`att_share_${currentClassId}`)) {
-              syncPublicAttendanceShare({
-                classRoom: activeClsObj,
-                students: sequencedStudents,
-                sessions: loadedAttendance,
-                teacher: profile || undefined,
-              }).catch(() => {});
-            }
-
-            if (
-              existingShareIds.has(`grade_share_${currentClassId}`) ||
-              existingShareIds.has(`nilai_share_${currentClassId}`)
-            ) {
-              syncPublicGradesShare({
-                classRoom: activeClsObj,
-                students: sequencedStudents,
-                grades: loadedGrades,
-                gradeColumns: loadedGradeCols,
-                teacher: profile || undefined,
-              }).catch(() => {});
-            }
-
-            if (
-              existingShareIds.has(`sav_share_${currentClassId}`) ||
-              existingShareIds.has(`tabungan_share_${currentClassId}`)
-            ) {
-              syncPublicSavingsShare({
-                classRoom: activeClsObj,
-                students: sequencedStudents,
-                transactions: loadedSavings,
-                teacher: profile || undefined,
-              }).catch(() => {});
-            }
-          }).catch(() => {});
+      } else {
+        const exists = classes.some((c) => c.id === activeClassId);
+        if (!exists) {
+          setActiveClassId(classes[0].id);
         }
       }
-    } catch (err: any) {
-      console.error('Error loading data from Supabase:', err);
-      setDataError(
-        err?.message ||
-          'Tidak dapat terhubung ke server PostgreSQL Supabase. Periksa koneksi internet Anda.'
-      );
-    } finally {
-      setIsLoadingData(false);
     }
-  }, [activeClassId]);
+  }, [classes, activeClassId, teacher?.activeClassId]);
 
-  // Auth initialization
-  const loadUserDataRef = useRef(loadUserData);
-  loadUserDataRef.current = loadUserData;
-
+  // Auth initialization & session listener
   useEffect(() => {
     let isMounted = true;
 
@@ -375,11 +189,8 @@ export function useTeacherData() {
         if (isMounted) {
           setSession(currentSession);
           setIsAuthChecking(false);
-          if (currentSession) {
-            loadUserDataRef.current();
-          }
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('Session check error:', err);
         if (isMounted) {
           setIsAuthChecking(false);
@@ -401,7 +212,7 @@ export function useTeacherData() {
 
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
           if (newSession) {
-            loadUserDataRef.current();
+            queryClient.invalidateQueries();
           }
         } else if (event === 'SIGNED_OUT') {
           queryClient.clear();
@@ -417,13 +228,6 @@ export function useTeacherData() {
             }
             keysToRemove.forEach((k) => localStorage.removeItem(k));
           } catch {}
-          setTeacher(null);
-          setClasses([]);
-          setStudents([]);
-          setAttendance([]);
-          setGrades([]);
-          setAgendas([]);
-          setSavings([]);
         }
       });
 
@@ -439,81 +243,49 @@ export function useTeacherData() {
   }, [queryClient]);
 
   // Class Selection
-  const handleSelectClass = async (clsId: string) => {
+  const handleSelectClass = (clsId: string) => {
     setActiveClassId(clsId);
     if (teacher) {
-      const updated = { ...teacher, activeClassId: clsId };
-      setTeacher(updated);
-      createOrUpdateTeacherProfile({ activeClassId: clsId }).catch(console.error);
-    }
-
-    const cached = SafeCache.get<any>(`class_data_${clsId}`);
-    if (cached) {
-      setStudents(cached.students || []);
-      setAttendance(cached.attendance || []);
-      setGrades(cached.grades || []);
-      setGradeColumns(cached.gradeColumns || []);
-      setSavings(cached.savings || []);
-      return;
-    }
-
-    setIsLoadingData(true);
-    try {
-      const [
-        loadedStudents,
-        loadedAttendance,
-        loadedGrades,
-        loadedGradeCols,
-        loadedSavings,
-      ] = await Promise.all([
-        getStudents(clsId),
-        getAttendanceSessions(clsId),
-        getStudentGrades(clsId),
-        getGradeColumns(clsId),
-        getSavingTransactions(clsId),
-      ]);
-
-      const sequencedStudents = resequenceStudentsAlphabetically(loadedStudents, clsId);
-      setStudents(sequencedStudents);
-      setAttendance(loadedAttendance);
-      setGrades(loadedGrades);
-      setGradeColumns(loadedGradeCols);
-      setSavings(loadedSavings);
-
-      SafeCache.set(`class_data_${clsId}`, {
-        students: sequencedStudents,
-        attendance: loadedAttendance,
-        grades: loadedGrades,
-        gradeColumns: loadedGradeCols,
-        savings: loadedSavings,
-      });
-    } catch (e: any) {
-      console.error('Error switching class data:', e);
-    } finally {
-      setIsLoadingData(false);
+      profileMutation.saveProfile({ activeClassId: clsId }).catch(console.error);
     }
   };
+
+  // Revalidate/Refresh data
+  const loadUserData = useCallback(async (targetClassId?: string, _force = false) => {
+    if (userId) {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.classes(userId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId) });
+      const cId = targetClassId || activeClassId;
+      if (cId) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.students(userId, cId) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.attendance(userId, cId) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.grades(userId, cId) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.savings(userId, cId) });
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.agendas(userId) });
+    }
+  }, [queryClient, userId, activeClassId]);
 
   // Manual Refresh
   const handleManualRefresh = async () => {
     setIsManualRefreshing(true);
     try {
       if (userId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.classes(userId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.agendas(userId) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.classes(userId) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.profile(userId) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.agendas(userId) });
         if (activeClassId) {
-          queryClient.invalidateQueries({ queryKey: queryKeys.students(userId, activeClassId) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.attendance(userId, activeClassId) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.grades(userId, activeClassId) });
-          queryClient.invalidateQueries({ queryKey: queryKeys.savings(userId, activeClassId) });
+          await queryClient.invalidateQueries({ queryKey: queryKeys.students(userId, activeClassId) });
+          await queryClient.invalidateQueries({ queryKey: queryKeys.attendance(userId, activeClassId) });
+          await queryClient.invalidateQueries({ queryKey: queryKeys.grades(userId, activeClassId) });
+          await queryClient.invalidateQueries({ queryKey: queryKeys.savings(userId, activeClassId) });
         }
       }
-      await loadUserData(activeClassId, true);
       setRefreshSuccessToast('Data diperbarui dari cloud Supabase');
       setTimeout(() => setRefreshSuccessToast(null), 3000);
-    } catch (err: any) {
-      alert(`Gagal memuat ulang data: ${err?.message || 'Koneksi error'}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Koneksi error';
+      alert(`Gagal memuat ulang data: ${msg}`);
     } finally {
       setIsManualRefreshing(false);
     }
@@ -522,15 +294,8 @@ export function useTeacherData() {
   // Profile Save
   const handleSaveTeacherProfile = async (formData: TeacherProfile): Promise<void> => {
     try {
-      const saved = await profileMutation.saveProfile(formData);
-      const refreshed = await getTeacherProfile(true);
-      const finalTeacher = refreshed || saved;
-      setTeacher(finalTeacher);
-      SafeCache.set('teacher_profile', finalTeacher);
-      try {
-        localStorage.setItem('muhiba_teacher_profile', JSON.stringify(finalTeacher));
-      } catch {}
-    } catch (err: any) {
+      await profileMutation.saveProfile(formData);
+    } catch (err: unknown) {
       console.error('Failed to save teacher profile:', err);
       throw err;
     }
@@ -542,10 +307,8 @@ export function useTeacherData() {
     let result: ClassRoom;
     if (exists) {
       result = await classMutations.updateClass(cls);
-      setClasses((prev) => prev.map((c) => (c.id === result.id ? result : c)));
     } else {
       result = await classMutations.createClass(cls);
-      setClasses((prev) => [...prev, result]);
       if (!activeClassId) {
         handleSelectClass(result.id);
       }
@@ -555,19 +318,15 @@ export function useTeacherData() {
 
   const handleDeleteClass = async (clsId: string) => {
     await classMutations.deleteClass(clsId);
-    const updated = classes.filter((c) => c.id !== clsId);
-    setClasses(updated);
     SafeCache.invalidate(`class_data_${clsId}`);
     SafeCache.invalidate('all_classes');
 
     if (activeClassId === clsId) {
-      if (updated.length > 0) {
-        handleSelectClass(updated[0].id);
+      const remaining = classes.filter((c) => c.id !== clsId);
+      if (remaining.length > 0) {
+        handleSelectClass(remaining[0].id);
       } else {
         setActiveClassId('');
-        setStudents([]);
-        setAttendance([]);
-        setGrades([]);
       }
     }
   };
@@ -576,25 +335,12 @@ export function useTeacherData() {
   const handleSaveStudent = async (std: Student) => {
     const targetClassId = std.classId;
     const exists = students.some((s) => s.id === std.id);
-    const updatedList = exists
-      ? students.map((s) => (s.id === std.id ? std : s))
-      : [...students, std];
 
-    const resequencedAll = resequenceStudentsAlphabetically(updatedList, targetClassId);
-    setStudents(resequencedAll);
-
-    const savedTarget = resequencedAll.find((s) => s.id === std.id) || std;
+    const savedTarget: Student = { ...std };
     if (exists) {
       await studentMutations.updateStudent(savedTarget);
     } else {
       await studentMutations.createStudent(savedTarget);
-    }
-
-    const classOnly = resequencedAll.filter((s) => s.classId === targetClassId);
-    try {
-      await studentMutations.batchInsertStudents(classOnly);
-    } catch (e) {
-      console.warn('Sync resequence student to cloud notice:', e);
     }
 
     if (activeClassId) {
@@ -609,20 +355,7 @@ export function useTeacherData() {
     const deletedStd = students.find((s) => s.id === stdId);
     const targetClassId = deletedStd?.classId || activeClassId;
 
-    const remaining = students.filter((s) => s.id !== stdId);
-    const resequencedAll = resequenceStudentsAlphabetically(remaining, targetClassId);
-    setStudents(resequencedAll);
-
     await studentMutations.deleteStudent({ studentId: stdId, targetClassId });
-
-    const classRemaining = resequencedAll.filter((s) => s.classId === targetClassId);
-    if (classRemaining.length > 0) {
-      try {
-        await studentMutations.batchInsertStudents(classRemaining);
-      } catch (err) {
-        console.warn('Batch resequence after delete notice:', err);
-      }
-    }
 
     if (activeClassId) {
       SafeCache.invalidate(`class_data_${activeClassId}`);
@@ -636,47 +369,7 @@ export function useTeacherData() {
     if (!newStds || newStds.length === 0) return;
     const targetClassId = newStds[0].classId || activeClassId;
 
-    const existingOther = students.filter((s) => s.classId !== targetClassId);
-    const existingClass = students.filter((s) => s.classId === targetClassId);
-
-    const updateMap = new Map<string, Student>();
-    const toAdd: Student[] = [];
-
-    newStds.forEach((std) => {
-      const lowerName = std.nama.trim().toLowerCase();
-      const existingMatch = existingClass.find(
-        (s) => s.id === std.id || s.nama.trim().toLowerCase() === lowerName
-      );
-      if (existingMatch) {
-        const merged: Student = {
-          ...existingMatch,
-          ...std,
-          id: existingMatch.id,
-          classId: existingMatch.classId,
-          nisn: std.nisn !== undefined && std.nisn !== '' ? std.nisn : existingMatch.nisn,
-          noHpOrangTua:
-            std.noHpOrangTua !== undefined && std.noHpOrangTua !== ''
-              ? std.noHpOrangTua
-              : existingMatch.noHpOrangTua,
-          catatanUmum:
-            std.catatanUmum !== undefined && std.catatanUmum !== ''
-              ? std.catatanUmum
-              : existingMatch.catatanUmum,
-          updated_at: new Date().toISOString(),
-        };
-        updateMap.set(existingMatch.id, merged);
-      } else {
-        toAdd.push(std);
-      }
-    });
-
-    const mergedExistingClass = existingClass.map((s) => updateMap.get(s.id) || s);
-    const combinedClass = [...mergedExistingClass, ...toAdd];
-
-    const resequencedClass = resequenceStudentsAlphabetically(combinedClass, targetClassId)
-      .filter((s) => s.classId === targetClassId);
-
-    setStudents([...existingOther, ...resequencedClass]);
+    await studentMutations.batchInsertStudents(newStds);
 
     if (activeClassId) {
       SafeCache.invalidate(`class_data_${activeClassId}`);
@@ -684,40 +377,26 @@ export function useTeacherData() {
       SafeCache.invalidate(`pub_share_grade_share_${activeClassId}`);
       SafeCache.invalidate(`pub_share_sav_share_${activeClassId}`);
     }
-
-    try {
-      await studentMutations.batchInsertStudents(resequencedClass);
-      if (activeClassId) {
-        const fresh = await getStudents(activeClassId);
-        if (fresh && fresh.length > 0) {
-          setStudents((prev) => {
-            const others = prev.filter((p) => p.classId !== activeClassId);
-            return [...others, ...fresh];
-          });
-        }
-      }
-    } catch (err) {
-      console.warn('Supabase batch insert notification:', err);
-    }
   };
 
   // Attendance Handlers
   const handleSaveAttendance = async (sessionData: AttendanceSession) => {
     const saved = await attendanceMutations.saveSession(sessionData);
-    const updatedSessions = [saved, ...attendance.filter((s) => s.id !== saved.id)];
-    setAttendance(updatedSessions);
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
 
     const cls = classes.find((c) => c.id === sessionData.classId);
     const clsStudents = students.filter((s) => s.classId === sessionData.classId);
+    const updatedSessions = [saved, ...attendance.filter((s) => s.id !== saved.id)];
 
+    // Sync to Public Share in Background
     syncPublicAttendanceShare({
       classRoom: cls,
       students: clsStudents,
       sessions: updatedSessions,
       teacher: teacher || undefined,
-    }).catch((err) => console.warn('Sync public attendance notice:', err));
+    }).catch((err: unknown) => console.warn('Sync public attendance notice:', err));
 
+    // Auto-sync into Teaching Agenda
     try {
       const syncedAgenda = await syncAttendanceSessionToAgenda(
         saved,
@@ -726,28 +405,28 @@ export function useTeacherData() {
         clsStudents
       );
       if (syncedAgenda) {
-        const nextAgendas = [syncedAgenda, ...agendas.filter((a) => a.id !== syncedAgenda.id)];
-        setAgendas(nextAgendas);
-        SafeCache.invalidate('all_agendas');
+        if (userId) {
+          queryClient.invalidateQueries({ queryKey: queryKeys.agendas(userId) });
+        }
         syncPublicAgendasShare({
-          agendas: nextAgendas,
+          agendas: [syncedAgenda, ...agendas.filter((a) => a.id !== syncedAgenda.id)],
           classRoom: cls,
           teacher: teacher || undefined,
         }).catch(() => {});
       }
-    } catch (syncErr) {
+    } catch (syncErr: unknown) {
       console.warn('Sinkronisasi otomatis agenda mengajar notice:', syncErr);
     }
   };
 
   const handleDeleteAttendance = async (sessionId: string) => {
     await attendanceMutations.deleteSession({ sessionId, targetClassId: activeClassId });
-    const updatedSessions = attendance.filter((s) => s.id !== sessionId);
-    setAttendance(updatedSessions);
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
 
     const cls = classes.find((c) => c.id === activeClassId);
     const clsStudents = students.filter((s) => s.classId === activeClassId);
+    const updatedSessions = attendance.filter((s) => s.id !== sessionId);
+
     syncPublicAttendanceShare({
       classRoom: cls,
       students: clsStudents,
@@ -759,23 +438,16 @@ export function useTeacherData() {
   // Grades Handlers
   const handleSaveGrade = async (gradeData: StudentGrade) => {
     const saved = await gradesMutations.saveGrade(gradeData);
-    let updatedGrades: StudentGrade[] = [];
-    setGrades((prev) => {
-      updatedGrades = [saved, ...prev.filter((g) => g.id !== saved.id)];
-      return updatedGrades;
-    });
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
 
     const cls = classes.find((c) => c.id === gradeData.classId);
     let clsStudents = students.filter((s) => s.classId === gradeData.classId);
-    if (clsStudents.length === 0) {
-      clsStudents = await getStudents(gradeData.classId).catch(() => []);
-    }
+    const updatedGrades = [saved, ...grades.filter((g) => g.id !== saved.id)];
 
     syncPublicGradesShare({
       classRoom: cls,
       students: clsStudents,
-      grades: updatedGrades.length > 0 ? updatedGrades : [saved, ...grades.filter((g) => g.id !== saved.id)],
+      grades: updatedGrades,
       gradeColumns,
       teacher: teacher || undefined,
     }).catch(() => {});
@@ -784,14 +456,11 @@ export function useTeacherData() {
   const handleSaveGradeCols = async (cols: GradeColumn[]) => {
     if (!activeClassId) return;
     await gradesMutations.saveGradeColumns({ columns: cols, targetClassId: activeClassId });
-    setGradeColumns(cols);
     SafeCache.invalidate(`class_data_${activeClassId}`);
 
     const cls = classes.find((c) => c.id === activeClassId);
-    let clsStudents = students.filter((s) => s.classId === activeClassId);
-    if (clsStudents.length === 0) {
-      clsStudents = await getStudents(activeClassId).catch(() => []);
-    }
+    const clsStudents = students.filter((s) => s.classId === activeClassId);
+
     syncPublicGradesShare({
       classRoom: cls,
       students: clsStudents,
@@ -804,11 +473,10 @@ export function useTeacherData() {
   // Agendas Handlers
   const handleSaveAgenda = async (agendaData: TeachingAgenda) => {
     const saved = await journalsMutations.saveAgenda(agendaData);
-    const updatedAgendas = [saved, ...agendas.filter((a) => a.id !== saved.id)];
-    setAgendas(updatedAgendas);
     SafeCache.invalidate('all_agendas');
 
     const cls = classes.find((c) => c.id === agendaData.classId);
+    const updatedAgendas = [saved, ...agendas.filter((a) => a.id !== saved.id)];
     syncPublicAgendasShare({
       agendas: updatedAgendas,
       classRoom: cls,
@@ -818,22 +486,18 @@ export function useTeacherData() {
 
   const handleBatchSaveAgendas = async (newAgendas: TeachingAgenda[]) => {
     await journalsMutations.batchSaveAgendas(newAgendas);
-    const updatedAgendas = await getTeachingAgendas();
-    setAgendas(updatedAgendas);
     SafeCache.invalidate('all_agendas');
-
     syncPublicAgendasShare({
-      agendas: updatedAgendas,
+      agendas: newAgendas,
       teacher: teacher || undefined,
     }).catch(() => {});
   };
 
   const handleDeleteAgenda = async (agendaId: string) => {
     await journalsMutations.deleteAgenda(agendaId);
-    const updatedAgendas = agendas.filter((a) => a.id !== agendaId);
-    setAgendas(updatedAgendas);
     SafeCache.invalidate('all_agendas');
 
+    const updatedAgendas = agendas.filter((a) => a.id !== agendaId);
     syncPublicAgendasShare({
       agendas: updatedAgendas,
       teacher: teacher || undefined,
@@ -843,40 +507,28 @@ export function useTeacherData() {
   // Savings Handlers
   const handleSaveSaving = async (txData: SavingTransaction) => {
     const saved = await financesMutations.saveTransaction(txData);
-    let updatedSavings: SavingTransaction[] = [];
-    setSavings((prev) => {
-      updatedSavings = [saved, ...prev.filter((s) => s.id !== saved.id)];
-      return updatedSavings;
-    });
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
 
     const cls = classes.find((c) => c.id === txData.classId);
-    let clsStudents = students.filter((s) => s.classId === txData.classId);
-    if (clsStudents.length === 0 && activeClassId) {
-      clsStudents = await getStudents(activeClassId).catch(() => []);
-    }
+    const clsStudents = students.filter((s) => s.classId === txData.classId);
+    const updatedSavings = [saved, ...savings.filter((s) => s.id !== saved.id)];
+
     syncPublicSavingsShare({
       classRoom: cls,
       students: clsStudents,
-      transactions: updatedSavings.length > 0 ? updatedSavings : [saved, ...savings.filter((s) => s.id !== saved.id)],
+      transactions: updatedSavings,
       teacher: teacher || undefined,
     }).catch(() => {});
   };
 
   const handleDeleteSaving = async (txId: string) => {
     await financesMutations.deleteTransaction({ txId, targetClassId: activeClassId });
-    let updatedSavings: SavingTransaction[] = [];
-    setSavings((prev) => {
-      updatedSavings = prev.filter((s) => s.id !== txId);
-      return updatedSavings;
-    });
     if (activeClassId) SafeCache.invalidate(`class_data_${activeClassId}`);
 
     const cls = classes.find((c) => c.id === activeClassId);
-    let clsStudents = students.filter((s) => s.classId === activeClassId);
-    if (clsStudents.length === 0 && activeClassId) {
-      clsStudents = await getStudents(activeClassId).catch(() => []);
-    }
+    const clsStudents = students.filter((s) => s.classId === activeClassId);
+    const updatedSavings = savings.filter((s) => s.id !== txId);
+
     syncPublicSavingsShare({
       classRoom: cls,
       students: clsStudents,
@@ -912,7 +564,7 @@ export function useTeacherData() {
   const handleLogout = async () => {
     try {
       await signOutSupabase();
-    } catch (err) {
+    } catch (err: unknown) {
       console.warn('Sign out notice:', err);
     }
     queryClient.clear();
@@ -941,42 +593,42 @@ export function useTeacherData() {
           localStorage.setItem('smk_saved_login_email', savedEmail);
         }
       }
-    } catch (clearErr) {
+    } catch (clearErr: unknown) {
       console.warn('Clear localStorage error on logout:', clearErr);
     }
 
     setSession(null);
-    setTeacher(null);
-    setClasses([]);
-    setStudents([]);
-    setAttendance([]);
-    setGrades([]);
-    setAgendas([]);
-    setSavings([]);
   };
 
   // Resolved Active Class & Active Teacher
-  const activeClass: ClassRoom = classes.find((c) => c.id === activeClassId) || {
-    id: activeClassId || 'empty_cls',
-    namaKelas: classes.length > 0 ? classes[0].namaKelas : 'Belum Ada Kelas',
-    mataPelajaran: classes.length > 0 ? classes[0].mataPelajaran : 'Silakan Buat Kelas',
-    kkm: 75,
-    jurusan: 'TKJ',
-    createdAt: new Date().toISOString(),
-  };
+  const activeClass: ClassRoom = useMemo(() => {
+    const found = classes.find((c) => c.id === activeClassId);
+    if (found) return found;
+    return {
+      id: activeClassId || (classes[0]?.id ?? 'empty_cls'),
+      namaKelas: classes[0]?.namaKelas || 'Belum Ada Kelas',
+      mataPelajaran: classes[0]?.mataPelajaran || 'Silakan Buat Kelas',
+      kkm: 75,
+      jurusan: 'TKJ',
+      createdAt: new Date().toISOString(),
+    };
+  }, [classes, activeClassId]);
 
-  const activeTeacher: TeacherProfile = teacher || {
-    id: session?.user?.id || 'guru_offline_id',
-    namaGuru: session?.user?.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
-    nip: '',
-    nbm: '',
-    namaSekolah: 'SMK Muhammadiyah Bawang',
-    mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
-    tahunAjaran: '2025/2026',
-    semester: 'Genap',
-    email: session?.user?.email || 'guru@smkmuhbawang.sch.id',
-    isLoggedIn: true,
-  };
+  const activeTeacher: TeacherProfile = useMemo(() => {
+    if (teacher) return teacher;
+    return {
+      id: session?.user?.id || 'guru_offline_id',
+      namaGuru: session?.user?.user_metadata?.nama_guru || 'Guru SMK Muhammadiyah Bawang',
+      nip: '',
+      nbm: '',
+      namaSekolah: 'SMK Muhammadiyah Bawang',
+      mataPelajaranUtama: 'Konsentrasi Keahlian TKJ',
+      tahunAjaran: '2025/2026',
+      semester: 'Genap',
+      email: session?.user?.email || 'guru@smkmuhbawang.sch.id',
+      isLoggedIn: true,
+    };
+  }, [teacher, session]);
 
   return {
     session,
