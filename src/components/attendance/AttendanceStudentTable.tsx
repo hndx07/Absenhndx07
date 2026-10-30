@@ -13,6 +13,7 @@ import {
 import { AttendanceSession, AttendanceStatus, Student } from '../../types';
 import { SmoothHorizontalScroller } from '../SmoothHorizontalScroller';
 import { TableEmptyRow } from '../common/StateFeedback';
+import { AttendanceStudentRow } from './AttendanceStudentRow';
 
 interface AttendanceStudentTableProps {
   currentSession: AttendanceSession;
@@ -149,93 +150,20 @@ export const AttendanceStudentTable: React.FC<AttendanceStudentTableProps> = ({
               />
             ) : (
               filteredStudents.map((std, idx) => {
-              const record = currentSession.records?.[std.id];
-              const status = record?.status;
-              const catatan = record?.catatan || '';
-
-              return (
-                <tr
-                  key={std.id}
-                  className={`transition ${
-                    idx % 2 === 0
-                      ? 'bg-white'
-                      : 'bg-emerald-50/20'
-                  } hover:bg-emerald-50/50`}
-                >
-                  <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-600">
-                    {std.no}
-                  </td>
-                  <td className="py-2.5 px-3 font-bold text-slate-800">
-                    {std.nama}
-                  </td>
-                  <td className="py-2.5 px-3 text-center">
-                    <span className="font-semibold text-slate-500">{std.gender}</span>
-                  </td>
-                  <td className="py-2.5 px-3">
-                    <div className="flex items-center justify-center gap-1.5">
-                      {(['H', 'S', 'I', 'A', 'D'] as AttendanceStatus[]).map((st) => {
-                        const isSelected = status === st;
-                        let style = 'bg-slate-100 text-slate-600 hover:bg-slate-200';
-                        if (isSelected) {
-                          if (st === 'H') style = 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20';
-                          else if (st === 'S') style = 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/20';
-                          else if (st === 'I') style = 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-500/20';
-                          else if (st === 'A') style = 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-500/20';
-                          else if (st === 'D') style = 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-500/20';
-                        }
-
-                        return (
-                          <button
-                            key={st}
-                            type="button"
-                            onClick={() => onUpdateRecord(std.id, st)}
-                            className={`w-8 h-8 rounded-xl font-bold font-mono transition text-xs flex items-center justify-center cursor-pointer ${style}`}
-                            title={
-                              st === 'H'
-                                ? 'Hadir'
-                                : st === 'S'
-                                ? 'Sakit'
-                                : st === 'I'
-                                ? 'Izin'
-                                : st === 'A'
-                                ? 'Alpa'
-                                : 'Dispensasi'
-                            }
-                          >
-                            {st}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-3">
-                    <input
-                      type="text"
-                      placeholder="Catatan izin/keterangan..."
-                      value={catatan}
-                      onChange={(e) => onUpdateRecord(std.id, status || 'H', e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-[#009B62] bg-white"
-                    />
-                  </td>
-                  <td className="py-2.5 px-3 text-center">
-                    <button
-                      type="button"
-                      onClick={() => onOpenPersonalWa(std)}
-                      className="px-2 py-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer shadow-2xs"
-                      title={
-                        std.noHpOrangTua
-                          ? `Pratinjau / Kirim pesan WA santun ke orang tua ${std.nama} (${std.noHpOrangTua})`
-                          : `Pratinjau pesan WA santun untuk orang tua ${std.nama}`
-                      }
-                    >
-                      <MessageSquare className="w-3 h-3 text-emerald-600" />
-                      <span>WA</span>
-                    </button>
-                  </td>
-                </tr>
-              );
-            })
-          )}
+                const record = currentSession.records?.[std.id];
+                return (
+                  <AttendanceStudentRow
+                    key={std.id}
+                    student={std}
+                    status={record?.status}
+                    catatan={record?.catatan || ''}
+                    index={idx}
+                    onUpdateRecord={onUpdateRecord}
+                    onOpenPersonalWa={onOpenPersonalWa}
+                  />
+                );
+              })
+            )}
           </tbody>
         </table>
       </SmoothHorizontalScroller>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   AttendanceSession,
   AttendanceStatus,
@@ -96,6 +96,7 @@ export function useAttendanceViewState({
   // Optimistic local sessions state for ZERO-DELAY instant click responsiveness
   const [localSessions, setLocalSessions] = useState<Record<string, AttendanceSession>>({});
   const saveDebounceTimerRef = useRef<any>(null);
+  const pendingSaveSessionsRef = useRef<Set<string>>(new Set());
 
   // Sync prop classSessions into localSessions when classSessions change
   useEffect(() => {
@@ -103,6 +104,10 @@ export function useAttendanceViewState({
       let changed = false;
       const next = { ...prev };
       classSessions.forEach((s) => {
+        // Do not overwrite session if local optimistic changes are currently pending or in-flight
+        if (pendingSaveSessionsRef.current.has(s.id)) {
+          return;
+        }
         if (!next[s.id] || JSON.stringify(next[s.id]) !== JSON.stringify(s)) {
           next[s.id] = s;
           changed = true;
@@ -118,6 +123,16 @@ export function useAttendanceViewState({
     classSessions.find((s) => s.id === activeSessionId) ||
     classSessions[0];
 
+  const currentSessionRef = useRef<AttendanceSession | undefined>(currentSession);
+  useEffect(() => {
+    currentSessionRef.current = currentSession;
+  }, [currentSession]);
+
+  const onSaveSessionRef = useRef(onSaveSession);
+  useEffect(() => {
+    onSaveSessionRef.current = onSaveSession;
+  }, [onSaveSession]);
+
   // Agenda Mengajar yang tersinkronisasi otomatis dengan sesi presensi ini
   const syncedAgenda = useMemo(() => {
     if (!currentSession || !agendas) return null;
@@ -130,30 +145,34 @@ export function useAttendanceViewState({
   }, [agendas, currentSession, currentClass.id]);
 
   // Background debounced cloud sync (prevents network wait and race conditions)
-  const scheduleSessionCloudSave = (sessionToSave: AttendanceSession) => {
+  const scheduleSessionCloudSave = useCallback((sessionToSave: AttendanceSession) => {
     setHasUnsavedChanges(true);
+    pendingSaveSessionsRef.current.add(sessionToSave.id);
     if (saveDebounceTimerRef.current) {
       clearTimeout(saveDebounceTimerRef.current);
     }
     saveDebounceTimerRef.current = setTimeout(async () => {
       try {
-        await onSaveSession(sessionToSave);
+        await onSaveSessionRef.current(sessionToSave);
         setHasUnsavedChanges(false);
       } catch (err) {
         console.error('Failed to sync attendance session:', err);
+      } finally {
+        pendingSaveSessionsRef.current.delete(sessionToSave.id);
       }
     }, 450);
-  };
+  }, []);
 
   // Explicit Save to Cloud function
   const handleSaveToCloud = async (overrideSession?: AttendanceSession) => {
     const targetSession = overrideSession || currentSession;
     if (!targetSession) return;
     if (saveDebounceTimerRef.current) clearTimeout(saveDebounceTimerRef.current);
+    pendingSaveSessionsRef.current.add(targetSession.id);
     setIsSavingToCloud(true);
     setSaveSuccessMsg(null);
     try {
-      await onSaveSession(targetSession);
+      await onSaveSessionRef.current(targetSession);
       const timeStr = new Date().toLocaleTimeString('id-ID', {
         hour: '2-digit',
         minute: '2-digit',
@@ -166,16 +185,18 @@ export function useAttendanceViewState({
     } catch (err: any) {
       alert(`Gagal menyimpan ke cloud: ${err.message || 'Koneksi terputus'}`);
     } finally {
+      pendingSaveSessionsRef.current.delete(targetSession.id);
       setIsSavingToCloud(false);
     }
   };
 
-  // Helper to change status for a student in current session - ZERO DELAY INSTANT CLICK
-  const handleUpdateRecord = (studentId: string, status: AttendanceStatus, catatan?: string) => {
-    if (!currentSession) return;
-    const existingRecords = currentSession.records || {};
+  // Helper to change status for a student in current session - ZERO DELAY INSTANT CLICK & STABLE CALLBACK
+  const handleUpdateRecord = useCallback((studentId: string, status: AttendanceStatus, catatan?: string) => {
+    const active = currentSessionRef.current;
+    if (!active) return;
+    const existingRecords = active.records || {};
     const updated: AttendanceSession = {
-      ...currentSession,
+      ...active,
       records: {
         ...existingRecords,
         [studentId]: {
@@ -196,7 +217,7 @@ export function useAttendanceViewState({
 
     // 2. Debounced background save to Cloud - no network blocking or race conditions
     scheduleSessionCloudSave(updated);
-  };
+  }, [scheduleSessionCloudSave]);
 
   // Set All Present shortcut - ZERO DELAY
   const handleSetAllPresent = () => {

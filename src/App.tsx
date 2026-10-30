@@ -119,7 +119,6 @@ function AppContent() {
     handleDeleteSaving,
     handleDownloadBackup,
     handleLogout,
-    isDemoMode,
   } = useTeacherData();
 
   // 3. Modal & Navigation States
@@ -179,7 +178,6 @@ function AppContent() {
         activeClass={activeClass}
         onToggleSideNav={() => setIsSideNavOpen((prev) => !prev)}
         onOpenClassModal={() => setIsClassModalOpen(true)}
-        isDemoMode={isDemoMode}
       />
 
       {/* Mobile Sidebar Drawer */}

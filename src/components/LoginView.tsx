@@ -9,7 +9,6 @@ import {
   AlertCircle,
   ShieldCheck,
   ExternalLink,
-  Sparkles,
 } from 'lucide-react';
 import {
   signInWithEmailPassword,
@@ -18,7 +17,6 @@ import {
   isValidHttpUrl,
 } from '../services/supabase';
 import { SCHOOL_CONFIG } from '../config/schoolConfig';
-import { startDemoSession } from '../utils/demoMode';
 
 interface LoginViewProps {
   onLoginSuccess: () => void;
@@ -93,11 +91,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleEnterDemo = () => {
-    startDemoSession();
-    onLoginSuccess();
   };
 
   return (
@@ -263,21 +256,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               )}
             </button>
           </form>
-
-          {/* Akses Mode Demo untuk Pengujian Cepat */}
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={handleEnterDemo}
-              className="w-full py-2.5 px-4 bg-slate-100/90 hover:bg-slate-200/90 active:bg-slate-300 text-slate-800 rounded-2xl font-bold text-xs transition border border-slate-300 flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-            >
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <span>Masuk Mode Demo (Uji Coba Sistem)</span>
-            </button>
-            <p className="text-[10px] text-slate-600 text-center mt-1 font-medium">
-              Eksplorasi seluruh fitur presensi & penilaian tanpa akun Supabase
-            </p>
-          </div>
 
           <div className="pt-2 border-t border-slate-200/60 text-center space-y-2">
             <p className="text-[11px] text-slate-600 flex items-center justify-center gap-1 font-medium">
